@@ -1,0 +1,268 @@
+/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em }
+.topbar .brand b             { color: var(--accent) }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}

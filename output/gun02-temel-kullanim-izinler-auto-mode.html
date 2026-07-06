@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 2 — Temel Kullanım, İzinler ve Auto Mode · Claude Code Master</title>
+<style>
+:root{
+  --bg:#F0EEE6; --surface:#FFFFFF; --surface-2:#F7F4EC; --code-bg:#F3EFE4;
+  --ink:#1A1915; --ink-soft:#57534A; --ink-faint:#8A857A;
+  --accent:#CC785C; --accent-ink:#AE4E2C; --line:#E5E0D3;
+  --kp-bg:#F6EADF; --kp-br:#CC785C;
+  --tip-bg:#ECEEE6; --tip-br:#86977A;
+  --warn-bg:#F7EDD6; --warn-br:#C79A3E;
+  --serif:Georgia,"Times New Roman",serif;
+  --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+  --sidebar-w:288px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.topbar{position:fixed;top:0;left:0;right:0;height:52px;z-index:40;
+  background:rgba(240,238,230,.88);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;
+  padding:0 18px}
+.topbar .brand{font-weight:700;font-size:14px;letter-spacing:.02em}
+.topbar .brand b{color:var(--accent)}
+.topbar .prog{flex:1;height:6px;background:var(--line);border-radius:99px;overflow:hidden;max-width:340px}
+.topbar .prog>span{display:block;height:100%;width:0;background:var(--accent);transition:width .35s ease}
+.topbar .proglabel{font-size:12px;color:var(--ink-soft);min-width:74px;text-align:right}
+.menu-btn{display:none;border:1px solid var(--line);background:var(--surface);
+  border-radius:8px;padding:5px 9px;font-size:15px;cursor:pointer}
+.layout{display:grid;grid-template-columns:var(--sidebar-w) 1fr;padding-top:52px}
+.sidebar{position:sticky;top:52px;align-self:start;height:calc(100vh - 52px);
+  overflow-y:auto;border-right:1px solid var(--line);background:var(--surface-2);
+  padding:22px 16px 40px}
+.sidebar h2{font-family:var(--serif);font-size:15px;margin:0 0 4px;color:var(--ink)}
+.sidebar .sub{font-size:12px;color:var(--ink-faint);margin-bottom:18px}
+.wk{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-faint);margin:18px 4px 6px}
+.dnav{display:flex;flex-direction:column;gap:1px}
+.dnav a,.dnav span{display:flex;gap:9px;align-items:baseline;text-decoration:none;
+  color:var(--ink-soft);padding:7px 9px;border-radius:8px;font-size:13.5px;line-height:1.35}
+.dnav a:hover{background:#EFEADF;color:var(--ink)}
+.dnav .num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);min-width:20px}
+.dnav .cur{background:var(--surface);color:var(--ink);font-weight:600;
+  box-shadow:0 1px 0 var(--line);border:1px solid var(--line)}
+.dnav .cur .num{color:var(--accent-ink)}
+.dnav .locked{color:var(--ink-faint);opacity:.7;cursor:not-allowed}
+.dnav .locked .num{color:var(--ink-faint)}
+.dnav .tier{font-size:11px;margin-left:auto;white-space:nowrap}
+.dnav .done::after{content:"✓";color:#5c8a4a;font-weight:700;margin-left:auto}
+.main{min-width:0}
+.content{max-width:800px;margin:0 auto;padding:40px 34px 90px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent-ink)}
+.content h1{font-family:var(--serif);font-weight:700;font-size:38px;line-height:1.15;
+  margin:10px 0 6px;letter-spacing:-.01em}
+.tagline{font-family:var(--serif);font-style:italic;color:var(--ink-soft);font-size:19px;margin:0 0 14px}
+.intro{font-size:17px;color:var(--ink-soft)}
+.tierbadge{display:inline-block;background:var(--kp-bg);border:1px solid var(--kp-br);
+  color:var(--accent-ink);font-size:12px;font-weight:700;border-radius:99px;padding:3px 11px;
+  margin-bottom:8px}
+h2.sec{font-family:var(--serif);font-size:25px;margin:44px 0 6px;padding-top:22px;
+  border-top:1px solid var(--line)}
+h2.sec .k{color:var(--accent);font-size:13px;font-weight:700;letter-spacing:.08em;
+  display:block;margin-bottom:2px;font-family:var(--sans)}
+h3.sub{font-family:var(--sans);font-size:18px;font-weight:700;margin:26px 0 6px}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:24px}
+li{margin:5px 0}
+a{color:var(--accent-ink);text-underline-offset:2px}
+.flow{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.flow .step{flex:1 1 150px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px}
+.flow .ph{font-weight:700;font-size:14px}
+.flow .du{color:var(--accent-ink);font-size:12.5px;font-weight:700}
+.flow .de{color:var(--ink-soft);font-size:13px;margin-top:3px}
+.meta{font-size:13.5px;color:var(--ink-soft);background:var(--surface-2);
+  border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0}
+.callout{border-left:4px solid var(--line);border-radius:10px;padding:12px 16px;margin:16px 0;
+  background:var(--surface-2);font-size:15px}
+.callout .lbl{font-weight:700;font-size:13px;letter-spacing:.02em;display:block;margin-bottom:2px}
+.callout.kp{background:var(--kp-bg);border-color:var(--kp-br)}
+.callout.kp .lbl{color:var(--accent-ink)}
+.callout.tip{background:var(--tip-bg);border-color:var(--tip-br)}
+.callout.tip .lbl{color:#4f6a43}
+.callout.warn{background:var(--warn-bg);border-color:var(--warn-br)}
+.callout.warn .lbl{color:#94701c}
+pre{background:var(--code-bg);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre code{font-family:var(--mono);font-size:13.5px;color:#2a2722;background:none;padding:0}
+code{font-family:var(--mono);font-size:.9em;background:var(--code-bg);
+  border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+pre code{border:none}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--surface-2);font-weight:700;font-size:12.5px;letter-spacing:.02em}
+tr:last-child td{border-bottom:none}
+.prompt{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;margin:14px 0}
+.prompt .pt{font-weight:700;margin-bottom:6px}
+.prompt pre{margin:0;background:var(--code-bg)}
+.prompt .note{font-size:13px;color:var(--ink-soft);margin-top:8px}
+.copybtn{float:right;font-size:12px;border:1px solid var(--line);background:var(--surface-2);
+  border-radius:7px;padding:3px 9px;cursor:pointer;color:var(--ink-soft)}
+.copybtn:hover{color:var(--accent-ink);border-color:var(--accent)}
+.challenge{background:var(--kp-bg);border:1px solid var(--kp-br);border-radius:16px;
+  padding:20px 22px;margin:18px 0}
+.challenge h3{margin-top:0}
+.solution{background:var(--surface);border:1px solid var(--line);border-radius:16px;
+  padding:18px 22px;margin:18px 0}
+.checks{list-style:none;padding:0;margin:12px 0}
+.checks li{margin:8px 0;padding:0}
+.checks label{display:flex;gap:11px;align-items:flex-start;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+.checks label:hover{border-color:var(--accent)}
+.checks input{margin-top:3px;width:17px;height:17px;accent-color:var(--accent);flex:none}
+.checks input:checked + span{color:var(--ink-faint);text-decoration:line-through}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:44px;
+  border-top:1px solid var(--line);padding-top:22px}
+.pager a{flex:1;text-decoration:none;border:1px solid var(--line);background:var(--surface);
+  border-radius:12px;padding:12px 16px;color:var(--ink)}
+.pager a:hover{border-color:var(--accent)}
+.pager .dir{font-size:12px;color:var(--ink-faint)}
+.pager .tt{font-weight:700;color:var(--accent-ink)}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.45;pointer-events:none}
+.foot{color:var(--ink-faint);font-size:12.5px;margin-top:30px;text-align:center}
+.scrim{display:none}
+@media (max-width:900px){
+  .menu-btn{display:inline-block}
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;top:52px;width:var(--sidebar-w);z-index:35;
+    transform:translateX(-100%);transition:transform .25s ease;box-shadow:2px 0 18px rgba(0,0,0,.12)}
+  body.nav-open .sidebar{transform:translateX(0)}
+  body.nav-open .scrim{display:block;position:fixed;inset:52px 0 0;background:rgba(20,20,18,.35);z-index:34}
+  .content{padding:26px 20px 80px}
+  .content h1{font-size:30px}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <span class="brand">Claude Code <b>Master</b></span>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div>
+<div class="wk">HAFTA 1 — Temel</div><nav class="dnav">
+<span class="done"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></span>
+<span class="cur"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></span>
+<span class="locked" title="yakında"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></span>
+<span class="locked" title="yakında"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></span>
+<span class="locked" title="yakında"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></span>
+</nav>
+<div class="wk">HAFTA 2 — Orta</div><nav class="dnav">
+<span class="locked" title="yakında"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></span>
+<span class="locked" title="yakında"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></span>
+<span class="locked" title="yakında"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></span>
+<span class="locked" title="yakında"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></span>
+<span class="locked" title="yakında"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></span>
+</nav>
+<div class="wk">HAFTA 3 — İleri</div><nav class="dnav">
+<span class="locked" title="yakında"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></span>
+<span class="locked" title="yakında"><span class="num">12</span><span>Hooks ve Sandboxing</span></span>
+<span class="locked" title="yakında"><span class="num">13</span><span>Skills &amp; Plugins</span></span>
+<span class="locked" title="yakında"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></span>
+<span class="locked" title="yakında"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></span>
+</nav>
+<div class="wk">HAFTA 4 — Master</div><nav class="dnav">
+<span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span>
+<span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span>
+<span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span>
+<span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span>
+<span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span>
+</nav>
+  </aside>
+  <div class="main"><article class="content">
+<div class="eyebrow">HAFTA 1 — Temel · Gün 02 / 20</div>
+<div class="tierbadge">🟢 Kademe 1</div>
+<h1>Temel Kullanım, İzinler ve Auto Mode</h1>
+<p class="tagline">"Doğru soru sormayı öğren, doğru kod al — ve izinleri yönet"</p>
+<p class="intro">Bu derste Claude Code&#x27;un araçlarını, izin sistemini ve auto mode&#x27;u öğreneceksin. İyi ve kötü prompt farkını bizzat deneyerek görecek, context window kavramıyla tanışacak ve ilk gerçek uygulamanı — CLI not defterini — Claude Code ile baştan sona oluşturacaksın.</p>
+
+<h2 class="sec"><span class="k">DERS PLANI</span>Bugünün Akışı</h2>
+<div class="flow"><div class="step"><div class="ph">1 · Teori</div><div class="du">40 dk</div><div class="de">Araçlar, izin sistemi, auto mode, context window, prompt kalitesi</div></div><div class="step"><div class="ph">2 · Pratik — Adım Adım</div><div class="du">45 dk</div><div class="de">Araç gözlemi, izin modları geçişi, prompt denemeleri, debugging</div></div><div class="step"><div class="ph">3 · Derinleş</div><div class="du">35 dk</div><div class="de">Prompt pattern&#x27;leri, done definition, git diff alışkanlığı, context farkındalığı</div></div><div class="step"><div class="ph">4 · Challenge</div><div class="du">40 dk</div><div class="de">CLI Not Defteri v1 + çözüm rehberi</div></div></div>
+<div class="meta"><strong>Ön koşul:</strong> Gün 1 tamamlanmış (Claude Code kurulu, kimlik doğrulama yapılmış); Temel terminal komutları (cd, ls, mkdir); Aktif internet bağlantısı</div>
+<div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code kurulu); VS Code (isteğe bağlı); Web tarayıcı (docs için)</div>
+
+<h2 class="sec"><span class="k">HEDEFLER</span>Öğrenme Hedefleri</h2>
+<ol><li>Claude Code&#x27;un temel araçlarını (Read, Write, Edit, Bash, Grep, Glob, WebSearch/WebFetch) ve agentic loop içindeki rollerini açıklayabileceksin.</li><li>İzin modlarını (Manual/default, acceptEdits, plan, auto) anlayacak, Shift+Tab ile aralarında geçiş yapabilecek ve her modun hangi risk seviyesinde uygun olduğunu ayırt edebileceksin.</li><li>Auto mode&#x27;un izin yorgunluğunu nasıl azalttığını, risk sınıflandırma modelini (classifier) ve neden review&#x27;un yerini almadığını açıklayabileceksin.</li><li>Context window kavramını (doluluk, /context, /compact, /clear) ve bilinçli context yönetiminin neden önemli olduğunu kavrayacaksın.</li><li>Aynı görevi kötü, orta ve iyi prompt ile ifade ederek çıktı kalitesi farkını gözlemleyecek; scope, requirement ve verification içeren prompt yapısını uygulayabileceksin.</li><li>İlk gerçek uygulamanı (CLI not defteri) Claude Code ile baştan sona yazdırıp, çalıştırıp, hatasını düzelttirip, git diff ile doğrulayacaksın.</li></ol>
+
+<h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Claude Code&#x27;un Araç Kutusu (Tools)</h3><p>Gün 1'de Claude Code'un agentic loop içinde çalıştığını gördün: Anla → Planla → Araç Kullan → Doğrula → Düzelt. Bugün bu döngüdeki 'Araç Kullan' adımını derinlemesine inceliyoruz. Claude Code her adımda bir veya birden fazla araç çağırır ve hangi aracı kullanacağına kendisi karar verir. Senin görevin outcome'u tarif etmek; araç seçimini ona bırakmak.</p><p>Claude Code'un araçlarını iki katmanda tanıyalım:</p><h3 class="sub">Temel Araçlar (Gün 2&#x27;de gözlemleyeceksin)</h3><table><thead><tr><th>Araç</th><th>Ne yapar</th><th>Ne zaman görünür</th><th>Başlangıç riski</th></tr></thead><tbody><tr><td>Read</td><td>Dosya içeriğini okur</td><td>Kod incelerken, proje taranırken</td><td>Düşük</td></tr><tr><td>Write</td><td>Yeni dosya oluşturur</td><td>Sıfırdan dosya yazarken</td><td>Orta</td></tr><tr><td>Edit</td><td>Mevcut dosyayı değiştirir</td><td>Refactor, fix, iyileştirme sırasında</td><td>Orta</td></tr><tr><td>Bash</td><td>Terminal komutu çalıştırır</td><td>Test, build, run, pip install sırasında</td><td>Değişken</td></tr><tr><td>Grep</td><td>Metin/pattern arar</td><td>Projede anahtar kelime/pattern ararken</td><td>Düşük</td></tr><tr><td>Glob</td><td>Dosya deseni bulur</td><td>Dosya keşfinde (*.py, *.json)</td><td>Düşük</td></tr><tr><td>WebFetch / WebSearch</td><td>Web&#x27;den bilgi çeker/arar</td><td>Dokümantasyon, güncel API bilgisi gerektiğinde</td><td>Orta</td></tr></tbody></table><h3 class="sub">İleri Seviye Araçlar (sonraki derslere köprü)</h3><table><thead><tr><th>Araç</th><th>Ne yapar</th><th>Hangi gün</th></tr></thead><tbody><tr><td>Agent (subagent)</td><td>İzole context&#x27;te uzman görev çalıştırır</td><td>Gün 11</td></tr><tr><td>MCP tools</td><td>Harici servislerle entegrasyon (GitHub, Slack vb.)</td><td>Gün 9</td></tr></tbody></table><div class="callout kp"><span class="lbl">Önemli</span>Claude hangi aracı kullanacağına kendisi karar verir; sen outcome&#x27;u tarif et, araç seçimini ona bırak. Ancak büyük repo veya riskli alanda çalışırken arama kapsamını ve dokunulmayacak dosyaları açıkça belirtmek hem hızı hem güvenliği artırır.</div><div class="callout tip"><span class="lbl">İpucu</span>Claude&#x27;un her adımda hangi aracı kullandığını terminalde gözlemle. Araç adı (Read, Write, Edit, Bash...) ve hedefi (dosya adı, komut) terminalde görünür. Bu farkındalık, ileride daha verimli prompt yazmana yardımcı olacak.</div><h3 class="sub">1.2 İzin Sistemi ve İzin Modları</h3><p>Claude Code her araç çağrısında bir karar verir: bu aksiyonu otomatik mi yapsın, yoksa senden izin mi istesin? Bu kararı belirleyen şey izin modudur. Shift+Tab ile mevcut izin modları arasında geçiş yaparsın. Hangi modların cycle'da göründüğü ortamına, Claude Code sürümüne ve hesap ayarlarına bağlıdır — her mod her zaman listede olmayabilir.</p><p>Temel cycle: default (Manual) → acceptEdits → plan. Auto mode, hesap gereksinimleri karşılanırsa cycle'a eklenir. bypassPermissions ise yalnızca başlangıçta özel bir flag ile etkinleştirilmişse görünür.</p><table><thead><tr><th>Mod</th><th>Davranış</th><th>Ne zaman kullanılır</th><th>Risk seviyesi</th></tr></thead><tbody><tr><td>Manual / default</td><td>Claude okur; dosya değiştirme, komut çalıştırma ve network aksiyonlarında izin ister</td><td>İlk hafta, hassas işler, tanımadığın repo</td><td>Düşük (her şey kontrollü)</td></tr><tr><td>acceptEdits</td><td>Dosya editlerini ve güvenli filesystem Bash komutlarını (mkdir, touch, rm, rmdir, mv, cp, sed) otomatik kabul eder; diğer Bash komutları ve kapsam dışı path&#x27;ler hâlâ izin ister</td><td>Küçük iterasyonlar, refactor döngüleri</td><td>Orta</td></tr><tr><td>plan</td><td>Önce dosyaları okur, araştırır ve plan sunar; onay almadan edit yapmaz. Planı onaylayınca istediğin moda geçer</td><td>Büyük değişiklik öncesi, mimari kararlar</td><td>Düşük (düşünme alanı)</td></tr><tr><td>auto</td><td>Rutin izinlerin bir kısmını azaltır; ayrı bir risk sınıflandırma modeli (classifier) aksiyonları çalışmadan önce değerlendirir</td><td>Güvenilen repo, uzun otonom görev</td><td>Orta-yüksek</td></tr><tr><td>bypassPermissions</td><td>Tüm izin kontrollerini atlar</td><td>Yalnızca izole container, VM veya sandbox</td><td>Yüksek</td></tr></tbody></table><div class="callout kp"><span class="lbl">Önemli</span>acceptEdits, &#x27;her şeyi otomatik onayla&#x27; demek değildir. Dosya editleri ve güvenli filesystem komutları (mkdir, touch, rm, rmdir, mv, cp, sed) çalışma dizininde otomatik kabul edilir; ama diğer Bash komutları, kapsam dışı path&#x27;ler ve korumalı dosyalar (protected paths) hâlâ onay ister.</div><div class="callout kp"><span class="lbl">Önemli</span>Plan mode, başlangıç seviyesi için en değerli moddur. &#x27;Önce ne yapılacağını anla, sonra diske dokun&#x27; disiplinini öğretir. Planı onayladığında istediğin izin modunda (auto, acceptEdits veya manual) çalışmaya geçersin.</div><div class="callout warn"><span class="lbl">Dikkat</span>bypassPermissions modunu yalnızca tamamen izole ortamlarda (container, VM, sandbox) kullan. Kendi makinende, gerçek projende asla kullanma. Bu eğitimde pratikte denenmeyecektir; bilgi amaçlı tanıyorsun.</div><h3 class="sub">1.3 Auto Mode</h3><p>Auto mode, Claude'dan ayrı çalışan bir risk sınıflandırma modeli (classifier) kullanır. Bu classifier, her aksiyonu çalışmadan önce değerlendirir ve risk kategorisine göre otomatik onaylar veya sana sorar. Sonuç: rutin izin onaylarının bir kısmı ortadan kalkar, akış hızlanır.</p><ul><li>Neden cazip: Uzun görevlerde sürekli onay vermek yerine Claude&#x27;un akışını bozmadan çalışmasını sağlar.</li><li>Neden kör güvenilmez: Auto mode bir güvenlik garantisi değil, ek koruma katmanıdır. Production deploy, migration, secret içeren dosyalar, destructive operasyonlar ve force push gibi riskli işlemlerde manuel review zorunlu kabul edilmelidir.</li><li>Ne zaman kullanılmaz: Tanımadığın repo, production ortam, hassas veri içeren dosyalar.</li><li>Kullanılabilirlik: Claude Code sürümü, model, provider ve organizasyon ayarlarına bağlıdır. Derste kendi ortamında Shift+Tab ile görünüp görünmediğini kontrol edeceğiz.</li></ul><div class="callout warn"><span class="lbl">Dikkat</span>Auto mode bir research preview&#x27;dur. İzin yorgunluğunu azaltır ama review&#x27;un yerini almaz. Auto mode&#x27;da bile git diff ve test sonucu okumadan işi bitmiş sayma. Yapılandırma detaylarını (güvenilen repo/domain tanımlama, izin kuralları) Gün 7 ve Gün 12&#x27;de derinlemesine işleyeceğiz.</div><div class="callout tip"><span class="lbl">İpucu</span>Auto mode&#x27;u ilk kez güvenli bir deneme repo&#x27;sunda dene; kendi projende kullanmadan önce davranışına aşina ol.</div><h3 class="sub">1.4 Context Window: Claude&#x27;un Kısa Süreli Hafızası</h3><p>Context window, Claude'un mevcut oturumda bildiği her şeydir: konuşma geçmişi, okunan dosyalar, CLAUDE.md, auto memory, tool sonuçları ve bazı sistem içerikleri. Her dosya okuma, her yanıt, her araç çıktısı context'e eklenir. Büyük context mümkün ama sınırsız değil.</p><p>Bazı güncel modeller 1M (bir milyon) token context destekler — örneğin Sonnet 5 native 1M ile çalışır; diğer modellerde [1m] varyantı seçilebilir. Kullanılabilirlik model, provider ve plan ayarına bağlıdır.</p><table><thead><tr><th>Komut</th><th>Ne yapar</th><th>Ne zaman kullanılır</th></tr></thead><tbody><tr><td>/context</td><td>Context doluluk görselleştirmesi (kategorilere göre dağılım)</td><td>Context&#x27;in ne kadar dolduğunu görmek istediğinde</td></tr><tr><td>/compact</td><td>Konuşma geçmişini yapısal bir özete dönüştürüp yer açar</td><td>Context dolmaya başladığında veya yeni göreve geçerken</td></tr><tr><td>/clear</td><td>Tüm konuşmayı siler, taze oturum başlatır</td><td>Tamamen alakasız bir işe geçerken</td></tr></tbody></table><div class="callout kp"><span class="lbl">Önemli</span>Context = Claude&#x27;un kısa süreli hafızası. Bilinçli yönetmek bir beceridir ve Gün 7&#x27;de derinlemesine işleyeceğiz. Bugün sadece /context ile durumu görebilmeyi öğren.</div><h3 class="sub">1.5 Prompt Kalitesi = Çıktı Kalitesi</h3><p>Claude Code'a verdiğin prompt'un kalitesi, aldığın çıktının kalitesini doğrudan belirler. İyi bir prompt sadece 'ne yap' demez; scope, requirement, constraint ve verification içerir.</p><p>İyi bir Claude Code prompt'unun 5 bileşeni:</p><table><thead><tr><th>Bileşen</th><th>Ne anlama gelir</th><th>Örnek</th></tr></thead><tbody><tr><td>Goal (Hedef)</td><td>Ne yapılmasını istiyorsun</td><td>CLI not defteri uygulaması yaz</td></tr><tr><td>Scope (Kapsam)</td><td>Hangi dosyalarda çalışsın, hangi dizinde</td><td>Sadece app.py ve notes.json oluştur</td></tr><tr><td>Requirements (Gereksinimler)</td><td>Ne üretsin, hangi özellikler olsun</td><td>Ekle, listele, sil, ara komutları olsun</td></tr><tr><td>Verification (Doğrulama)</td><td>Nasıl test edilsin</td><td>Çalıştır, örnek not ekle, sonucu özetle</td></tr><tr><td>Done / Tamamlanma Tanımı</td><td>Ne zaman &#x27;bitti&#x27; sayılacak</td><td>Program hatasız çalışıyor, git diff kontrol edildi</td></tr></tbody></table><p>Structured prompt formatı — bugünden itibaren bu yapıyı kullan:</p><pre><code>Goal: Python ile CLI not uygulaması yaz.
+
+Scope: Sadece app.py ve notes.json oluştur.
+
+Requirements:
+- Not ekle, listele, sil, ara komutları olsun
+- JSON dosyasında sakla
+- Türkçe karakterleri bozma
+
+Verification: Uygulamayı çalıştır, örnek not ekle, listele ve sil.
+
+Done / Tamamlanma Tanımı:
+- Program hatasız çalışıyor
+- JSON dosyasında veri persist ediyor
+- git diff kontrol edildi</code></pre><div class="callout kp"><span class="lbl">Önemli</span>Done / Tamamlanma Tanımı alanı, Claude&#x27;a &#x27;ne zaman durması gerektiğini&#x27; söyler ve seni de &#x27;gerçekten bitti mi?&#x27; diye düşünmeye zorlar. Bu alışkanlığı şimdiden edin — ileride auto mode ve agent teams kullandığında, done definition olmadan &#x27;bitmiş gibi görünen ama aslında eksik&#x27; iş riskiyle karşılaşırsın.</div><p>Aynı görevin kötü, orta ve iyi prompt ile ifadesi:</p><table><thead><tr><th>Kalite</th><th>Prompt</th><th>Beklenen sonuç</th></tr></thead><tbody><tr><td>Kötü</td><td>Not defteri yap</td><td>Belirsiz: hangi dil? Ne tür not? Nasıl saklansın?</td></tr><tr><td>Orta</td><td>Python ile CLI not defteri yaz</td><td>Daha iyi ama scope, test ve done yok</td></tr><tr><td>İyi</td><td>Python ile CLI not defteri yaz. Ekle, listele, sil ve ara olsun. notes.json&#x27;da sakla. Türkçe bozulmasın. Çalıştır ve test et.</td><td>Net scope, gereksinimler, doğrulama adımı var</td></tr></tbody></table><div class="callout tip"><span class="lbl">İpucu</span>Prompt&#x27;a beklenen dosya adı, test kriteri veya çıktı formatı eklemek sonucu dramatik iyileştirir. &#x27;Ne istediğini tanımla, nasıl yapacağını bırak&#x27; — ama büyük/riskli işte scope ve constraint ver.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 Araçları Gözlemleme</h3><p>İlk pratik adımımız Claude Code'un araçlarını canlı gözlemlemek. Aşağıdaki prompt'u Claude Code'a ver ve terminalde hangi araçların kullanıldığını izle:</p><pre><code>Python ile hello_notes.py oluştur.
+Program notes.txt dosyasına 3 satır örnek not yazsın.
+Sonra dosyayı okuyup satır sayısını ekrana bassın.
+Programı çalıştır ve sonucu doğrula.</code></pre><ol><li>Claude Code&#x27;un terminaldeki çıktısını izle: Write (dosya oluşturma), Bash (python komutu çalıştırma), Read (dosya okuma) araçlarını göreceksin.</li><li>Her araç kullanımında Claude&#x27;un ne söylediğini oku: hangi dosyaya ne yazıyor, hangi komutu çalıştırıyor.</li><li>Manual/default modda olduğun için her adımda izin isteyecek — diff&#x27;leri ve komutları bilinçli incele.</li><li>Sonuç başarılıysa /context çalıştır ve context doluluk durumunu gör.</li></ol><div class="callout tip"><span class="lbl">İpucu</span>Claude&#x27;un kullandığı her aracın adı terminalde açıkça görünür: &#x27;Read file&#x27;, &#x27;Write file&#x27;, &#x27;Execute bash&#x27; gibi. Bu çıktıları okumak, Claude&#x27;un ne yaptığını anlamanın en hızlı yolu.</div><h3 class="sub">2.2 İzin Modları Arasında Geçiş</h3><p>Şimdi aynı küçük görev üzerinde farklı izin modlarını deneyeceğiz. Tek bir dosya (counter.py) üzerinde çalışarak her modun farkını gözlemle:</p><ol><li>Manual/default mod: &#x27;Bir counter.py oluştur, 1&#x27;den 10&#x27;a say&#x27; de. Dosya oluşturma ve çalıştırma iznini gör.</li><li>Shift+Tab → acceptEdits mod: &#x27;counter.py&#x27;ye geri sayım özelliği ekle&#x27; de. Dosya editinin otomatik kabul edildiğini, ama python counter.py komutunun hâlâ izin isteyebildiğini gözlemle.</li><li>Shift+Tab → plan mod: &#x27;counter.py&#x27;ye dosyaya yazma özelliği ekle&#x27; de. Claude&#x27;un önce plan sunduğunu ve onay bekleyip edit yapmadığını gör. Planı onayladığında hangi moda geçeceğini seç.</li><li>Eğer auto mode ortamında mevcutsa (Shift+Tab ile görünüyorsa): güvenli bir deneme klasöründe kısa bir görev dene. Görev: &#x27;counter.py&#x27;ye toplam sonucu hesaplayan bir özellik ekle ve test et.&#x27; Claude&#x27;un izin sormadan çalışmasını gözlemle.</li></ol><div class="callout warn"><span class="lbl">Dikkat</span>Auto mode&#x27;da çalışırken terminali dikkatle izle; beklenmedik bir şey görürsen Escape ile durdurabilirsin. Her zaman git diff ile sonuçları kontrol et.</div><h3 class="sub">2.3 Prompt Denemeleri (Aynı Görev, 3 Kalite)</h3><p>Şimdi prompt kalitesinin çıktıyı nasıl etkilediğini bizzat deneyeceksin. Aynı uygulama (CLI not defteri) için 3 farklı kalitede prompt ver ve sonuçları karşılaştır. Her denemeden önce /clear ile temiz oturum başlat:</p><ol><li>Kötü prompt: &#x27;Not defteri yap&#x27; — Claude&#x27;un ne üreteceğini gözlemle. Muhtemelen çok basit veya yanlış dilde bir şey çıkacak.</li><li>Orta prompt: &#x27;Python ile CLI not defteri yaz&#x27; — Daha iyi ama scope, test ve dosya formatı belirsiz.</li><li>İyi prompt: &#x27;Python ile CLI not defteri yaz. Ekle, listele, sil ve ara komutları olsun. Notları notes.json dosyasında sakla. Hatalı girişlerde kullanıcıyı uyar. Programı çalıştır ve test et.&#x27; — Sonuçtaki farkı gör: dosya sayısı, hata yönetimi, test durumu.</li></ol><p>Üç sonucu karşılaştır: hangi prompt daha eksiksiz kod üretti? Hangisi test etti? Hangisi hata yönetimi ekledi? Bu fark, eğitimin geri kalanında sürekli karşına çıkacak.</p><h3 class="sub">2.4 Hata Mesajıyla Debugging</h3><p>Gerçek hayatta Claude Code'u en çok kullanacağın senaryolardan biri: bir hata mesajını yapıştırıp düzeltmesini istemek. Ama burada da prompt kalitesi kritik.</p><p>İki debugging prompt'unu karşılaştır:</p><pre><code># Zayıf debugging prompt:
+Bu hatayı düzelt:
+Traceback (most recent call last):
+  File &quot;app.py&quot;, line 12, in delete_note
+    notes.pop(note_id)
+IndexError: pop index out of range</code></pre><pre><code># Güçlü debugging prompt:
+Bu CLI not uygulamasında not silme sırasında
+aşağıdaki hata oluşuyor.
+
+Beklenen davranış: ID verilince ilgili not silinsin,
+yoksa kullanıcıya uyarı versin.
+
+Stack trace:
+Traceback (most recent call last):
+  File &quot;app.py&quot;, line 12, in delete_note
+    notes.pop(note_id)
+IndexError: pop index out of range
+
+Kodu incele, minimal düzeltme yap,
+sonra aynı senaryoyu çalıştırarak doğrula.</code></pre><ol><li>Zayıf prompt&#x27;u ver ve Claude&#x27;un adımlarını izle.</li><li>Aynı hatayı güçlü prompt ile ver — farkı gör: Claude bağlamı anlıyor, minimal fix yapıyor ve doğruluyor.</li><li>Claude&#x27;un debugging adımlarını gözlemle: Read → analiz → Edit → Bash (test çalıştırma).</li></ol><div class="callout kp"><span class="lbl">Önemli</span>Claude&#x27;a sadece hatayı değil, çalışma niyetini ve beklenen davranışı da ver. Bu, düzeltme kalitesini dramatik artırır.</div><h3 class="sub">2.5 Git Diff Alışkanlığı</h3><p>Claude Code her değişiklik yaptığında, sonuçları kontrol etme alışkanlığını bugünden başlatıyoruz. acceptEdits ve auto mode kullanırken 'sonradan review' becerisi şart.</p><pre><code>git status    # hangi dosyalar değişti?
+git diff      # ne değişti?</code></pre><div class="callout tip"><span class="lbl">İpucu</span>Claude&#x27;un yaptığı her değişiklikten sonra git diff oku. Bu, ileride auto mode&#x27;a geçtiğinde güvenlik ağın olacak. Aynı alışkanlığı challenge&#x27;da da uygulayacaksın.</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ / UYGULAMA</h2><h3 class="sub">3.1 Prompt Pattern&#x27;leri</h3><p>Farklı görevler farklı prompt yapıları gerektirir. İşte başlangıç için 4 temel pattern — her birini ne zaman kullanacağını öğren:</p><table><thead><tr><th>Pattern</th><th>Kullanım</th><th>Örnek prompt</th></tr></thead><tbody><tr><td>Yap ve test et</td><td>Basit, tek adımlı görevler</td><td>Bir fibonacci fonksiyonu yaz, 10. terimi hesaplat ve doğrula.</td></tr><tr><td>Analiz et ve öner</td><td>Mevcut kodu değerlendirmek</td><td>CLI not defterini incele ve 3 iyileştirme öner, henüz uygulama.</td></tr><tr><td>Planla, onay al, uygula</td><td>Büyük değişiklik, mimari karar</td><td>Not defterine kategori özelliği eklemek istiyorum. Önce plan yap.</td></tr><tr><td>Kısıtlı görev</td><td>Hassas, büyük repo, belirli scope</td><td>Sadece app.py içindeki delete_note fonksiyonunu düzelt, başka dosyaya dokunma.</td></tr></tbody></table><div class="callout tip"><span class="lbl">İpucu</span>&#x27;Planla, onay al, uygula&#x27; pattern&#x27;i ile plan mode doğal bir uyum sağlar. Bu pattern&#x27;i büyük değişikliklerden önce kullanmayı alışkanlık haline getir.</div><h3 class="sub">3.2 Done Definition Disiplini</h3><p>Her görevde 'tamamlandı' ne demek? Bu soruyu sormak, hem Claude'un doğru noktada durmasını hem de senin sonucu bilinçli doğrulamanı sağlar.</p><pre><code>Done / Tamamlanma Tanımı:
+Bu görev ancak şu durumda tamamlanmış sayılır:
+- Program hatasız çalıştı
+- En az 3 senaryo manuel denendi
+- git diff ile değişiklikler kontrol edildi
+- Claude hangi dosyaları değiştirdiğini özetledi</code></pre><p>Bu format, Claude Code eğitimini gerçek development disiplinine bağlar. Bu alışkanlığı şimdiden edin — ileride auto mode ve agent teams kullandığında, done definition olmadan 'bitmiş gibi görünen ama aslında eksik' iş riskiyle karşılaşırsın.</p><h3 class="sub">3.3 Context Farkındalığı (Gün 7&#x27;ye Hazırlık)</h3><p>Context yönetimini Gün 7'de derinlemesine işleyeceğiz. Bugün sadece temel farkındalığı oluşturuyoruz:</p><ol><li>/context komutuyla context doluluk durumunu gör. Kategorilere göre dağılımı (system prompt, CLAUDE.md, dosyalar, konuşma) incele.</li><li>Birkaç dosya okutup /context&#x27;i tekrar çalıştır — doluluk değişimini gözlemle.</li><li>/compact ile konuşma geçmişini özetlemeyi dene; öncesi ve sonrasındaki doluluk farkını gör.</li><li>/clear ile taze oturum başlat — ne zaman /compact ne zaman /clear kullanman gerektiğini anla.</li></ol><div class="callout tip"><span class="lbl">İpucu</span>Büyük araştırma görevlerinde context&#x27;i korumak için subagent&#x27;a delege etmek etkilidir — subagent kendi izole context&#x27;inde çalışır, sadece sonuç senin context&#x27;ine döner. Bunu Gün 11&#x27;de pratikte uygulayacağız.</div>
+
+<h2 class="sec"><span class="k">KÜTÜPHANE</span>Prompt & Şablon Kütüphanesi</h2>
+<div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Araç gözlem</div><pre><code>Python ile hello_notes.py oluştur. Program notes.txt dosyasına 3 satır örnek not yazsın. Sonra dosyayı okuyup satır sayısını ekrana bassın. Programı çalıştır ve sonucu doğrula. Her adımda hangi aracı kullandığını görmek istiyorum.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">İzin modu karşılaştırma</div><pre><code>Bir fibonacci fonksiyonu yaz, test et ve çalıştır. Şu an Manual/default moddayım; her adımda ne izin istediğini görmek istiyorum.</code></pre><div class="note">Aynı görevi acceptEdits modunda tekrar dene ve izin davranışı farkını gözlemle.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Structured prompt (iyi örnek)</div><pre><code>Goal: Python ile CLI not uygulaması yaz.
+Scope: Sadece app.py ve notes.json oluştur.
+Requirements:
+- Not ekle, listele, sil, ara komutları olsun
+- Notları JSON dosyasında sakla
+- Türkçe karakterleri bozma (ensure_ascii=False)
+Verification: Programı çalıştır, not ekle, listele, ara ve sil.
+Done / Tamamlanma Tanımı:
+- Program hatasız çalışıyor
+- JSON dosyasında veri persist ediyor
+- git diff kontrol edildi</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Debugging (bağlamlı)</div><pre><code>Bu CLI not uygulamasında not silme sırasında aşağıdaki hata oluşuyor.
+Beklenen davranış: ID verilince ilgili not silinsin, yoksa kullanıcıya uyarı versin.
+Stack trace:
+Traceback (most recent call last):
+  File &quot;app.py&quot;, line 12, in delete_note
+    notes.pop(note_id)
+IndexError: pop index out of range
+
+Kodu incele, minimal düzeltme yap, sonra aynı senaryoyu çalıştırarak doğrula.</code></pre><div class="note">Gerçek stack trace&#x27;ler ne kadar tam olursa Claude o kadar iyi düzeltir. Beklenen davranışı belirtmek düzeltme kalitesini artırır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Plan modu denemesi</div><pre><code>Plan moduna geç (Shift+Tab). Sonra:
+CLI not defterine kategori özelliği eklemek istiyorum. Her nota bir kategori atanabilsin ve kategoriye göre filtreleme yapılabilsin.
+Önce plan yap, onay bekle.</code></pre><div class="note">Claude&#x27;un planı sunmasını gözlemle: edit yapmayacak, onay bekleyecek. Planı onaylayınca hangi modda devam edeceğini seçeceksin.</div></div>
+
+<h2 class="sec"><span class="k">CHALLENGE</span>Günün Challenge'ı</h2>
+<div class="challenge">
+<h3>CHALLENGE: CLI Not Defteri v1 — İlk Vibe Coding Projen (🟢 Kademe 1)</h3>
+<p>Claude Code ile komut satırından çalışan bir not defteri uygulaması oluştur. Amaç sadece kod yazmak değil; Claude&#x27;un araçlarını, izin modlarını ve prompt kalitesinin etkisini bizzat gözlemlemek.</p>
+<p><strong>Gereksinimler:</strong></p>
+<ul><li>Python ile yazılsın</li><li>Not ekleme, listeleme, silme ve arama</li><li>Notlar notes.json dosyasında saklansın (kapat-aç sonrası veri korunsun)</li><li>İlk çalıştırmada notes.json dosyası yokken program çökmemeli (dosyayı otomatik oluşturmalı)</li><li>Türkçe karakterler bozulmadan saklanmalı ve gösterilmeli (ş, ç, ğ, ü, ö, ı)</li><li>Basit hata yönetimi (geçersiz komut, olmayan not ID&#x27;si)</li><li>Claude çalıştırıp test etsin</li></ul>
+<p><strong>Başarı Kriterleri:</strong></p>
+<ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>Uygulama hatasız çalışıyor</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>4 temel işlem çalışıyor (ekle, listele, sil, ara)</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>Notlar JSON dosyasında persist ediyor (kapat-aç sonrası kaybolmuyor)</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>İlk çalıştırmada notes.json yokken program çökmüyor (dosyayı otomatik oluşturuyor)</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>Türkçe karakterler bozulmadan saklanıyor ve gösteriliyor</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>Hatalı girişlerde program çökmüyor, uyarı veriyor</span></label></li><li><label><input type="checkbox" data-k="succ6"><span>git diff ile değişiklikler kontrol edildi</span></label></li></ul>
+</div>
+<div class="solution">
+<h3 class="sub">Çözüm Rehberi</h3>
+<p>Tek structured prompt ile temel versiyonu oluştur, sonra iterasyonla iyileştir. Aynı görevi önce Manual/default modda, sonra acceptEdits modunda yaptırarak farkı gözlemle.</p>
+<p><strong>Önerilen prompt zinciri:</strong></p>
+<div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) İlk üretim (structured prompt)</div><pre><code>Goal: Python ile CLI not defteri uygulaması yaz.
+Scope: Sadece app.py ve notes.json oluştur.
+Requirements:
+- Komutlar: ekle, listele, sil, ara
+- Notları notes.json dosyasında sakla
+- İlk çalıştırmada dosya yoksa boş liste ile oluştur
+- Türkçe karakterleri koru (ensure_ascii=False)
+- Hatalı girişlerde uyarı ver, çökme
+Verification: Programı çalıştır, not ekle, listele, ara ve sil.
+Done / Tamamlanma Tanımı:
+- Program hatasız çalışıyor
+- 3 kez çalıştırıp farklı senaryolar denendi
+- git diff kontrol edildi</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) İyileştirme (gözlemden sonra)</div><pre><code>CLI not defterini incele ve şu iyileştirmeleri yap:
+- Her nota otomatik zaman damgası ekle
+- Notları ID ile silmeyi destekle
+- --help komutu ekle
+Sadece app.py dosyasını değiştir. Çalıştır ve test et.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) Doğrulama</div><pre><code>Uygulamayı 3 kez çalıştır, her seferinde farklı senaryo dene:
+1) Not ekle ve listele
+2) Olmayan bir ID ile silmeyi dene (hata yönetimi)
+3) Türkçe karakterli not ekle ve ara
+Sonuçları özetle.</code></pre></div>
+<p><strong>Kontrol noktaları:</strong></p>
+<ul><li>Claude&#x27;un hangi araçları kullandığını izle: Write (dosya oluşturma), Edit (düzenleme), Bash (çalıştırma/test).</li><li>İzin isteme anlarını gözlemle: dosya oluşturmadan ve python komutunu çalıştırmadan önce (Manual/default modda).</li><li>Her adımda git diff ile değişiklikleri kontrol et.</li><li>Aynı görevi bir kez Manual/default modda, bir kez acceptEdits modunda yaptır; akış farkını gözlemle.</li></ul>
+<p><strong>Sık yapılan hatalar:</strong></p>
+<ul><li>Çok belirsiz prompt (&#x27;not defteri yap&#x27;) — scope + requirement + verification + done definition ver.</li><li>İlk çalıştırmada notes.json yokken FileNotFoundError — dosya yoksa boş liste ile oluşturma kontrolü gerekli.</li><li>Türkçe karakterlerin JSON&#x27;da bozulması (\u015f gibi escape) — json.dump(..., ensure_ascii=False) kontrolü şart.</li><li>Dosya yolu hardcoding — çalışma dizinine göreceli path kullan.</li><li>İzinleri okumadan hızlıca onaylamak — ilk günlerde her diff&#x27;i ve komutu bilinçli incele.</li></ul>
+</div>
+
+<h2 class="sec"><span class="k">ÖZET</span>Takeaway'ler</h2>
+<ol><li>Claude Code 7 temel araç kullanır (Read, Write, Edit, Bash, Grep, Glob, WebFetch/WebSearch); hangi aracı kullanacağına kendisi karar verir.</li><li>İzin modları (Manual/default → acceptEdits → plan → auto) farklı güvenlik-verimlilik denge noktaları sunar; Shift+Tab ile geçiş yaparsın.</li><li>acceptEdits dosya editlerini ve güvenli filesystem komutlarını otomatik kabul eder; ama her şeyi sınırsız çalıştırmaz.</li><li>Auto mode izin yorgunluğunu azaltır ama bir research preview&#x27;dur; review&#x27;un yerini almaz — git diff ve test sonucu kontrol etmeye devam et.</li><li>Context window, Claude&#x27;un kısa süreli hafızasıdır; /context ile izle, /compact ile yer aç, /clear ile taze başla.</li><li>İyi prompt = Goal + Scope + Requirements + Verification + Done / Tamamlanma Tanımı. Bu 5 bileşen çıktı kalitesini dramatik artırır.</li><li>Debugging&#x27;de Claude&#x27;a sadece hatayı değil, beklenen davranışı ve bağlamı da ver.</li><li>git diff alışkanlığını bugünden başlat — ileride auto mode ve agent teams için güvenlik ağın olacak.</li></ol>
+
+<h2 class="sec"><span class="k">KAYNAKLAR</span>Ekstra Okuma</h2>
+<p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p>
+<ul><li><a href="https://code.claude.com/docs/en/overview" target="_blank" rel="noopener">⭐ Claude Code Tools &amp; Capabilities (araçlar)</a></li><li><a href="https://code.claude.com/docs/en/permission-modes" target="_blank" rel="noopener">⭐ Permission Modes (izin modları, auto mode)</a></li><li><a href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">⭐ Best Practices — Prompt Techniques</a></li><li><a href="https://code.claude.com/docs/en/context-window" target="_blank" rel="noopener">⭐ Context Window</a></li></ul>
+<p><strong>Topluluk (önerilen):</strong></p>
+<ul><li><a href="https://code.claude.com/docs/en/prompt-library" target="_blank" rel="noopener">Prompt Library (resmi prompt örnekleri)</a></li><li><a href="https://claudelog.com/" target="_blank" rel="noopener">ClaudeLog — Community Best Practices</a></li></ul>
+<p><strong>Ek kaynaklar:</strong></p>
+<ul><li><a href="https://code.claude.com/docs/en/whats-new" target="_blank" rel="noopener">What&#x27;s New (haftalık yeni özellikler)</a></li></ul>
+<div class="callout tip"><span class="lbl">Yarın (Gün 3)</span>CLAUDE.md ve Auto Memory — Claude&#x27;a projenin kurallarını öğretecek, CLAUDE.md hiyerarşisini anlayacak, auto memory&#x27;nin nasıl çalıştığını görecek ve CLI Not Defteri&#x27;ne bir CLAUDE.md ekleyerek kod kalitesindeki farkı gözlemleyeceksin.</div>
+
+<h2 class="sec"><span class="k">SELF-ASSESSMENT</span>Kontrol Listesi</h2>
+<p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p>
+<ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Claude Code&#x27;un temel araçlarını sayabiliyorum: Read, Write, Edit, Bash, Grep, Glob, WebFetch/WebSearch.</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>Manual/default modda Claude&#x27;un ne zaman izin istediğini gözlemledim.</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>acceptEdits modunun dosya editlerini otomatik kabul ettiğini ama her Bash komutunu sınırsız çalıştırmadığını biliyorum.</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>Plan mode&#x27;da Claude&#x27;un önce araştırıp plan sunduğunu, onay almadan edit yapmadığını gördüm.</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>Auto mode&#x27;un izin yorgunluğunu azalttığını ama review&#x27;un yerini almadığını açıklayabiliyorum.</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>Shift+Tab ile mevcut izin modları arasında geçiş yapabiliyorum.</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>Aynı görevi kötü, orta ve iyi prompt ile denedim; farkı gözlemledim.</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Structured prompt formatını (Goal / Scope / Requirements / Verification / Done) uyguladım.</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Bir stack trace&#x27;i bağlamıyla birlikte Claude&#x27;a verip minimal fix + test döngüsü yaptım.</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>CLI Not Defteri v1 challenge&#x27;ını tamamladım.</span></label></li><li><label><input type="checkbox" data-k="final10" data-final="1"><span>git status ve git diff ile Claude&#x27;un yaptığı değişiklikleri kontrol ettim.</span></label></li><li><label><input type="checkbox" data-k="final11" data-final="1"><span>/context ile context kullanımını gördüm; /compact ve /clear farkını temel düzeyde açıklayabiliyorum.</span></label></li></ul>
+
+<div class="pager"><a href="gun01-claude-code-nedir-ve-kurulum.html"><div class="dir">← Önceki</div><div class="tt">Gün 1: Claude Code Nedir ve Kurulum</div></a><a class="next" href="gun03-claude.md-ve-auto-memory.html"><div class="dir">Sonraki →</div><div class="tt">Gün 3: CLAUDE.md ve Auto Memory</div></a></div>
+<div class="foot">Claude Code Master Eğitim Programı · Gün 2/20 · Temmuz 2026</div>
+</article></div>
+</div>
+<script>window.__CCEDU_DAY__=2;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>
