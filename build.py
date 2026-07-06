@@ -10,6 +10,10 @@ Kullanım:
 """
 import sys, os, importlib
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 OUT  = os.path.join(BASE, "output")
 os.makedirs(OUT, exist_ok=True)

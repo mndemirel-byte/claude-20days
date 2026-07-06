@@ -1,0 +1,750 @@
+{
+  "day": 1,
+  "total_days": 20,
+  "week": 1,
+  "slug": "claude-code-nedir-kurulum",
+  "title": "Claude Code Nedir ve Kurulum",
+  "tagline": "Terminalindeki AI takım arkadaşınla tanış",
+  "tier": null,
+  "date_label": "Temmuz 2026",
+  "intro": "Bu derste Claude Code'un ne olduğunu, nasıl çalıştığını ve diğer AI kodlama araçlarından farkını öğreneceksin. Dersin sonunda Claude Code'u bilgisayarına kurup ilk komutunu çalıştıracak ve ilk kodunu yazdıracaksın.",
+  "flow": [
+    {
+      "phase": "1 · Teori",
+      "dur": "35 dk",
+      "desc": "Claude Code nedir, agentic loop, yüzeyler, modeller"
+    },
+    {
+      "phase": "2 · Kurulum",
+      "dur": "45 dk",
+      "desc": "Native kurulum, doğrulama, kimlik doğrulama, VS Code"
+    },
+    {
+      "phase": "3 · İlk denemeler",
+      "dur": "40 dk",
+      "desc": "Slash komutları, izin modları, ilk kod"
+    },
+    {
+      "phase": "4 · Challenge",
+      "dur": "40 dk",
+      "desc": "'Günün Sözü' uygulaması + çözüm rehberi"
+    }
+  ],
+  "prerequisites": [
+    "Temel terminal komutları (cd, ls, mkdir)",
+    "Aktif internet bağlantısı",
+    "Anthropic ücretli plan (Pro/Max/Team/Enterprise) veya Console hesabı"
+  ],
+  "tools_needed": [
+    "Terminal",
+    "VS Code (isteğe bağlı)",
+    "Web tarayıcı"
+  ],
+  "objectives": [
+    "Claude Code'un ne olduğunu ve agentic loop ile nasıl çalıştığını açıklayabileceksin",
+    "Claude Code'u native yöntemle kurup çalıştırabileceksin",
+    "Terminal, IDE, Desktop ve Web yüzeylerini ve ne zaman hangisini kullanacağını ayırt edebileceksin",
+    "Güncel modelleri (Opus 4.8, Sonnet 5, Haiku 4.5, Fable 5) ve effort seviyelerini tanıyacaksın",
+    "Temel slash komutlarını ve izin modlarını kullanarak Claude Code ile etkileşime geçebileceksin",
+    "İlk Python scriptini Claude Code ile yazdırıp çalıştıracaksın"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 Claude Code Nedir?"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code, Anthropic tarafından geliştirilen **agentic** (ajan tabanlı) bir kodlama aracıdır. Terminalinde yaşayan; projeni anlayan ve doğal dil komutlarıyla kod yazabilen, dosya düzenleyen, komut çalıştıran ve git işlemlerini yöneten bir AI asistanıdır."
+        },
+        {
+          "t": "keypoint",
+          "text": "Claude Code bir chatbot değildir. Kopyala-yapıştır ile çalışmaz. Doğrudan senin proje klasöründe çalışır: dosyalarını okur, düzenleme yapar, terminal komutları çalıştırır ve git ile entegre olur. Bir 'AI takım arkadaşı' gibi düşün."
+        },
+        {
+          "t": "p",
+          "text": "**Claude Code ne yapabilir?**"
+        },
+        {
+          "t": "list",
+          "items": [
+            "**Kod yazma:** Doğal dil ile tarif et, Claude üretsin ('Python ile bir REST API yaz').",
+            "**Kod düzenleme:** Mevcut dosyaları okuyup değişiklik önerir ve uygular.",
+            "**Bug düzeltme:** Hata mesajını yapıştır, Claude izleyip düzeltsin.",
+            "**Test yazma:** 'Auth modülü için testleri yaz, çalıştır, fail edenleri düzelt'.",
+            "**Git işlemleri:** Commit, branch, merge, PR işlemlerini doğal dil ile yap.",
+            "**Refactoring & dokümantasyon:** README, API docs, changelog oluşturma."
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.2 Nasıl Çalışır? (Agentic Loop)"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code'un en önemli özelliği agentic çalışmasıdır. Bir görev verdiğinde sadece cevap dönmez; bir döngü içinde birden fazla adım atar:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Adım",
+            "Ne yapar",
+            "Örnek"
+          ],
+          "rows": [
+            [
+              "1. Anlama",
+              "Görevi analiz eder, projeyi tarar",
+              "Proje yapısını ve dosyaları inceler"
+            ],
+            [
+              "2. Planlama",
+              "Yaklaşım belirler",
+              "'Önce DB, sonra API, sonra test' planlar"
+            ],
+            [
+              "3. Araç kullanımı",
+              "Dosya okur/yazar, komut çalıştırır",
+              "Dosya oluşturur, pip install çalıştırır"
+            ],
+            [
+              "4. Doğrulama",
+              "Sonucu kontrol eder",
+              "Testi çalıştırır, hataları görür"
+            ],
+            [
+              "5. İterasyon",
+              "Hata varsa düzeltir",
+              "Test fail olursa kodu günceller"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Bu döngü, Claude Code'u chatbot'lardan ayıran özelliktir. Bir chatbot'a 'test yaz' dersen kodu gösterir ama çalıştırmaz. Claude Code yazar, çalıştırır, fail edenleri düzeltir ve tekrar çalıştırır."
+        },
+        {
+          "t": "h",
+          "text": "1.3 Claude Code'un Araçları (Tools)"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Araç",
+            "İşlev",
+            "Örnek kullanım"
+          ],
+          "rows": [
+            [
+              "Read",
+              "Dosya içeriğini okur",
+              "Kaynak kod, config dosyaları"
+            ],
+            [
+              "Write",
+              "Yeni dosya oluşturur",
+              "Sıfırdan kod dosyası"
+            ],
+            [
+              "Edit",
+              "Mevcut dosyayı düzenler",
+              "Bir fonksiyona parametre ekleme"
+            ],
+            [
+              "Bash",
+              "Terminal komutu çalıştırır",
+              "pip install, git, npm"
+            ],
+            [
+              "Grep / Glob",
+              "Metin/dosya deseni arar",
+              "Projede 'TODO' bulma, *.py listeleme"
+            ],
+            [
+              "Agent",
+              "Alt-ajan (subagent) çalıştırır",
+              "Ayrı bir Claude review yapsın"
+            ],
+            [
+              "WebSearch / WebFetch",
+              "Web'den bilgi çeker",
+              "Güncel bir kütüphane API'sini araştırma"
+            ]
+          ]
+        },
+        {
+          "t": "p",
+          "text": "Claude bir araç kullanmadan önce (varsayılan modda) senden izin ister: dosya değişikliğinde diff gösterir, Bash komutlarında onay bekler. İzin davranışını Gün 2'de derinlemesine göreceğiz."
+        },
+        {
+          "t": "h",
+          "text": "1.4 Çalışma Yüzeyleri"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code tek bir motoru dört yüzeyde sunar; CLAUDE.md, ayarlar ve MCP server'lar hepsinde geçerlidir."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Yüzey",
+            "Açıklama",
+            "Kimin için"
+          ],
+          "rows": [
+            [
+              "Terminal CLI",
+              "Komut satırında tam kontrol",
+              "Bu eğitimin ana ortamı"
+            ],
+            [
+              "VS Code / JetBrains",
+              "IDE içinde entegre deneyim, inline diff",
+              "Görsel diff isteyenler"
+            ],
+            [
+              "Desktop App",
+              "Bağımsız masaüstü uygulaması, görsel diff, paralel oturum",
+              "Birden fazla oturum yönetenler"
+            ],
+            [
+              "Web (claude.ai/code)",
+              "Tarayıcıda, lokal kurulum gerektirmez",
+              "Hızlı denemeler, uzaktan çalışma"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Ek entegrasyonlar: **Slack** (mention ile görev delege etme) ve **Chrome (beta)** (canlı web uygulaması debug). Bunları ileri günlerde kullanacağız."
+        },
+        {
+          "t": "h",
+          "text": "1.5 Modeller ve Effort Seviyeleri"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code, model ailesini kısa alias'larla sunar. `/model` ile seçersin:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Alias",
+            "Model",
+            "En iyi olduğu iş"
+          ],
+          "rows": [
+            [
+              "opus",
+              "Claude Opus 4.8",
+              "Karmaşık akıl yürütme, mimari kararlar"
+            ],
+            [
+              "sonnet",
+              "Claude Sonnet 5",
+              "Günlük kodlama (native 1M context)"
+            ],
+            [
+              "haiku",
+              "Claude Haiku 4.5",
+              "Basit, hızlı görevler"
+            ],
+            [
+              "fable",
+              "Claude Fable 5",
+              "En yetenekli; uzun/otonom görevler (varsayılan değil)"
+            ],
+            [
+              "opusplan",
+              "Opus + Sonnet",
+              "Planlamada opus, uygulamada sonnet"
+            ]
+          ]
+        },
+        {
+          "t": "p",
+          "text": "**Effort (çaba) seviyeleri:** `low`, `medium`, `high` (varsayılan), `xhigh`, `max`. Daha yüksek effort = daha derin düşünme, daha çok token. Prompt içinde `ultrathink` yazarak tek seferlik derin düşünme tetikleyebilirsin. **Fast mode** ise Opus'ta daha hızlı yanıt verir."
+        },
+        {
+          "t": "keypoint",
+          "text": "Context window artık 200K değil: Sonnet 5 **native 1M (1 milyon) token** ile çalışır; Opus üst planlarda 1M'e otomatik yükselir. Bu, büyük kod tabanlarıyla çalışmayı kolaylaştırır."
+        },
+        {
+          "t": "h",
+          "text": "1.6 Diğer AI Kodlama Araçlarıyla Karşılaştırma"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Özellik",
+            "Claude Code",
+            "GitHub Copilot",
+            "Cursor",
+            "ChatGPT"
+          ],
+          "rows": [
+            [
+              "Çalışma yeri",
+              "Terminal + IDE + Web",
+              "IDE içinde",
+              "Özel IDE",
+              "Tarayıcı"
+            ],
+            [
+              "Dosya erişimi",
+              "Tüm proje",
+              "Açık dosya",
+              "Tüm proje",
+              "Yok"
+            ],
+            [
+              "Komut çalıştırma",
+              "Evet (Bash)",
+              "Hayır",
+              "Sınırlı",
+              "Hayır"
+            ],
+            [
+              "Git entegrasyonu",
+              "Tam",
+              "Sınırlı",
+              "Sınırlı",
+              "Yok"
+            ],
+            [
+              "Agentic (otonom)",
+              "Evet",
+              "Hayır",
+              "Kısmi",
+              "Hayır"
+            ],
+            [
+              "Context window",
+              "200K–1M",
+              "Değişken",
+              "Değişken",
+              "Değişken"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Claude Code'un en büyük farkı **agentic** olmasıdır: görev ver, planlama yapar, birden fazla dosyada çalışır, komut çalıştırır, sonucu doğrular."
+        },
+        {
+          "t": "h",
+          "text": "1.7 Abonelik Modelleri ve Maliyet"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Plan",
+            "Aylık",
+            "Claude Code",
+            "Not"
+          ],
+          "rows": [
+            [
+              "Free (claude.ai)",
+              "Ücretsiz",
+              "YOK",
+              "Claude Code içermez"
+            ],
+            [
+              "Pro",
+              "$20",
+              "VAR",
+              "Varsayılan model Sonnet 5"
+            ],
+            [
+              "Max (5x / 20x)",
+              "$100 / $200",
+              "VAR",
+              "Daha yüksek limit; varsayılan Opus 4.8"
+            ],
+            [
+              "Team / Enterprise",
+              "Kişi başı",
+              "VAR",
+              "Merkezi yönetim, yönetici ayarları"
+            ],
+            [
+              "API (Console)",
+              "Kullanım başına",
+              "VAR",
+              "Token başına ücret"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Eğitim için **Pro plan ($20/ay)** yeterlidir. Rate limit'e sık takılırsan Max plana geçmeyi düşünebilirsin."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM KURULUM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "2.1 Ön Gereksinim Kontrolü"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Gereksinim",
+            "Nasıl kontrol edersin",
+            "Minimum"
+          ],
+          "rows": [
+            [
+              "İşletim sistemi",
+              "Sürüm bilgisi",
+              "macOS 13+ / Windows 10 1809+ / Ubuntu 20.04+"
+            ],
+            [
+              "İnternet",
+              "Tarayıcıda bir siteyi aç",
+              "Aktif bağlantı"
+            ],
+            [
+              "Anthropic hesabı",
+              "claude.ai'da oturum aç",
+              "Pro veya üstü plan"
+            ],
+            [
+              "RAM",
+              "Sistem bilgisi",
+              "4GB (8GB önerilir)"
+            ]
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Node.js artık **zorunlu değil**. Native kurulum bir binary indirir ve çalışmak için Node'a ihtiyaç duymaz. Node'u yalnızca (a) npm ile kurmayı seçersen veya (b) bu programda React/FastAPI projeleri geliştireceğin için kuracağız — Claude Code'un kendisi için değil."
+        },
+        {
+          "t": "h",
+          "text": "2.2 Claude Code Kurulumu"
+        },
+        {
+          "t": "p",
+          "text": "**Yöntem 1: Native Installer (önerilen)** — ek bağımlılık gerektirmez, otomatik güncellenir."
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# macOS / Linux / WSL\ncurl -fsSL https://claude.ai/install.sh | bash"
+        },
+        {
+          "t": "code",
+          "lang": "powershell",
+          "text": "# Windows (PowerShell)\nirm https://claude.ai/install.ps1 | iex"
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# Homebrew (macOS)\nbrew install --cask claude-code\n\n# WinGet (Windows)\nwinget install Anthropic.ClaudeCode"
+        },
+        {
+          "t": "warn",
+          "text": "Homebrew/WinGet kurulumlarında otomatik güncelleme yoktur; manuel `brew upgrade` / `winget upgrade` gerekir. Native installer ise arka planda otomatik güncellenir."
+        },
+        {
+          "t": "p",
+          "text": "**Yöntem 2: npm ile kurulum** — yalnızca Node.js 18+ mevcutsa tercih et."
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "node --version   # v18.0.0+ olmalı\nnpm install -g @anthropic-ai/claude-code"
+        },
+        {
+          "t": "warn",
+          "text": "Asla `sudo npm install -g` kullanma! İzin ve güvenlik sorunlarına yol açar. İzin hatası alırsan nvm kullan."
+        },
+        {
+          "t": "h",
+          "text": "2.3 Kurulumu Doğrulama"
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "claude --version    # sürüm numarası görmelisin\nclaude doctor       # kurulum tipi, sürüm, bağlantı kontrolü"
+        },
+        {
+          "t": "h",
+          "text": "2.4 İlk Çalıştırma ve Kimlik Doğrulama"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Terminal'de herhangi bir klasörde `claude` yaz ve çalıştır.",
+            "Tarayıcın açılır; Anthropic hesabınla giriş yap.",
+            "Giriş başarılıysa terminal'e dön — Claude Code hazır.",
+            "İlk komutunu çalıştır: `/status` (model, bağlantı ve oturum bilgisi gösterir)."
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Kimlik doğrulama bir kereliktir; token lokal saklanır. Sonraki açılışlarda tekrar giriş gerekmez."
+        },
+        {
+          "t": "h",
+          "text": "2.5 Model ve Effort Seçimi"
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "/model            # model seçiciyi açar (opus / sonnet / haiku / fable ...)\n/model sonnet     # doğrudan Sonnet 5'e geç\n/status           # hangi model ve effort aktif, gör"
+        },
+        {
+          "t": "h",
+          "text": "2.6 VS Code Extension Kurulumu (isteğe bağlı)"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "VS Code'u aç, Extensions görünümüne git (Cmd/Ctrl+Shift+X).",
+            "'Claude Code' ara ve kur.",
+            "Command Palette (Cmd/Ctrl+Shift+P) → 'Claude Code' → panelini aç."
+          ]
+        },
+        {
+          "t": "h",
+          "text": "2.7 Ayarlar Dosyası"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code ayarları `~/.claude/settings.json` içinde saklanır ve otomatik oluşturulur. İlk gün dokunmana gerek yok; ama yerini bilmen önemli — ileride MCP, hook ve model ayarları buraya gelecek."
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "cat ~/.claude/settings.json"
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — İLK DENEMELER",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 Temel Slash Komutları"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Komut",
+            "Ne yapar"
+          ],
+          "rows": [
+            [
+              "/status",
+              "Model, bağlantı ve oturum bilgisi"
+            ],
+            [
+              "/model",
+              "Kullanılan modeli değiştirir"
+            ],
+            [
+              "/cost",
+              "Bu oturumdaki token kullanımı ve maliyet"
+            ],
+            [
+              "/usage",
+              "Plan limitlerinin ne kadarını tükettiğin"
+            ],
+            [
+              "/context",
+              "Context penceresinin doluluğunu gösterir"
+            ],
+            [
+              "/compact",
+              "Context'i sıkıştırır (özet çıkarır, yer açar)"
+            ],
+            [
+              "/clear",
+              "Konuşmayı siler, sıfırdan başlar"
+            ],
+            [
+              "/help",
+              "Tüm komutları listeler"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "3.2 İzin Modları (kısa tanışma)"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code'da `Shift+Tab` ile izin modları arasında geçersin: normal (her aksiyona onay), **acceptEdits** (düzenlemeleri otomatik kabul), **plan** (önce plan yap), **auto** (auto mode). Bugün normal modda kal; bu modları ve auto mode'u Gün 2'de detaylı işleyeceğiz."
+        },
+        {
+          "t": "h",
+          "text": "3.3 İlk Kodunu Yazdır"
+        },
+        {
+          "t": "p",
+          "text": "Terminal'de Claude Code açıkken sırayla dene ve her adımda ne yaptığını gözlemle:"
+        },
+        {
+          "t": "p",
+          "text": "**Deneme 1 — Basit:** `Python ile \"Merhaba Dünya!\" yazan bir script oluştur ve çalıştır.` Claude bir dosya oluşturacak, kodu yazacak ve çalıştırmak için izin isteyecek."
+        },
+        {
+          "t": "p",
+          "text": "**Deneme 2 — Biraz karmaşık:** `Python ile bir hesap makinesi yaz; toplama/çıkarma/çarpma/bölme yapsın, kullanıcıdan input alsın, sıfıra bölmeyi handle etsin. Çalıştır ve test et.`"
+        },
+        {
+          "t": "p",
+          "text": "**Deneme 3 — Debugging:** Bir hata mesajını yapıştırıp düzeltmesini iste (aşağıdaki kütüphanede hazır prompt var)."
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "Kendini tanıt",
+      "prompt": "Merhaba! Kendini tanıt: ne yapabilirsin, hangi araçlara sahipsin ve şu an hangi modeli kullanıyorsun?"
+    },
+    {
+      "title": "İlk script (Hello World)",
+      "prompt": "Python ile \"Merhaba Dünya!\" yazan bir script oluştur ve çalıştır."
+    },
+    {
+      "title": "Çok adımlı görev (hesap makinesi)",
+      "prompt": "Python ile bir hesap makinesi yaz. Toplama, çıkarma, çarpma ve bölme yapabilsin. Kullanıcıdan input alsın. Sıfıra bölme hatasını handle etsin. Çalıştır ve test et."
+    },
+    {
+      "title": "Hata mesajı ile debugging",
+      "prompt": "Şu hatayı alıyorum, sebebini bul ve düzelt:\nTraceback (most recent call last): File \"app.py\", line 5, in <module> result = 10 / 0 ZeroDivisionError: division by zero",
+      "note": "Gerçek hayatta en çok kullanacağın senaryo budur. Stack trace ne kadar tam olursa Claude o kadar iyi düzeltir."
+    },
+    {
+      "title": "Model karşılaştırma denemesi",
+      "prompt": "Aynı görevi iki farklı effort ile dene: '/effort high' ve '/effort xhigh'. Bir bubble sort implementasyonu yazdır ve çıktı farkını gözlemle.",
+      "note": "Effort komutu ortama göre `/effort` veya model seçici altında olabilir; `/help` ile doğrula."
+    }
+  ],
+  "challenge": {
+    "title": "CHALLENGE: İlk Vibe Coding Deneyimin — 'Günün Sözü' Uygulaması",
+    "task": "Claude Code'u kullanarak her çalıştırıldığında rastgele bir motivasyon sözü gösteren bir Python uygulaması yap. Amaç kod yazmak değil; Claude'un her adımda ne yaptığını gözlemlemek.",
+    "requirements": [
+      "Python ile yazılsın",
+      "En az 10 motivasyon sözü ve yazarları olsun",
+      "Her çalıştırmada rastgele bir söz seçsin",
+      "Sözün yazarını da göstersin",
+      "Renkli terminal çıktısı versin (colorama veya ANSI)",
+      "Claude çalıştırıp test etsin"
+    ],
+    "success": [
+      "Uygulama hatasız çalışıyor",
+      "Her çalıştırmada farklı bir söz gösteriyor",
+      "Renkli çıktı veriyor",
+      "Kod okunabilir ve yorum içeriyor"
+    ],
+    "solution": {
+      "intro": "Tek bir net prompt ile başla, sonra iyileştir. Aşağıdaki prompt zinciri tipik bir 'yap → gözlemle → derinleştir' akışını gösterir.",
+      "prompts": [
+        {
+          "title": "1) İlk üretim",
+          "prompt": "Python ile bir motivasyon sözü uygulaması yaz. İçinde 10 farklı motivasyon sözü ve yazarları olsun. Her çalıştırıldığında rastgele bir söz seçip renkli yazdırsın (colorama kullan). Çalıştır ve test et."
+        },
+        {
+          "title": "2) İyileştirme (gözlemden sonra)",
+          "prompt": "Sözleri ayrı bir quotes.py dosyasına taşı, ana dosyadan import et. Ayrıca kullanıcı isterse belirli bir yazarın sözünü filtreleyebilsin (komut satırı argümanı ile)."
+        },
+        {
+          "title": "3) Doğrulama",
+          "prompt": "Uygulamayı 3 kez çalıştır ve her seferinde farklı söz geldiğini göster. Kodda eksik yorum varsa ekle."
+        }
+      ],
+      "notes": [
+        "Claude'un hangi araçları kullandığını izle: Write (dosya), Bash (çalıştırma), Edit (iyileştirme).",
+        "İzin isteme anlarını gözlemle: dosya oluşturmadan ve `python` komutunu çalıştırmadan önce.",
+        "colorama kurulu değilse Claude `pip install colorama` çalıştırmak için izin isteyecek."
+      ],
+      "pitfalls": [
+        "Prompt'u fazla belirsiz bırakmak ('güzel bir uygulama yap') → net gereksinim ver.",
+        "Rastgeleliği test etmemek → en az 3 kez çalıştırıp farklı çıktı gördüğünü doğrula.",
+        "İzinleri okumadan hızlıca onaylamak → ilk günlerde her diff'i ve komutu bilinçli incele."
+      ]
+    }
+  },
+  "takeaways": [
+    "Claude Code bir chatbot değil, agentic bir kodlama aracıdır: dosya okur/yazar, komut çalıştırır, git yönetir.",
+    "Agentic loop: Anla → Planla → Araç Kullan → Doğrula → Düzelt döngüsünde çalışır.",
+    "Dört yüzey var: Terminal, IDE (VS Code/JetBrains), Desktop App ve Web. Motor hepsinde aynı.",
+    "Güncel modeller: Opus 4.8, Sonnet 5 (native 1M context), Haiku 4.5 ve en yetenekli Fable 5.",
+    "Effort seviyeleri (low→max) ve fast mode ile derinlik/hız dengesini ayarlarsın.",
+    "Native installer önerilen yöntemdir (bağımlılık gerektirmez, otomatik güncellenir); Node.js zorunlu değil.",
+    "Pro plan ($20/ay) eğitim için yeterlidir; ücretsiz plan Claude Code içermez.",
+    "/status, /model, /cost, /context, /compact gibi slash komutları günlük kullanımda hayatidir."
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Claude Code Overview (Resmi Docs)",
+        "url": "https://code.claude.com/docs/en/overview"
+      },
+      {
+        "label": "Kurulum ve Sistem Gereksinimleri",
+        "url": "https://code.claude.com/docs/en/setup"
+      },
+      {
+        "label": "Model Konfigürasyonu (modeller, effort, 1M context)",
+        "url": "https://code.claude.com/docs/en/model-config"
+      },
+      {
+        "label": "Best Practices Rehberi",
+        "url": "https://code.claude.com/docs/en/best-practices"
+      }
+    ],
+    "community": [
+      {
+        "label": "What's New (haftalık yeni özellikler)",
+        "url": "https://code.claude.com/docs/en/whats-new"
+      },
+      {
+        "label": "ClaudeLog (topluluk best practices)",
+        "url": "https://claudelog.com/"
+      },
+      {
+        "label": "Awesome Claude Code (küratörlü liste)",
+        "url": "https://github.com/hesreallyhim/awesome-claude-code"
+      }
+    ],
+    "extra": [
+      {
+        "label": "Claude Code Resmi Ürün Sayfası",
+        "url": "https://claude.com/product/claude-code"
+      },
+      {
+        "label": "Changelog (son güncellemeler)",
+        "url": "https://code.claude.com/docs/en/changelog"
+      }
+    ]
+  },
+  "next_preview": "Temel Kullanım, İzinler ve Auto Mode — Claude Code'un araçlarını derinlemesine öğrenecek, izin modları ve auto mode'u kavrayacak, iyi vs kötü prompt farkını görecek ve 🟢 CLI Not Defteri projesine (Kademe 1) başlayacaksın.",
+  "checklist": [
+    "Claude Code'un ne olduğunu ve agentic loop'u açıklayabiliyorum",
+    "Claude Code'u başarıyla kurdum (claude --version çalışıyor)",
+    "claude doctor ile kurulumu doğruladım",
+    "Kimlik doğrulama tamamlandı (/status başarılı)",
+    "Dört çalışma yüzeyini ve ne zaman hangisini kullanacağımı biliyorum",
+    "Güncel modelleri (Opus 4.8, Sonnet 5, Haiku 4.5, Fable 5) ve effort seviyelerini tanıyorum",
+    "En az 3 farklı prompt ile Claude Code'u denedim",
+    "Shift+Tab ile izin modları arasında geçişi denedim",
+    "Günün challenge'ını tamamladım ('Günün Sözü' uygulaması)",
+    "Resmi docs'tan en az Overview sayfasını okudum",
+    "~/.claude/settings.json dosyasının yerini biliyorum"
+  ]
+}

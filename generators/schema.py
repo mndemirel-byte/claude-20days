@@ -2,7 +2,7 @@
 Ortak ders şeması (tek kaynak) + blok yapıcı yardımcılar.
 
 Her gün, content/gunXX.py içinde bir LESSON sözlüğü tanımlar.
-Üç renderer (md / html / pdf) bu tek kaynaktan çıktı üretir.
+İki renderer (json / html) bu tek kaynaktan çıktı üretir.
 
 --- LESSON şeması ------------------------------------------------------------
 LESSON = {
