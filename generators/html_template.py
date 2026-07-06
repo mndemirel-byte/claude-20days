@@ -68,7 +68,7 @@ PAGE = """<!DOCTYPE html>
 <body>
 <header class="topbar">
   <button class="menu-btn" aria-label="Menü">☰</button>
-  <span class="brand">Claude Code <b>Master</b></span>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
   <div class="prog"><span></span></div>
   <span class="proglabel"></span>
 </header>
