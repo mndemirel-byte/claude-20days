@@ -1,0 +1,650 @@
+# -*- coding: utf-8 -*-
+"""Gün 4 — Proje Klasör Yapısı ve Başlangıç Şablonu (v2.0, Temmuz 2026)."""
+from generators.schema import h, p, keypoint, tip, warn, bullets, steps, code, table
+
+LESSON = {
+    "day": 4,
+    "total_days": 20,
+    "week": 1,
+    "slug": "proje-klasor-yapisi-baslangic-sablonu",
+    "title": "Proje Klasör Yapısı ve Başlangıç Şablonu",
+    "tagline": "İyi yapı, daha az prompt demektir.",
+    "tier": "🟡 Kademe 2",
+    "date_label": "Temmuz 2026",
+
+    "intro": (
+        "Bugüne kadar CLAUDE.md, auto memory ve path-scoped rules ile Claude'a nasıl talimat "
+        "verdiğini öğrendin. Şimdi bu bilgiyi gerçek bir projenin iskeletine bağlama zamanı. "
+        "Klasör yapısı sadece dosya düzeni değildir — Claude için bir navigasyon haritasıdır. "
+        "Bugün Todo App projesini (Kademe 2) sıfırdan kuracak, Claude'u \"mülakat ederek\" "
+        "PRD.md ürettirecek ve Plan Mode ile kod yazmadan düşünmeyi deneyeceksin."
+    ),
+
+    "flow": [
+        {"phase": "1 · Context Mimarisi", "dur": "35 dk", "desc": "Neden yapı önemli, commitlenecek vs machine-local ayrımı, .claude/ bileşenleri, docs/ üçlüsü"},
+        {"phase": "2 · Repo İskeleti",     "dur": "40 dk", "desc": "src/web + src/api yapısı, .claude/, docs/, CLAUDE.md güncelleme, git init"},
+        {"phase": "3 · PRD + Architecture","dur": "50 dk", "desc": "AskUserQuestion ile PRD interview, ARCHITECTURE.md, ilk feature spec'i, tutarlılık kontrolü"},
+        {"phase": "4 · Plan Mode + Challenge", "dur": "25 dk", "desc": "Plan Mode'da ilk CRUD planı, planı kaydetme, challenge"},
+    ],
+
+    "prerequisites": [
+        "Gün 1-3 tamamlanmış (CLAUDE.md, auto memory, path-scoped rules biliniyor)",
+        "Terminal + metin editörü + git kurulu",
+    ],
+
+    "tools_needed": [
+        "Claude Code (terminal veya VS Code)",
+        "Git",
+        "Metin editörü",
+    ],
+
+    "objectives": [
+        "Claude Code projeleri için ideal klasör yapısını (CLAUDE.md, .claude/, docs/, src/, tests/) kurabileceksin",
+        ".claude/ dizininin alt bileşenlerini (rules, skills, agents, hooks, settings.json) rolleriyle ayırt edebileceksin",
+        "PRD.md, ARCHITECTURE.md ve ilk feature SPEC'inin amaç farkını açıklayabileceksin",
+        "AskUserQuestion tool'u ile Claude'a \"interview\" yaptırıp cevaplardan bir PRD ürettirebileceksin",
+        "Plan Mode'u (Shift+Tab / --permission-mode plan) kullanarak salt-okunur analiz yapabileceksin",
+        "Todo App projesinin (Kademe 2) tam iskeletini — klasör yapısı + üç doküman türü — kurabileceksin",
+    ],
+
+    "sections": [
+        # -------------------------------------------------------------
+        # BÖLÜM 1 — TEORİK TEMEL
+        # -------------------------------------------------------------
+        {
+            "num": "BÖLÜM 1",
+            "title": "CONTEXT MİMARİSİ OLARAK YAPI",
+            "blocks": [
+                h("1.1 Neden Yapı Önemli?"),
+                p(
+                    "Rastgele dosya düzeni, Claude'un context'i verimsiz tüketmesine ve alakasız "
+                    "dosyaları taramasına yol açar. Her yeni oturumda Claude projeyi keşfederken "
+                    "zaman ve token harcar; iyi bir yapı bu keşfi neredeyse gereksiz kılar."
+                ),
+                keypoint(
+                    "İyi bir klasör yapısı, Claude'a ekstra talimat yazmadan \"bu proje nasıl "
+                    "organize edilmiş\" bilgisini verir. Konvansiyonun kendisi context'tir — "
+                    "klasör yapısı, Claude için bir navigasyon haritasıdır."
+                ),
+
+                h("1.2 Commitlenecek vs Machine-Local Ayrımı"),
+                p(
+                    "Proje dosyalarının bir kısmı git'e girer ve takımla paylaşılır; bir kısmı "
+                    "ise kişisel/makine-özel kalır ve asla commitlenmez. Bu ayrımı baştan netleştirmek "
+                    "karışıklığı önler:"
+                ),
+                table(
+                    ["Kategori", "Örnekler"],
+                    [
+                        [
+                            "Repo'ya girecekler (commitlenir)",
+                            "CLAUDE.md, .claude/rules/, .claude/skills/, .claude/agents/, "
+                            "docs/, src/, tests/, .gitignore",
+                        ],
+                        [
+                            "Kişisel / machine-local kalacaklar",
+                            "~/.claude/ (global user config), .claude/settings.local.json, "
+                            "auto memory (~/.claude/projects/<proje>/memory/), CLAUDE.local.md",
+                        ],
+                    ],
+                ),
+                warn(
+                    "Auto memory ve `~/.claude/projects/` altındaki dosyalar Claude Code'un "
+                    "kendi yönettiği, makine-local mekanizmalardır. Bunları repo iskeletinin "
+                    "bir parçası olarak elle oluşturmaya çalışma — Claude Code onları kendi "
+                    "yönetir."
+                ),
+
+                h("1.3 İdeal Proje Yapısı (Genel Bakış)"),
+                p(
+                    "Aşağıdaki ağaç, olgun bir Claude Code projesinin genel görünümüdür. "
+                    "Her klasör gün 1'den itibaren gerekmez — ihtiyaç oldukça eklenir:"
+                ),
+                code(
+                    "my-project/\n"
+                    "├── CLAUDE.md                  # Proje kuralları (Gün 3)\n"
+                    "├── .gitignore\n"
+                    "├── .claude/\n"
+                    "│   ├── rules/                 # Path-scoped kurallar (Gün 3)\n"
+                    "│   ├── skills/                # Yeniden kullanılabilir workflow'lar (Gün 6)\n"
+                    "│   ├── agents/                # Subagent tanımları (Gün 11)\n"
+                    "│   ├── hooks/                 # Yaşam döngüsü scriptleri (Gün 12)\n"
+                    "│   └── settings.json          # Proje bazlı ayarlar\n"
+                    "├── docs/\n"
+                    "│   ├── PRD.md                 # Ürün gereksinimleri\n"
+                    "│   ├── ARCHITECTURE.md        # Mimari kararlar\n"
+                    "│   └── specs/                 # Feature başına teknik spec'ler\n"
+                    "├── src/                       # Kaynak kod\n"
+                    "└── tests/                     # Testler",
+                    "text",
+                ),
+                p(
+                    "Not: Auto memory (`~/.claude/projects/<proje>/memory/`) bu ağacın dışındadır "
+                    "— o, home dizininde, Claude Code tarafından otomatik yönetilir; repo içine "
+                    "elle eklenmez."
+                ),
+
+                h("1.4 .claude/ Dizini: Tüm Alt Bileşenler"),
+                p(
+                    "`.claude/` dizini projenin \"kontrol merkezi\"dir. Her alt klasörün ayrı "
+                    "bir rolü var; bugün yalnızca iskeleti kuracağız, gerçek kullanımları ileri "
+                    "günlerde derinleşecek:"
+                ),
+                table(
+                    ["Alt bileşen", "Rol", "Ne zaman derinleşir?"],
+                    [
+                        ["rules/", "Path-scoped talimatlar; yalnızca eşleşen dosyalar okunduğunda yüklenir", "Gün 3 (işlendi)"],
+                        ["skills/", "Yeniden kullanılabilir, çok dosyalı workflow paketleri (SKILL.md + destek dosyaları)", "Gün 6"],
+                        ["agents/", "Ayrı context'e sahip uzmanlaşmış subagent tanımları", "Gün 11"],
+                        ["hooks/", "Tool kullanımı öncesi/sonrası tetiklenen otomasyon scriptleri", "Gün 12"],
+                        ["settings.json", "Proje bazlı izin ve konfigürasyon ayarları", "Sürekli"],
+                        ["plugins/", "Kurulu plugin manifestleri (genelde elle düzenlenmez)", "Gün 13, 19"],
+                    ],
+                ),
+                keypoint(
+                    "`commands/` klasörü **legacy formattır.** Anthropic 2026'da custom command'leri "
+                    "skill sistemiyle birleştirdi: `.claude/commands/review.md` hâlâ çalışır ve "
+                    "`/review` komutunu oluşturur, ama önerilen güncel yol `.claude/skills/review/"
+                    "SKILL.md`'dir. İkisi aynı isimde varsa **skill kazanır.** Skills ayrıca destek "
+                    "dosyaları, frontmatter kontrolü ve otomatik (model tarafından tetiklenen) "
+                    "yüklemeyi de destekler — commands bunları yapamaz. Bu ayrımı Gün 6'da "
+                    "derinleştireceğiz."
+                ),
+                warn(
+                    "`settings.json` içine secret, API key, token veya şifre yazılmaz. Bu dosya "
+                    "git'e commitlenir ve takımla paylaşılır — hassas veriler `.env` dosyasında "
+                    "veya bir secret manager'da tutulmalı."
+                ),
+
+                h("1.5 docs/ Üçlüsü: PRD, ARCHITECTURE ve İlk Feature Spec'i"),
+                p(
+                    "`docs/` dizini üç farklı soyutlama seviyesinde doküman barındırır. Her biri "
+                    "farklı bir soruya cevap verir:"
+                ),
+                table(
+                    ["Doküman", "Soru", "Zorunluluk"],
+                    [
+                        ["PRD.md", "Ne yapıyoruz, neden, kim için?", "Zorunlu"],
+                        ["ARCHITECTURE.md", "Nasıl yapıyoruz, hangi teknolojiyle, sınırlar ne?", "Zorunlu"],
+                        [
+                            "docs/specs/00N-*.md",
+                            "Bu spesifik feature'ın tam teknik detayı ve kabul kriterleri nedir?",
+                            "Feature başına, ihtiyaç oldukça",
+                        ],
+                    ],
+                ),
+                p(
+                    "Todo App gibi orta ölçekli bir projede tek ve devasa bir `SPEC.md` yazmak "
+                    "yerine, her feature için küçük bir spec dosyası açmak daha sürdürülebilirdir: "
+                    "`docs/specs/001-todo-olustur.md`, `docs/specs/002-todo-listele.md` gibi. "
+                    "Bu yaklaşım Kademe 3-4'te (SaaS Dashboard, mikro-servis) doğal olarak büyür "
+                    "ve issue/kanban tabanlı workflow'lara bağlanır."
+                ),
+                warn(
+                    "Üç doküman türü birbiriyle çelişirse Claude hangisine öncelik vereceğini "
+                    "bilemez. Önemli bir karar değiştiğinde ilgili tüm dosyaları güncel tut — "
+                    "Bölüm 3'te bunun için bir \"drift check\" prompt'u göreceksin."
+                ),
+
+                h("1.6 Interview-Driven Spec: Claude Seni Mülakat Etsin"),
+                p(
+                    "Resmi Claude Code best practice'i şunu önerir: büyük bir özellik için "
+                    "minimal bir prompt ile başla ve Claude'dan **AskUserQuestion** tool'unu "
+                    "kullanarak seni sorularla derinleştirmesini iste."
+                ),
+                code(
+                    "Todo App'i inşa edeceğiz: kullanıcıların görev ekleyip listeleyebileceği "
+                    "bir uygulama. AskUserQuestion tool'unu kullanarak beni detaylı bir şekilde "
+                    "mülakat et. Teknik implementasyon, UI/UX, edge case'ler ve trade-off'lar "
+                    "hakkında sor. Bariz soruları sorma; düşünmediğim zor kısımlara odaklan. "
+                    "Her şeyi kapsayana kadar mülakata devam et, sonra tam bir PRD'yi docs/PRD.md "
+                    "dosyasına yaz.",
+                    "text",
+                ),
+                keypoint(
+                    "Bu yöntem, \"ne istediğini düşünmeden yazdırmak\" yerine kritik kararları "
+                    "(mimari, UX, edge case) kod yazılmadan önce yüzeye çıkarır. Ucuz olan "
+                    "aşamada (yazı) pahalı olacak hatayı (kod, sonradan değişim) önler."
+                ),
+
+                h("1.7 Plan Mode: Araştırma + Plan, Değişiklik Değil"),
+                p(
+                    "`Shift+Tab` ile veya `claude --permission-mode plan` ile Plan Mode'a "
+                    "geçebilirsin. Bu modda Claude kaynak dosyaları **değiştirmez** — ama "
+                    "araştırma amaçlı dosya **okuyabilir** ve izinli keşif komutları "
+                    "**çalıştırabilir.** Yani \"tamamen pasif okuma modu\" değildir; "
+                    "Claude anlamak için gerekeni yapar, sadece yazma/değiştirme işlemlerini "
+                    "sana onaylatmadan yapmaz."
+                ),
+                p(
+                    "PRD/ARCHITECTURE hazırlanırken Plan Mode idealdir: Claude önce anlar ve "
+                    "planlar, sen onaylayınca gerçek yazıma (dosya oluşturma) geçilir."
+                ),
+                tip(
+                    "Plan'ı dosyaya kaydettirebilirsin. Varsayılan konum `~/.claude/plans`'dir; "
+                    "`plansDirectory` ayarını `./plans` gibi repo-içi bir yola ayarlarsan planlar "
+                    "PR review için commit edilebilir hale gelir."
+                ),
+            ],
+        },
+
+        # -------------------------------------------------------------
+        # BÖLÜM 2 — TODO APP REPO İSKELETİ
+        # -------------------------------------------------------------
+        {
+            "num": "BÖLÜM 2",
+            "title": "TODO APP REPO İSKELETİ",
+            "blocks": [
+                h("2.1 Proje İskeletini Sıfırdan Kurma"),
+                p(
+                    "Todo App için React/TypeScript (frontend) + FastAPI (backend) + SQLite "
+                    "(veritabanı) stack'ini kullanacağız. Klasör yapısını `src/web` (frontend) "
+                    "ve `src/api` (backend) olarak ayırıyoruz — bu ayrım hem kısa hem de "
+                    "sorumlulukları net biçimde ayırıyor:"
+                ),
+                steps([
+                    "Yeni proje dizini oluştur: `mkdir todo-app && cd todo-app`",
+                    "Tüm klasör ağacını tek seferde kur (aşağıdaki komut)",
+                    "`.gitignore` oluştur: node_modules, __pycache__, .env, *.db, .claude/settings.local.json",
+                    "Claude Code'u aç ve yapının doğru kurulduğunu `/memory` ile doğrula",
+                ]),
+                code(
+                    "mkdir -p todo-app/{.claude/{rules,skills,agents,hooks},docs/specs,"
+                    "src/web,src/api,tests/web,tests/api}\n"
+                    "cd todo-app\n"
+                    "touch CLAUDE.md .gitignore",
+                    "bash",
+                ),
+                code(
+                    "todo-app/\n"
+                    "├── CLAUDE.md\n"
+                    "├── .gitignore\n"
+                    "├── .claude/\n"
+                    "│   ├── rules/\n"
+                    "│   ├── skills/\n"
+                    "│   ├── agents/\n"
+                    "│   ├── hooks/\n"
+                    "│   └── settings.json\n"
+                    "├── docs/\n"
+                    "│   ├── PRD.md\n"
+                    "│   ├── ARCHITECTURE.md\n"
+                    "│   └── specs/\n"
+                    "│       └── 001-todo-olustur.md\n"
+                    "├── src/\n"
+                    "│   ├── web/        # React + TypeScript\n"
+                    "│   └── api/         # FastAPI\n"
+                    "└── tests/\n"
+                    "    ├── web/\n"
+                    "    └── api/",
+                    "text",
+                ),
+
+                h("2.2 PRD.md İçin Interview Başlatma"),
+                steps([
+                    "Claude Code'u proje dizininde aç",
+                    "Bölüm 1.6'daki interview prompt'unu ver",
+                    "AskUserQuestion ile gelen soruları yanıtla (hedef kullanıcı, MVP kapsamı, "
+                    "auth gerekip gerekmediği, çoklu kullanıcı desteği vb.)",
+                    "Claude'un PRD.md'yi `docs/PRD.md` konumuna yazmasını onayla",
+                ]),
+                code(
+                    "> Claude AskUserQuestion ile soruyor:\n"
+                    "1. Todo'lar tek kullanıcı için mi, yoksa çoklu kullanıcı/auth gerekiyor mu?\n"
+                    "   [ ] Tek kullanıcı (MVP)  [ ] Çoklu kullanıcı + auth\n"
+                    "2. Todo'larda son tarih (due date) olacak mı?\n"
+                    "   [ ] Hayır, sadece başlık  [ ] Evet, tarih + hatırlatma\n"
+                    "3. Kategoriler/etiketler gerekli mi?\n"
+                    "   [ ] Hayır  [ ] Evet, basit etiketleme",
+                    "text",
+                ),
+                tip(
+                    "Cevapların netse (\"tek kullanıcı, MVP, sade\") interview kısa sürer. "
+                    "Belirsizsen Claude derinleşir — bu iyi bir şey, çünkü kod yazılmadan önce "
+                    "kararları netleştiriyorsun."
+                ),
+
+                h("2.3 Git Init + İlk Commit"),
+                steps([
+                    "`git init`",
+                    "`.gitignore` içeriğini kontrol et",
+                    "`git add .`",
+                    "İlk commit: Conventional Commits formatında",
+                ]),
+                code(
+                    "git init\n"
+                    "git add .\n"
+                    'git commit -m "feat: proje iskeleti ve PRD.md oluşturuldu"',
+                    "bash",
+                ),
+
+                h("2.4 CLAUDE.md'yi Yeni Yapıya Göre Güncelleme"),
+                steps([
+                    "Gün 3'te öğrendiğin CLAUDE.md'ye şimdi klasör yapısını proje kuralı olarak ekle",
+                    "Stack bilgisini (React/TS + FastAPI + SQLite) ve `src/web` / `src/api` ayrımını belirt",
+                    "`/init` komutunu tekrar çalıştırabilirsin — yeni docs/ ve .claude/ yapısını fark edip günceller",
+                ]),
+                code(
+                    "# CLAUDE.md (güncellenmiş proje kuralları)\n\n"
+                    "## Stack\n"
+                    "- Frontend: React + TypeScript (`src/web`)\n"
+                    "- Backend: Python 3.12+, FastAPI (`src/api`)\n"
+                    "- Database: SQLite\n\n"
+                    "## Klasör Yapısı\n"
+                    "- `src/web/` — frontend kodu, component başına dosya\n"
+                    "- `src/api/` — backend kodu, route/model/schema ayrımı\n"
+                    "- `docs/` — PRD, ARCHITECTURE, feature spec'leri\n"
+                    "- `tests/` — src/ ile birebir eşlenen test yapısı\n\n"
+                    "## Kurallar\n"
+                    "- Type hints (Python) ve TypeScript tipleri zorunlu\n"
+                    "- Her yeni feature için `docs/specs/00N-*.md` yaz",
+                    "markdown",
+                ),
+            ],
+        },
+
+        # -------------------------------------------------------------
+        # BÖLÜM 3 — PRATİK: DERİNLEŞ
+        # -------------------------------------------------------------
+        {
+            "num": "BÖLÜM 3",
+            "title": "İNTERVIEW-DRIVEN PRD + ARCHITECTURE",
+            "blocks": [
+                h("3.1 ARCHITECTURE.md Yazımı"),
+                p(
+                    "PRD.md hazır olduğunda, Claude'a bu dosyayı okutup mimari kararlar için "
+                    "ikinci bir interview/plan turu yaptır. ARCHITECTURE.md şu başlıkları "
+                    "içermeli:"
+                ),
+                bullets([
+                    "**Stack** — frontend/backend/db teknolojileri ve versiyon gereksinimleri",
+                    "**Klasör Sorumlulukları** — `src/web` ve `src/api` içinde ne nerede yaşar",
+                    "**Veri Modeli** — Todo tablosu şeması (id, title, done, created_at vb.)",
+                    "**API Surface** — endpoint listesi, HTTP metodları, request/response şekli",
+                    "**Error Handling** — hata formatı, status kod convention'ı",
+                    "**Testing Strategy** — hangi katmanda hangi test türü (unit/integration)",
+                    "**Deployment Assumptions** — Render'a nasıl deploy edileceği (Gün 5/10'da detaylanacak)",
+                    "**Non-goals** — bu sürümde bilinçli olarak yapılmayacaklar",
+                    "**Architectural Decisions** — neden bu seçildi, alternatifler nelerdi",
+                ]),
+                keypoint(
+                    "**Non-goals** bölümü özellikle değerlidir — scope creep'i engeller. Claude'a "
+                    "\"bunu yap\" demek kadar \"bunu bu sürümde yapmayacağız\" demek de projeyi "
+                    "odakta tutar (ör. \"v1'de kullanıcı auth'u yok\", \"v1'de mobil uygulama yok\")."
+                ),
+                code(
+                    "PRD.md'yi oku. Buna dayanarak docs/ARCHITECTURE.md oluştur. Şu başlıkları "
+                    "içersin: Stack, Klasör Sorumlulukları, Veri Modeli, API Surface, Error "
+                    "Handling, Testing Strategy, Deployment Assumptions, Non-goals, Architectural "
+                    "Decisions. Kod yazma, sadece mimari dokümanı üret.",
+                    "text",
+                ),
+
+                h("3.2 İlk Feature Spec'i: 001-todo-olustur.md"),
+                p(
+                    "Tam bir SPEC.md yerine, ilk feature için küçük ve odaklı bir spec dosyası "
+                    "oluşturuyoruz. Bu, \"todo ekleme\" özelliğinin uçtan uca teknik detayını "
+                    "içerir:"
+                ),
+                code(
+                    "# Feature 001 — Todo Oluştur\n\n"
+                    "## User Story\n"
+                    "Kullanıcı olarak, bir başlık girip yeni bir todo oluşturabilmek istiyorum "
+                    "ki yapılacaklarımı takip edebileyim.\n\n"
+                    "## API Contract\n"
+                    "POST /api/todos\n"
+                    "Request: { \"title\": string }\n"
+                    "Response: { \"id\": int, \"title\": string, \"done\": false, \"created_at\": string }\n\n"
+                    "## Validation Rules\n"
+                    "- title boş olamaz\n"
+                    "- title max 200 karakter\n\n"
+                    "## Acceptance Criteria\n"
+                    "- [ ] Geçerli title ile POST → 201 Created\n"
+                    "- [ ] Boş title ile POST → 422 Validation Error\n"
+                    "- [ ] Oluşturulan todo veritabanında görünüyor\n\n"
+                    "## Test Cases\n"
+                    "- test_create_todo_success\n"
+                    "- test_create_todo_empty_title_fails\n"
+                    "- test_create_todo_title_too_long_fails",
+                    "markdown",
+                ),
+                tip(
+                    "Sonraki feature'lar için aynı şablonu kullan: `002-todo-listele.md`, "
+                    "`003-todo-tamamla.md` gibi. Bu, ileride issue/kanban tabanlı bir workflow'a "
+                    "doğal olarak bağlanır."
+                ),
+
+                h("3.3 Üç Doküman Arası Tutarlılık Kontrolü"),
+                steps([
+                    "Claude'dan PRD/ARCHITECTURE/spec dosyalarını çapraz okuyup çelişki taramasını iste",
+                    "Bulunan tutarsızlıkları düzelt (ör. PRD'de \"etiketleme yok\" derken ARCHITECTURE'da etiket tablosu varsa)",
+                ]),
+                code(
+                    "docs/PRD.md, docs/ARCHITECTURE.md ve docs/specs/001-todo-olustur.md "
+                    "dosyalarını karşılaştır. Aralarında çelişki veya tutarsızlık var mı? "
+                    "Varsa tablo halinde listele: hangi dosya, hangi iddia, neden çelişiyor.",
+                    "text",
+                ),
+                warn(
+                    "Dokümanlar zamanla eskir. Her önemli mimari veya kapsam kararı değiştiğinde "
+                    "ilgili tüm dosyaları güncel tut — aksi halde Claude gelecekte hangi dosyaya "
+                    "güveneceğini bilemez."
+                ),
+
+                h("3.4 Plan Mode ile Deneme"),
+                steps([
+                    "`Shift+Tab` ile Plan Mode'a geç",
+                    "\"Todo App'in ilk CRUD endpoint'ini (POST /api/todos) nasıl kurarsın?\" diye sor",
+                    "Claude'un ürettiği planı incele — kod yazılmadığını doğrula",
+                    "Planı kaydet: `docs/plans/gun04-ilk-crud-plani.md`",
+                ]),
+                tip(
+                    "Plan Mode'dan çıkmak için tekrar `Shift+Tab`'a bas veya planı onaylayıp "
+                    "\"bu planı uygula\" de — Claude o zaman gerçek dosya değişikliklerine geçer."
+                ),
+            ],
+        },
+    ],
+
+    # -------------------------------------------------------------------------
+    # PROMPT KÜTÜPHANESİ
+    # -------------------------------------------------------------------------
+    "prompts": [
+        {
+            "title": "Proje İskeleti Kur",
+            "prompt": (
+                "todo-app adında bir proje için şu klasör yapısını oluşturan bir bash komutu "
+                "yaz: CLAUDE.md, .gitignore, .claude/{rules,skills,agents,hooks}, "
+                "docs/{PRD.md,ARCHITECTURE.md,specs}, src/{web,api}, tests/{web,api}."
+            ),
+        },
+        {
+            "title": "PRD Interview Başlat",
+            "prompt": (
+                "Todo App'i inşa edeceğiz: kullanıcıların görev ekleyip listeleyebileceği bir "
+                "uygulama. AskUserQuestion tool'unu kullanarak beni detaylı bir şekilde mülakat "
+                "et. Teknik implementasyon, UI/UX, edge case'ler ve trade-off'lar hakkında sor. "
+                "Bariz soruları sorma; düşünmediğim zor kısımlara odaklan. Her şeyi kapsayana "
+                "kadar mülakata devam et, sonra tam bir PRD'yi docs/PRD.md dosyasına yaz."
+            ),
+        },
+        {
+            "title": "ARCHITECTURE.md Oluştur",
+            "prompt": (
+                "PRD.md'yi oku. Buna dayanarak docs/ARCHITECTURE.md oluştur. Şu başlıkları "
+                "içersin: Stack, Klasör Sorumlulukları, Veri Modeli, API Surface, Error "
+                "Handling, Testing Strategy, Deployment Assumptions, Non-goals, Architectural "
+                "Decisions. Kod yazma, sadece mimari dokümanı üret."
+            ),
+        },
+        {
+            "title": "Çapraz Tutarlılık Kontrolü",
+            "prompt": (
+                "docs/PRD.md, docs/ARCHITECTURE.md ve docs/specs/001-todo-olustur.md "
+                "dosyalarını karşılaştır. Aralarında çelişki veya tutarsızlık var mı? Varsa "
+                "tablo halinde listele: hangi dosya, hangi iddia, neden çelişiyor."
+            ),
+        },
+        {
+            "title": "Plan Mode Denemesi",
+            "prompt": (
+                "(Plan Mode'dayken) Todo App'in ilk CRUD endpoint'ini (POST /api/todos) nasıl "
+                "kurarsın? Adım adım bir plan üret, kod yazma. Planı docs/plans/"
+                "gun04-ilk-crud-plani.md dosyasına kaydet."
+            ),
+        },
+        {
+            "title": "Scope Freeze Prompt",
+            "prompt": (
+                "Şu ana kadarki PRD ve ARCHITECTURE dokümanlarına göre: hangi kararlar "
+                "kesinleşti, hangi kararlar hâlâ açık? Açık kararları kod yazımından önce "
+                "listele."
+            ),
+            "note": "Kod yazmadan önce hangi kararların hâlâ belirsiz olduğunu netleştirmek için kullan.",
+        },
+        {
+            "title": "Docs Drift Check",
+            "prompt": (
+                "docs/PRD.md, docs/ARCHITECTURE.md ve mevcut klasör yapısını (src/, tests/) "
+                "karşılaştır. Güncel implementasyonla dokümanlar arasında drift (sapma) var mı? "
+                "Varsa tablo halinde listele."
+            ),
+            "note": "Proje ilerledikçe dokümanların güncelliğini kontrol etmek için periyodik olarak çalıştır.",
+        },
+    ],
+
+    # -------------------------------------------------------------------------
+    # CHALLENGE
+    # -------------------------------------------------------------------------
+    "challenge": {
+        "title": "CHALLENGE: 🟡 Todo App (Kademe 2) Proje İskeletini Kur",
+        "task": (
+            "Todo App projesi için tam klasör yapısını, PRD.md'yi, ARCHITECTURE.md'yi ve ilk "
+            "feature spec'ini Claude yardımıyla interview üzerinden oluştur."
+        ),
+        "requirements": [
+            "Tam klasör yapısını oluştur: src/web, src/api, .claude/{rules,skills,agents,hooks}, docs/specs",
+            "AskUserQuestion interview'i ile docs/PRD.md üret",
+            "PRD.md'yi okutup docs/ARCHITECTURE.md üret",
+            "docs/specs/001-todo-olustur.md yaz (user story + API contract + acceptance criteria)",
+            "CLAUDE.md'yi yeni yapıya göre güncelle",
+            "Plan Mode'da ilk CRUD planını üret ve docs/plans/gun04-ilk-crud-plani.md olarak kaydet",
+            "git init yap ve ilk commit'i at",
+        ],
+        "success": [
+            "Tam klasör yapısı mevcut: src/web, src/api ve .claude/ alt klasörleri (rules, skills, agents, hooks) oluşturulmuş",
+            "PRD.md şu 5 başlığı içeriyor: hedef kullanıcı, problem tanımı, core user flow, MVP kapsamı, out-of-scope maddeleri",
+            "ARCHITECTURE.md şu başlıkları içeriyor: frontend/backend ayrımı, veri modeli, API endpoint taslağı, deployment varsayımları, test stratejisi, non-goals",
+            "docs/specs/001-todo-olustur.md mevcut ve en az 3 acceptance criteria içeriyor",
+            "CLAUDE.md yeni yapıyı (stack, klasör sorumlulukları) yansıtacak şekilde güncellenmiş",
+            "Plan Mode çıktısı docs/plans/gun04-ilk-crud-plani.md olarak kaydedilmiş",
+            "Git init yapılmış, en az 1 commit atılmış",
+        ],
+        "solution": {
+            "intro": (
+                "Sıralı bir akış izle: önce iskelet, sonra interview ile PRD, sonra ARCHITECTURE, "
+                "sonra ilk feature spec'i, en son Plan Mode denemesi ve commit."
+            ),
+            "prompts": [
+                {
+                    "title": "1) Proje iskeletini kur",
+                    "prompt": (
+                        "todo-app adında bir proje için şu klasör yapısını oluştur: CLAUDE.md, "
+                        ".gitignore, .claude/{rules,skills,agents,hooks}, "
+                        "docs/{PRD.md,ARCHITECTURE.md,specs}, src/{web,api}, tests/{web,api}."
+                    ),
+                },
+                {
+                    "title": "2) PRD interview'i başlat",
+                    "prompt": (
+                        "Todo App'i inşa edeceğiz: React/TypeScript frontend + FastAPI backend + "
+                        "SQLite. AskUserQuestion tool'unu kullanarak beni mülakat et: hedef "
+                        "kullanıcı, MVP kapsamı, auth gerekip gerekmediği, due date/etiket gibi "
+                        "ek özellikler. Sonra docs/PRD.md'yi yaz."
+                    ),
+                },
+                {
+                    "title": "3) ARCHITECTURE.md ve ilk spec'i üret",
+                    "prompt": (
+                        "PRD.md'ye dayanarak docs/ARCHITECTURE.md oluştur (Stack, Klasör "
+                        "Sorumlulukları, Veri Modeli, API Surface, Error Handling, Testing "
+                        "Strategy, Deployment Assumptions, Non-goals, Architectural Decisions). "
+                        "Ardından ilk feature için docs/specs/001-todo-olustur.md yaz: user "
+                        "story, API contract, validation rules, acceptance criteria, test cases."
+                    ),
+                },
+            ],
+            "notes": [
+                "Interview sırasında Claude'un sorduğu her soruyu dikkatle oku — bariz olmayan "
+                "sorular genelde en kritik kararlardır (ör. çoklu kullanıcı desteği).",
+                "ARCHITECTURE.md'yi yazdırdıktan sonra mutlaka oku ve Non-goals bölümünün "
+                "gerçekten senin niyetini yansıttığını doğrula.",
+                "Plan Mode'da Claude'un dosya okuyabildiğini ama yazamadığını gözlemle — "
+                "`Shift+Tab` ile modlar arası geçişi net gör.",
+            ],
+            "pitfalls": [
+                "PRD ve ARCHITECTURE'ı yazdırıp hiç okumadan geçmek — tutarsızlıklar burada gizlenir.",
+                "docs/specs/ yerine tek ve devasa bir SPEC.md yazmaya çalışmak — feature başına küçük dosyalar daha sürdürülebilir.",
+                ".claude/commands/ ile skill sistemini karıştırmak — bugün sadece klasörleri açıyoruz, gerçek kullanım Gün 6'da.",
+                "Plan Mode çıktısını kaydetmeyi unutmak — `docs/plans/` içine yazdırmazsan oturum kapanınca kaybolur.",
+            ],
+        },
+    },
+
+    # -------------------------------------------------------------------------
+    # TAKEAWAYS
+    # -------------------------------------------------------------------------
+    "takeaways": [
+        "Klasör yapısı dosya düzeni değildir; Claude için bir navigasyon haritasıdır — iyi yapı, daha az prompt demektir.",
+        "Repo'ya girecekler (CLAUDE.md, .claude/rules|skills|agents, docs/, src/, tests/) ile machine-local kalacaklar (~/.claude/, auto memory, settings.local.json) net ayrılmalı.",
+        ".claude/commands/ legacy formattır; yeni workflow'lar için .claude/skills/ tercih edilir — ikisi aynı isimde varsa skill kazanır.",
+        "docs/ üçlüsü: PRD.md (ne/neden) ve ARCHITECTURE.md (nasıl) zorunlu; SPEC her feature için küçük, odaklı bir dosya (docs/specs/00N-*.md) olarak başlar.",
+        "AskUserQuestion tool'u ile interview-driven spec yazımı, kritik kararları kod yazılmadan önce yüzeye çıkarır.",
+        "Plan Mode dosya değiştirmez ama araştırma amaçlı okuyabilir ve keşif komutu çalıştırabilir — tamamen pasif değildir.",
+        "ARCHITECTURE.md'de Non-goals bölümü scope creep'i engeller: neyin bu sürümde yapılmayacağını netleştirir.",
+        "settings.json ve CLAUDE.local.md secret store değildir — API key/token için .env veya secret manager kullanılır.",
+    ],
+
+    # -------------------------------------------------------------------------
+    # READING
+    # -------------------------------------------------------------------------
+    "reading": {
+        "official": [
+            {"label": "Explore the .claude Directory (Resmi Docs)", "url": "https://code.claude.com/docs/en/claude-directory"},
+            {"label": "Best Practices — AskUserQuestion / Interview Workflow", "url": "https://code.claude.com/docs/en/best-practices"},
+            {"label": "Permission Modes (Plan Mode dahil)", "url": "https://code.claude.com/docs/en/permission-modes"},
+            {"label": "Extend Claude with Skills", "url": "https://code.claude.com/docs/en/skills"},
+        ],
+        "community": [
+            {"label": "ClaudeLog — Topluluk best practices", "url": "https://claudelog.com/"},
+            {"label": "Awesome Claude Code (küratörlü liste)", "url": "https://github.com/hesreallyhim/awesome-claude-code"},
+        ],
+        "extra": [
+            {"label": "Claude Code Best Practices (Anthropic Engineering)", "url": "https://www.anthropic.com/engineering/claude-code-best-practices"},
+        ],
+    },
+
+    # -------------------------------------------------------------------------
+    # NEXT PREVIEW
+    # -------------------------------------------------------------------------
+    "next_preview": (
+        "Git Entegrasyonu, Checkpointing ve Workflow — commit stratejileri, branch workflow, "
+        "merge conflict çözümü, /rewind ile geri alma ve Todo App'in ilk deploy'una hazırlık "
+        "öğreneceksin."
+    ),
+
+    # -------------------------------------------------------------------------
+    # CHECKLIST
+    # -------------------------------------------------------------------------
+    "checklist": [
+        "Claude Code projeleri için ideal klasör yapısını (CLAUDE.md, .claude/, docs/, src/, tests/) açıklayabiliyorum",
+        "Repo'ya girecekler ile machine-local kalacakları ayırt edebiliyorum",
+        ".claude/ alt bileşenlerini (rules, skills, agents, hooks, settings.json) rolleriyle biliyorum",
+        ".claude/commands/ ile .claude/skills/ arasındaki legacy/güncel ilişkiyi biliyorum",
+        "PRD.md, ARCHITECTURE.md ve ilk feature spec'inin amaç farkını açıklayabiliyorum",
+        "AskUserQuestion ile interview-driven PRD yazdırdım",
+        "Plan Mode'u (Shift+Tab) kullanarak salt-okunur bir plan ürettim",
+        "ARCHITECTURE.md'ye Non-goals bölümü ekledim",
+        "Todo App proje iskeletini (klasör + 3 doküman türü) kurdum",
+        "Günün challenge'ını tamamladım (Todo App Kademe 2 iskeleti)",
+    ],
+}
