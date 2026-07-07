@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 5 — Git Entegrasyonu, Checkpointing ve Oturum Yönetimi · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><span class="cur"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></span></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><span class="locked" title="yakında"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></span><span class="locked" title="yakında"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></span></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></span><span class="locked" title="yakında"><span class="num">12</span><span>Hooks ve Sandboxing</span></span><span class="locked" title="yakında"><span class="num">13</span><span>Skills &amp; Plugins</span></span><span class="locked" title="yakında"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></span><span class="locked" title="yakında"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></span></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 1 — Temel · Gün 05 / 20</div><h1>Git Entegrasyonu, Checkpointing ve Oturum Yönetimi</h1><p class="tagline">“Claude Code, Git&#x27;in en iyi arkadaşı”</p><p class="intro">Bugün üç güvenlik katmanını tanıyacaksın: Git commit ile kalıcı proje tarihçesi, checkpointing ile Claude düzenlemelerini geri alma ve session yönetimi ile konuşma bağlamını oturumlar arası sürdürme. Bu üçlü, Claude Code&#x27;u &#x27;tek seferlik kod yazdırma aracı&#x27; olmaktan çıkarıp profesyonel geliştirme workflow&#x27;una dönüştürür.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Büyük Resim</div><div class="du">20 dk</div><div class="de">Üç güvenlik katmanı: Git commit vs checkpoint vs session</div></div><div class="step"><div class="ph">2 · Guided Practice</div><div class="du">55 dk</div><div class="de">Commit, branch, merge conflict, /rewind pratiği</div></div><div class="step"><div class="ph">3 · Workflow Hardening</div><div class="du">30 dk</div><div class="de">PR oluşturma, .gitignore, session yönetimi, /branch</div></div><div class="step"><div class="ph">4 · Challenge</div><div class="du">45 dk</div><div class="de">3 branch + conflict + rollback + debrief</div></div></div><div class="meta"><strong>Ön koşul:</strong> Git temel komutları (init, add, commit, push, pull, branch, merge); Gün 1–4 tamamlanmış (Claude Code kurulu, CLAUDE.md ve proje yapısı hazır); Terminal ve kod editörü açık</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); Git (v2.20+); GitHub CLI (gh) — PR pratiği için isteğe bağlı; VS Code veya tercih edilen editör (diff incelemesi için)</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Claude Code&#x27;un git işlemlerini doğal dil ile yönetebilecek ve commit, branch, merge, PR komutlarını kullanabileceksin</li><li>Conventional commit formatında anlamlı commit mesajları yazdırabilecek ve atomic vs batch commit stratejilerini ayırt edebileceksin</li><li>Feature branch workflow&#x27;unu (oluşturma → geliştirme → commit → merge/PR) Claude Code ile uçtan uca uygulayabileceksin</li><li>Merge conflict durumlarını Claude Code ile tespit edip çözebileceksin</li><li>Checkpointing mekanizmasını anlayacak ve /rewind ile kod ve konuşma durumunu geri sarabileceksin</li><li>Oturum yönetimi araçlarını (--continue, --resume, --from-pr, /branch) kullanarak çalışmayı oturumlar arası sürdürebileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Büyük Resim: Üç Güvenlik Katmanı</h3><p>Claude Code ile çalışırken üç farklı güvenlik mekanizması seni korur. Her birinin kapsamı ve kalıcılığı farklıdır; birbirinin yerine geçmez, birbirini tamamlar.</p><table><thead><tr><th>Katman</th><th>Ne korur?</th><th>Kalıcılık</th><th>Geri alma</th></tr></thead><tbody><tr><td><strong>Git commit</strong></td><td>Proje tarihçesi — tüm dosyalar, tüm katkıcılar</td><td>Kalıcı (remote&#x27;a push edildiğinde dağıtık)</td><td><code>git revert</code>, <code>git reset</code>, branch stratejisi</td></tr><tr><td><strong>Checkpoint (/rewind)</strong></td><td>Claude&#x27;un file edit tool ile yaptığı değişiklikler + konuşma durumu</td><td>Oturum bazlı (30 gün, ayarlanabilir)</td><td>Esc+Esc → menüden seç → Restore</td></tr><tr><td><strong>Session</strong></td><td>Konuşma bağlamı — prompt&#x27;lar, dosya okumaları, komut çıktıları</td><td>Lokal diske kaydedilir (~/.claude/projects/)</td><td><code>--continue</code>, <code>--resume</code>, <code>/branch</code></td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Git proje tarihçesini korur; checkpoint çalışma anındaki AI denemelerini geri alır; session yönetimi ise konuşma bağlamını sürdürür. Bu üçlüyü birbirine karıştırma — her biri farklı bir sorunu çözer.</div><h3 class="sub">1.2 Claude Code ve Git: Nasıl Çalışır?</h3><p>Claude Code, Git işlemlerini çoğunlukla terminal komutları üzerinden yürütür. Doğal dilde verdiğin talimatı uygun <code>git</code> komutlarına çevirir, izin moduna bağlı olarak çalıştırır ve sonucu sana raporlar. Bu yüzden yaptığı işlemleri <code>git status</code>, <code>git diff</code>, <code>git log</code> gibi komutlarla doğrulamak iyi bir alışkanlıktır.</p><ul><li><strong>git status / diff / log:</strong> Okuma işlemleri — genelde izin gerekmez.</li><li><strong>git add / commit:</strong> Yazma işlemleri — izin moduna göre onay gerekebilir.</li><li><strong>git push / pull / merge:</strong> Ağ ve birleştirme işlemleri — yüksek etkili, genelde onay gerektirir.</li><li><strong>git checkout / branch:</strong> Branch yönetimi — düşük riskli, auto mode&#x27;da çoğunlukla otomatik.</li></ul><div class="callout tip"><span class="lbl">💡 İpucu</span>Claude Code bir GUI git client değil. Arka planda terminal komutları çalıştırır. Bu avantajdır: Claude&#x27;un yaptığı her işlem standart git komutları olduğu için sonuçları her zaman <code>git log</code>, <code>git diff</code> veya VS Code Git panelinde doğrulayabilirsin.</div><h3 class="sub">1.3 Commit Stratejileri ve Mesaj Yazdırma</h3><p>İyi bir commit stratejisi, proje tarihçesini okunabilir ve geri alınabilir kılar. Claude Code ile iki temel strateji kullanabilirsin:</p><table><thead><tr><th>Strateji</th><th>Ne zaman?</th><th>Avantaj</th><th>Risk</th></tr></thead><tbody><tr><td><strong>Atomic commit</strong></td><td>Her mantıksal değişiklik ayrı commit</td><td>Geri alma kolay, PR review temiz</td><td>Daha fazla commit, daha sık onay</td></tr><tr><td><strong>Batch commit</strong></td><td>Birkaç ilişkili değişiklik tek commit</td><td>Hızlı, az gürültü</td><td>Geri alma zor, review karışık</td></tr></tbody></table><p><strong>Conventional Commit formatı</strong> takımlar arası standart bir dil sağlar:</p><pre><code>type(scope): kısa açıklama
+
+[opsiyonel gövde]
+
+[opsiyonel footer: BREAKING CHANGE, Closes #123]</code></pre><table><thead><tr><th>Tip</th><th>Anlam</th><th>Örnek</th></tr></thead><tbody><tr><td>feat</td><td>Yeni özellik</td><td>feat(auth): add JWT token validation</td></tr><tr><td>fix</td><td>Hata düzeltme</td><td>fix(api): handle null response in /users</td></tr><tr><td>refactor</td><td>Davranış değiştirmeden yapı iyileştirme</td><td>refactor(db): extract query builder</td></tr><tr><td>docs</td><td>Dokümantasyon</td><td>docs(readme): add setup instructions</td></tr><tr><td>test</td><td>Test ekleme/düzeltme</td><td>test(auth): add edge case for expired token</td></tr><tr><td>chore</td><td>Build, CI, bağımlılık</td><td>chore(deps): bump express to 4.19</td></tr><tr><td>ci</td><td>CI/CD değişikliği</td><td>ci(github): add lint step to PR workflow</td></tr><tr><td>perf</td><td>Performans iyileştirme</td><td>perf(query): add index on created_at</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span>Commit mesajını İngilizce mi Türkçe mi yazmalı? Takım standardına bağlı. Açık kaynak veya uluslararası takımlarda İngilizce tercih edilir. Claude Code&#x27;a CLAUDE.md&#x27;de dil tercihi belirtirsen otomatik uyar.</div><h3 class="sub">1.4 Branch Workflow</h3><p>Feature branch pattern, paralel geliştirmenin temel taşıdır. Akış şöyle işler:</p><ol><li><code>main</code> branch&#x27;ten yeni bir feature branch oluştur (<code>git checkout -b feature/add-priority</code>)</li><li>Feature branch&#x27;te çalış, commit&#x27;ler at</li><li>İş bitince <code>main</code>&#x27;e dön ve feature branch&#x27;i merge et (<code>git merge feature/add-priority</code>)</li><li>Conflict varsa çöz, merge commit&#x27;i oluştur</li><li>Feature branch&#x27;i sil (<code>git branch -d feature/add-priority</code>)</li></ol><p><strong>Merge conflict</strong> iki branch&#x27;te aynı dosyanın aynı bölümü farklı değiştirildiğinde oluşur. Git hangi değişikliğin geçerli olduğuna karar veremez ve conflict marker&#x27;ları ile seni bilgilendirir:</p><pre><code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+function formatTodo(todo) {
+  return `[${todo.priority}] ${todo.title}`;
+}
+=======
+function formatTodo(todo) {
+  return `${todo.title} (due: ${todo.dueDate})`;
+}
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/add-duedate</code></pre><div class="callout kp"><span class="lbl">🔑 Önemli</span>Claude Code conflict marker&#x27;larını okur, her iki tarafın amacını analiz eder, uygun bir birleştirme önerir ve uygular. Ama sonucu mutlaka kendin doğrula — Claude her iki değişikliğin iş mantığını her zaman tam kavrayamayabilir.</div><h3 class="sub">1.5 Checkpointing: Oturum İçi Güvenlik Ağı</h3><p>Checkpointing, Claude Code&#x27;un dosya düzenleme araçları (file edit tools) ile yaptığı her değişikliği otomatik olarak kaydeder. Her kullanıcı prompt&#x27;u yeni bir checkpoint oluşturur. Checkpoint&#x27;ler oturumlar arası da erişilebilir kalır — resumed bir session&#x27;da bile önceki checkpoint&#x27;lere dönebilirsin.</p><p><strong><code>/rewind</code> menüsü</strong> altı aksiyon sunar:</p><table><thead><tr><th>Aksiyon</th><th>Dosyalar</th><th>Konuşma</th><th>Ne zaman kullan?</th></tr></thead><tbody><tr><td>Restore code and conversation</td><td>⬅ Geri alınır</td><td>⬅ Geri alınır</td><td>Hem kodu hem konuşmayı o noktaya döndürmek istiyorsan</td></tr><tr><td>Restore conversation</td><td>Değişmez</td><td>⬅ Geri alınır</td><td>Kod doğru ama konuşma yanlış yöne gittiyse</td></tr><tr><td>Restore code</td><td>⬅ Geri alınır</td><td>Değişmez</td><td>Konuşma doğru ama kod bozulduysa</td></tr><tr><td>Summarize from here</td><td>Değişmez</td><td>Seçilen noktadan sonrası özetlenir</td><td>Gereksiz konuşmayı sıkıştırıp context kazanmak</td></tr><tr><td>Summarize up to here</td><td>Değişmez</td><td>Seçilen noktadan öncesi özetlenir</td><td>Erken tartışmayı sıkıştırıp son çalışmayı korumak</td></tr><tr><td>Never mind</td><td>Değişmez</td><td>Değişmez</td><td>Vazgeçtim, menüden çık</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Checkpoint&#x27;in izlemediği üç kritik durum:
+
+1. <strong>Bash komutları ile dosya değişiklikleri izlenmez.</strong> Claude <code>rm</code>, <code>mv</code>, <code>cp</code> çalıştırırsa /rewind bu değişiklikleri geri alamaz.
+2. <strong>Dışarıdan yapılan değişiklikler izlenmez.</strong> Editörde veya başka terminalde yaptığın değişiklikler checkpoint kapsamı dışındadır.
+3. <strong>Checkpoint, versiyon kontrol yerine geçmez.</strong> Checkpoint&#x27;i &#x27;lokal undo&#x27;, Git&#x27;i &#x27;kalıcı tarihçe&#x27; olarak düşün.</div><div class="callout tip"><span class="lbl">💡 İpucu</span><code>/clear</code> sonrası bile /rewind menüsü önceki session&#x27;a dönme seçeneği sunar (menüde &quot;/resume &lt;session-id&gt; (previous session)&quot; girişi). Bu özellik Claude Code v2.1.191 veya sonrası gerektirir; eski sürümlerde /resume ile önceki session&#x27;ı seçebilirsin.</div><h3 class="sub">1.6 Oturum (Session) Yönetimi</h3><p>Claude Code her konuşmayı otomatik olarak diske kaydeder (<code>~/.claude/projects/&lt;proje&gt;/&lt;session-id&gt;.jsonl</code>). Bu sayede bir göreve dönebilir, alternatif bir yaklaşım deneyebilir veya görevler arası geçiş yapabilirsin.</p><table><thead><tr><th>Komut / Flag</th><th>İşlev</th><th>Tipik kullanım</th></tr></thead><tbody><tr><td><code>claude --continue</code></td><td>Son oturumu devam ettir</td><td>Terminal kapandı, kaldığın yerden devam</td></tr><tr><td><code>claude --resume</code></td><td>Oturum seçici aç</td><td>Birden fazla görev arası geçiş</td></tr><tr><td><code>claude --resume &lt;isim&gt;</code></td><td>İsimle doğrudan devam</td><td>Paralel çalışmada hızlı erişim</td></tr><tr><td><code>claude --from-pr &lt;no&gt;</code></td><td>PR&#x27;a bağlı oturumu bul</td><td>PR review&#x27;dan oturuma dönme</td></tr><tr><td><code>/resume</code></td><td>Aktif session içinden geçiş</td><td>Görev değiştirme</td></tr><tr><td><code>/branch [isim]</code></td><td>Oturumu dallandır (fork)</td><td>Alternatif yaklaşım denemesi</td></tr><tr><td><code>/export</code></td><td>Konuşmayı dışa aktar</td><td>Arşivleme, paylaşma</td></tr><tr><td><code>/rename &lt;isim&gt;</code></td><td>Oturumu isimlendir</td><td>Session picker&#x27;da kolay bulma</td></tr><tr><td><code>claude -n &lt;isim&gt;</code></td><td>Başlangıçta isim ver</td><td>Paralel görevlerde ayrışma</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Session&#x27;ları isimlendirmek (claude -n veya /rename) paralel çalışmada hayati önem taşır. &#x27;claude --resume auth-refactor&#x27; yazmak, session picker&#x27;da eski konuşmaları taramaktan çok daha hızlıdır.</div><p><strong>Session picker kısayolları:</strong> <code>Ctrl+W</code> = tüm worktree&#x27;leri göster, <code>Ctrl+A</code> = makinedeki tüm projeleri göster, <code>Ctrl+B</code> = mevcut branch&#x27;e filtrele, <code>Ctrl+R</code> = session&#x27;ı yeniden adlandır, <code>Space</code> = önizleme.</p><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">Pre-flight Checklist</h3><p>Pratiğe başlamadan önce ortamın hazır olduğundan emin ol:</p><pre><code># Claude Code güncel mi?
+claude --version
+
+# Git kurulu mu?
+git --version
+
+# Proje dizininde misin?
+cd ~/todo-app &amp;&amp; git status
+
+# (Opsiyonel) GitHub CLI hazır mı?
+gh --version
+gh auth status
+
+# Remote repo var mı?
+git remote -v</code></pre><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>PR oluşturma pratiği için GitHub CLI (gh) kurulu, <code>gh auth login</code> yapılmış, remote repository tanımlı ve branch upstream&#x27;e push edilmiş olmalıdır. Bunlar hazır değilse PR bölümünü atlayıp diğer pratiklere devam edebilirsin.</div><h3 class="sub">2.1 İlk Commit: Diff Gör, Onayla, Commit Et</h3><p>Claude Code ile commit atmanın güvenli yolu: önce değişiklikleri görmek, sonra onaylamak. Bu &#x27;güvenlik kapısı&#x27; alışkanlığını bugünden başlat.</p><ol><li>Claude Code&#x27;u Todo App dizininde başlat: <code>claude</code></li><li>Bir değişiklik yap: &quot;README.md&#x27;ye proje açıklaması ve kurulum talimatları ekle&quot;</li><li>Commit isteği ver — ama önce diff görmek iste:
+&quot;Değişiklikleri analiz et. Önce git status ve git diff özetini göster. Ben onaylamadan commit atma. Commit mesajını conventional commit formatında öner.&quot;</li><li>Claude diff&#x27;i gösterecek ve commit mesajı önerecek — onayladığında commit atar</li><li>Sonucu doğrula: <code>git log --oneline -3</code></li></ol><pre><code># Claude&#x27;un oluşturacağı tipik çıktı:
+$ git log --oneline -3
+a1b2c3d docs(readme): add project description and setup instructions
+f4e5d6c feat(init): initialize todo-app project structure
+1234567 Initial commit</code></pre><div class="callout kp"><span class="lbl">🔑 Önemli</span>&quot;Önce diff göster, onaylamadan commit atma&quot; alışkanlığı profesyonel workflow&#x27;un temelidir. CLAUDE.md&#x27;ye bu kuralı ekleyerek Claude Code&#x27;un her zaman bu akışı izlemesini sağlayabilirsin.</div><h3 class="sub">2.2 Feature Branch Oluşturma ve Geliştirme</h3><ol><li>Claude&#x27;a branch oluşturmasını söyle:
+&quot;feature/add-priority adında yeni bir branch oluştur ve geçiş yap&quot;</li><li>Claude&#x27;un çalıştıracağı komutu ve çıktıyı gözlemle</li><li>Branch&#x27;te bir özellik implement et:
+&quot;Todo&#x27;lara priority (low/medium/high) alanı ekle. Mevcut todo oluşturma ve listeleme fonksiyonlarını buna göre güncelle.&quot;</li><li>Değişiklikleri commit et:
+&quot;Bu değişiklikleri atomic commit&#x27;ler halinde commit et. Her mantıksal değişiklik ayrı commit olsun.&quot;</li></ol><pre><code># Branch oluşturma çıktısı:
+$ git checkout -b feature/add-priority
+Switched to a new branch &#x27;feature/add-priority&#x27;
+
+# Sonuç:
+$ git log --oneline feature/add-priority ^main
+b7c8d9e feat(todo): add priority field to todo model
+e0f1a2b feat(todo): display priority in list view</code></pre><h3 class="sub">2.3 Deterministik Merge Conflict Oluşturma ve Çözme</h3><p>Conflict&#x27;i rastlantıya bırakmayacağız. Adım adım, kontrollü bir conflict oluşturup Claude Code ile çözeceğiz.</p><ol><li><strong>main branch&#x27;e dön:</strong> &quot;main branch&#x27;e geçiş yap&quot; → <code>git checkout main</code></li><li><strong>main&#x27;de aynı dosyayı değiştir:</strong> &quot;src/todo.js (veya .py) dosyasındaki formatTodo fonksiyonunu düzenle: çıktıya oluşturulma tarihini ekle&quot; (Claude main&#x27;de bu değişikliği yapar ve commit eder)</li><li><strong>feature branch&#x27;i merge et:</strong> &quot;feature/add-priority branch&#x27;ini main ile merge et&quot;</li><li><strong>Conflict gözlemle:</strong> formatTodo fonksiyonu her iki branch&#x27;te farklı değiştirildiği için Git conflict oluşturacak</li><li><strong>Claude&#x27;dan çözüm iste:</strong> &quot;Bu merge conflict&#x27;i çöz. Her iki tarafın amacını analiz et: main&#x27;deki tarih alanını ve feature&#x27;daki priority alanını birleştir.&quot;</li><li><strong>Sonucu doğrula:</strong> Claude çözüm uyguladıktan sonra dosyayı aç ve her iki özelliğin de (tarih + priority) korunduğunu kontrol et</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Conflict çözdükten sonra testi çalıştırmayı unutma. Claude&#x27;a &quot;merge conflict&#x27;i çözdükten sonra testleri çalıştır&quot; dersen hem çözüm hem doğrulamayı tek adımda halleder.</div><h3 class="sub">2.4 /rewind ile Geri Sarma Pratiği</h3><ol><li>Claude&#x27;a kasıtlı bir hatalı değişiklik yaptır:
+&quot;formatTodo fonksiyonunun return ifadesini sil ve yerine boş string döndür&quot;</li><li>Değişikliğin yapıldığını doğrula — dosyayı editörde aç</li><li>Geri sar: <strong>Esc tuşuna iki kez bas</strong> (prompt boşken) veya <code>/rewind</code> yaz</li><li>Rewind menüsünde hatalı prompt&#x27;u bul, seç</li><li><strong>&quot;Restore code and conversation&quot;</strong> seçeneğini seç</li><li>Dosyayı tekrar aç — formatTodo fonksiyonunun eski haline döndüğünü gör</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Eğer Claude hatalı değişikliği Bash komutuyla yaptıysa (örneğin <code>sed</code> ile), /rewind bunu geri alamaz. Bu durumda <code>git checkout -- &lt;dosya&gt;</code> veya <code>git stash</code> kullan.</div><pre><code># /rewind menüsü yaklaşık şöyle görünür:
+#
+# Select a message to rewind to:
+#
+# &gt; formatTodo fonksiyonunun return ifadesini sil...  (2 min ago)
+#   Bu değişiklikleri atomic commit&#x27;ler halinde...     (8 min ago)
+#   feature/add-priority adında yeni branch oluştur... (12 min ago)
+#
+# Select action:
+#   Restore code and conversation
+#   Restore conversation
+#   Restore code
+#   Summarize from here
+#   Summarize up to here
+#   Never mind</code></pre><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ / UYGULAMA</h2><h3 class="sub">3.1 Oturum Yönetimi Pratiği</h3><p>Aşağıdaki alıştırmalar session yönetimini günlük workflow&#x27;una yerleştirir. Her adımı sırayla dene.</p><ol><li><strong>Oturumu isimlendir:</strong> <code>/rename todo-priority</code> yazarak mevcut session&#x27;a isim ver</li><li><strong>Çıkış yap:</strong> <code>Ctrl+C</code> ile Claude Code&#x27;dan çık</li><li><strong>Devam et:</strong> <code>claude --continue</code> ile son oturuma dön — context&#x27;in korunduğunu gör</li><li><strong>Tekrar çık</strong> ve bu sefer <code>claude --resume</code> ile oturum seçiciyi aç</li><li><strong>Kısayolları dene:</strong> <code>Ctrl+W</code> ile worktree&#x27;leri göster, <code>Space</code> ile önizle</li><li><strong>İsimle devam et:</strong> <code>claude --resume todo-priority</code> ile doğrudan dön</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Paralel çalışma senaryosu: bir terminalde &#x27;claude -n backend-api&#x27; ile backend, diğerinde &#x27;claude -n frontend-ui&#x27; ile frontend geliştir. İki session birbirinden bağımsızdır ve ikisi de isimle resumable.</div><h3 class="sub">3.2 /branch ile Oturum Dallandırma</h3><p>Farklı bir yaklaşım denemek istiyorsun ama mevcut çalışmayı kaybetmek istemiyorsun. <code>/branch</code> tam bunu yapar: konuşmayı kopyalar, yeni bir session açar, orijinali korur.</p><ol><li>Todo App session&#x27;ında <code>/branch try-streaming</code> yaz</li><li>Yeni branch&#x27;te alternatif implementasyon dene: &quot;Todo listesini streaming response ile gösterecek şekilde yeniden yaz&quot;</li><li>Sonuç beğenmediysen: <code>/resume todo-priority</code> ile orijinal session&#x27;a dön</li><li>Sonuç beğendiysen: yeni session&#x27;da devam et — orijinal hâlâ session picker&#x27;da</li></ol><div class="callout kp"><span class="lbl">🔑 Önemli</span>/branch konuşmayı dallandırır, dosya sistemini değil. Dallanmış session&#x27;da yapılan dosya değişiklikleri gerçektir ve aynı dizinde çalışan diğer session&#x27;lar tarafından görülür. Dosya izolasyonu istiyorsan worktree kullan (Gün 16).</div><h3 class="sub">3.3 PR Oluşturma (GitHub CLI ile)</h3><p>Claude Code, GitHub CLI (gh) kuruluysa doğrudan PR oluşturabilir. Bu bölüm gh kurulu olmayanlar için opsiyoneldir.</p><ol><li>Feature branch&#x27;e geçiş yap ve push et: &quot;feature/add-priority branch&#x27;ine geçip remote&#x27;a push et&quot;</li><li>PR oluştur: &quot;Bu branch için bir PR oluştur. PR açıklamasında ne değiştiğini, neden değiştiğini ve test talimatlarını yaz.&quot;</li><li>PR sonrası oturuma dönme pratiği: terminal kapat, sonra <code>claude --from-pr 1</code> ile PR&#x27;a bağlı session&#x27;ı bul</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>PR pratiği için gerekli ön koşullar: (1) <code>gh</code> kurulu ve <code>gh auth login</code> yapılmış, (2) remote repository tanımlı (<code>git remote -v</code>), (3) branch push edilmiş, (4) diff ve test review yapılmış. Bunlar hazır değilse bu bölümü atla — diğer pratikler gh gerektirmez.</div><h3 class="sub">3.4 .gitignore Yönetimi</h3><p>Claude Code ile .gitignore yönetimi doğal dil kadar basit. Ama hangi dosyaların ignore edilmesi gerektiğini bilmek senin sorumluluğun.</p><ol><li>Claude&#x27;a: &quot;.gitignore dosyasına node_modules, .env, __pycache__, .claude/ worktree dizinleri ve IDE ayarlarını ekle&quot;</li><li>Sonucu doğrula: <code>cat .gitignore</code></li><li>CLAUDE.md&#x27;ye .gitignore kuralı ekle: &quot;Yeni dosya oluştururken .gitignore&#x27;u kontrol et ve gerekiyorsa güncelle&quot;</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>.claude/worktrees/ dizinini .gitignore&#x27;a ekle — worktree içerikleri main checkout&#x27;ta untracked dosya olarak görünmesini istemezsin.</div><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Güvenli Commit (Diff Gate)</div><pre><code>Değişiklikleri analiz et. Önce git status ve git diff özetini göster. Mantıksal olarak ayrılabilecek değişiklikler varsa commit planı öner. Ben onaylamadan commit atma. Commit mesajlarını conventional commit formatında yaz.</code></pre><div class="note">Bu prompt &#x27;güvenlik kapısı&#x27; mantığıyla çalışır: önce görüntüle, sonra onayla. CLAUDE.md&#x27;ye kalıcı kural olarak eklenmesi önerilir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Branch Workflow Başlatıcı</div><pre><code>feature/&lt;isim&gt; adında yeni bir branch oluştur, bu branch&#x27;e geçiş yap, ve mevcut proje durumunu kısaca bildir (hangi branch&#x27;teyiz, kaç commit farkımız var).</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Conflict Çözücü</div><pre><code>Bu branch&#x27;i main ile merge et. Conflict oluşursa her iki tarafı analiz et, her iki değişikliğin amacını koru ve uygun bir birleştirme uygula. Çözüm sonrası testleri çalıştır.</code></pre><div class="note">Claude conflict marker&#x27;larını okuyup çözüm önerir, ama sonucu mutlaka doğrula.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">PR Hazırlayıcı</div><pre><code>Son commit&#x27;lerdeki değişiklikleri analiz et. PR açıklaması yaz: ne değişti, neden değişti, nasıl test edilir. Sonra gh cli ile PR oluştur.</code></pre><div class="note">gh CLI kurulu ve auth yapılmış olmalı. Yoksa sadece PR açıklamasını yazdır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Git Dedektifi</div><pre><code>Son 10 commit&#x27;i analiz et. Hangi dosyalar en çok değişmiş, commit pattern&#x27;leri nasıl, conventional commit formatına uyum oranı nedir? Kısa bir rapor çıkar.</code></pre><div class="note">Mevcut projenin git tarihçesini anlamak ve iyileştirme noktalarını bulmak için.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>Çok-Branch&#x27;li Geliştirme ve Rewind Simülasyonu</h3><p>Todo App projesinde çok-branch&#x27;li bir geliştirme simülasyonu gerçekleştir. Üç farklı feature&#x27;ı branch&#x27;lerde geliştir, merge et, en az bir conflict çöz ve /rewind ile geri sarma pratiği yap.</p><p><strong>Gereksinimler:</strong></p><ul><li>Todo App projesinde 3 feature branch oluştur: feature/add-priority, feature/add-duedate, feature/add-categories</li><li>Her branch&#x27;te ilgili özelliği Claude Code ile implement et</li><li>Her branch&#x27;te en az 1 commit (conventional commit formatında) at</li><li>Branch&#x27;leri sırayla main&#x27;e merge et — en az bir merge conflict oluştur ve Claude Code ile çöz</li><li>Bir branch&#x27;teki değişikliği bilinçli olarak boz, /rewind ile geri sar</li><li>Tüm merge&#x27;ler sonrası &#x27;git log --oneline --graph --all&#x27; ile branch/merge tarihçesini incele</li><li>Session&#x27;ı isimlendir ve --resume ile geri dönmeyi dene</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>3 feature branch başarıyla oluşturuldu ve her birinde en az 1 conventional commit var</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>En az 1 merge conflict Claude Code ile çözüldü ve çözüm sonrası fonksiyonellik korunuyor</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>/rewind ile en az 1 geri sarma yapıldı ve önceki kod durumuna dönüldü</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>Tüm branch&#x27;ler main&#x27;e merge edildi ve proje çalışır durumda (hata yok)</span></label></li><li><label><input type="checkbox" data-k="succ4"><span><code>git log --oneline --graph</code> çıktısında branch/merge geçmişi görünüyor</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>Session isimlendirildi ve <code>claude --resume &lt;isim&gt;</code> ile geri dönüldü</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ı adım adım çözmek için aşağıdaki akışı izle. Önemli olan sıralama: branch&#x27;leri sırayla merge etmen gerekir ki conflict oluşsun.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1. Priority branch</div><pre><code>feature/add-priority branch&#x27;i oluştur. Todo model&#x27;ine priority alanı (low/medium/high) ekle, listeleme ve oluşturma fonksiyonlarını güncelle.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2. Conflict tohumu (main)</div><pre><code>main&#x27;e dön. src/todo dosyasındaki formatTodo fonksiyonuna created_at tarihi ekle ve commit et.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3. İlk merge (conflict çöz)</div><pre><code>feature/add-priority&#x27;yi main ile merge et. Conflict varsa her iki tarafı (priority + tarih) koru.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4. Due date branch</div><pre><code>feature/add-duedate branch&#x27;i oluştur. Todo&#x27;lara due date alanı ekle.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">5. Categories branch</div><pre><code>feature/add-categories branch&#x27;i oluştur. Todo&#x27;lara kategori (work/personal/urgent) ekle.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">6. Bilinçli bozma + rewind</div><pre><code>Bir değişikliği kasıtlı olarak boz: formatTodo fonksiyonunu tamamen sil.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">7. Kalan merge&#x27;ler</div><pre><code>Kalan branch&#x27;leri sırayla main ile merge et.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Conflict&#x27;i garanti etmek için main&#x27;de ve feature branch&#x27;te aynı fonksiyonun aynı satırlarını değiştir. Önerilen hedef: formatTodo (veya eşdeğeri) fonksiyonu.</li><li>Merge sırası önemlidir — ilk merge conflict yaratır, sonrakiler genelde temiz geçer (farklı dosya/satır).</li><li>/rewind pratiğini merge&#x27;lerden önce yap ki geri sarılacak temiz bir checkpoint olsun.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ Bash ile dosya silme (rm, mv) checkpoint&#x27;te izlenmez — /rewind bunları geri alamaz. Bu durumda &#x27;git checkout -- &lt;dosya&gt;&#x27; kullan.</li><li>⚠️ Merge conflict çözdükten sonra test çalıştırmayı unutma — Claude iki tarafı birleştirse bile iş mantığı bozulmuş olabilir.</li><li>⚠️ PR oluşturmak için gh CLI kurulu ve auth yapılmış olmalı — kurulu değilse sadece PR açıklaması yazdır ve commit&#x27;leri push etmekle yetin.</li><li>⚠️ Session&#x27;ları isimlendirmezsen /resume menüsünde hangi konuşmanın hangisi olduğunu ayırt edemezsin.</li><li>⚠️ /branch dosya sistemini dallandırmaz, sadece konuşmayı dallandırır — iki dallanmış session aynı dosyaları düzenleyebilir.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Git kalıcı proje tarihçesi, checkpoint oturum içi geri alma, session konuşma bağlamı sürdürme — üçü birbirini tamamlar, yerine geçmez</li><li>Claude Code git komutlarını terminal üzerinden yürütür; sonuçları git log, git diff ile doğrulamak her zaman iyi pratiktir</li><li>&quot;Önce diff göster, onaylamadan commit atma&quot; güvenlik kapısı profesyonel workflow&#x27;un temelidir</li><li>Conventional commit formatı (feat/fix/refactor/docs/test/chore) takım iletişimini standartlaştırır</li><li>/rewind menüsü 6 aksiyon sunar: 3 restore + 2 summarize + never mind — her birinin farklı kullanım senaryosu var</li><li>Checkpoint yalnızca Claude&#x27;un file edit tool değişikliklerini izler; Bash komutları ve dışarıdan yapılan değişiklikler kapsam dışıdır</li><li>Session&#x27;ları isimlendirmek (claude -n veya /rename) paralel çalışmada zaman kazandırır</li><li>/branch konuşmayı dallandırır ama dosya sistemini değil — dosya izolasyonu için worktree gerekir</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/checkpointing" target="_blank" rel="noopener">Checkpointing — /rewind menüsü, checkpoint limitleri ve kullanım senaryoları</a></li><li>⭐ <a href="https://code.claude.com/docs/en/sessions" target="_blank" rel="noopener">Manage Sessions — --continue, --resume, --from-pr, /branch, session picker, naming</a></li><li>⭐ <a href="https://code.claude.com/docs/en/common-workflows" target="_blank" rel="noopener">Common Workflows — Resume, PR oluşturma ve günlük git workflow reçeteleri</a></li><li>⭐ <a href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">Best Practices — Rewind with checkpoints, session yönetimi stratejileri</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://www.conventionalcommits.org/" target="_blank" rel="noopener">Conventional Commits — commit mesaj formatı spesifikasyonu</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://www.atlassian.com/git/tutorials/comparing-workflows" target="_blank" rel="noopener">Git Branching Strategies (Atlassian) — Git Flow, GitHub Flow, Trunk-based Development karşılaştırması</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 6)</span>Yarın (Gün 6) Claude Code&#x27;un slash komutlarını ve bundled skill&#x27;lerini keşfedeceğiz. Tekrarlayan işleri bir kez tanımlayıp /commit, /test, /review gibi kendi custom komutlarını yazmayı öğreneceksin.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Üç güvenlik katmanını (Git commit / checkpoint / session) ve farklarını açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>Claude Code ile en az 3 farklı commit yaptım (conventional commit formatında)</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>Feature branch oluşturup main&#x27;e merge ettim</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>En az 1 merge conflict&#x27;i Claude Code ile çözdüm</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>/rewind menüsünü açtım ve en az bir geri sarma (Restore code and conversation) yaptım</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>Checkpoint&#x27;in Bash komutlarını ve dışarıdan yapılan değişiklikleri izlemediğini biliyorum</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>--continue veya --resume ile bir oturumu devam ettirdim</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Session&#x27;ımı isimlendirdim (/rename veya claude -n) ve isimle resume ettim</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Günün challenge&#x27;ını tamamladım (3 branch → merge → conflict çözümü → /rewind)</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Resmi docs&#x27;tan Checkpointing ve Sessions sayfalarını okudum</span></label></li></ul><div class="pager"><a href="gun04-proje-klasor-yapisi.html"><div class="dir">← Önceki</div><div class="tt">Gün 4</div><div>Proje Klasör Yapısı ve Başlangıç Şablonu</div></a><a class="next" href="gun06-slash-commands-skills.html"><div class="dir">Sonraki →</div><div class="tt">Gün 6</div><div>Slash Commands &amp; Bundled Skills</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 5/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=5;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>

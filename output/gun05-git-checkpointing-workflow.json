@@ -1,0 +1,739 @@
+{
+  "day": 5,
+  "total_days": 20,
+  "week": 1,
+  "slug": "git-checkpointing-oturum-yonetimi",
+  "title": "Git Entegrasyonu, Checkpointing ve Oturum Yönetimi",
+  "tagline": "Claude Code, Git'in en iyi arkadaşı",
+  "tier": null,
+  "date_label": "Temmuz 2026",
+  "intro": "Bugün üç güvenlik katmanını tanıyacaksın: Git commit ile kalıcı proje tarihçesi, checkpointing ile Claude düzenlemelerini geri alma ve session yönetimi ile konuşma bağlamını oturumlar arası sürdürme. Bu üçlü, Claude Code'u 'tek seferlik kod yazdırma aracı' olmaktan çıkarıp profesyonel geliştirme workflow'una dönüştürür.",
+  "flow": [
+    {
+      "phase": "1 · Büyük Resim",
+      "dur": "20 dk",
+      "desc": "Üç güvenlik katmanı: Git commit vs checkpoint vs session"
+    },
+    {
+      "phase": "2 · Guided Practice",
+      "dur": "55 dk",
+      "desc": "Commit, branch, merge conflict, /rewind pratiği"
+    },
+    {
+      "phase": "3 · Workflow Hardening",
+      "dur": "30 dk",
+      "desc": "PR oluşturma, .gitignore, session yönetimi, /branch"
+    },
+    {
+      "phase": "4 · Challenge",
+      "dur": "45 dk",
+      "desc": "3 branch + conflict + rollback + debrief"
+    }
+  ],
+  "prerequisites": [
+    "Git temel komutları (init, add, commit, push, pull, branch, merge)",
+    "Gün 1–4 tamamlanmış (Claude Code kurulu, CLAUDE.md ve proje yapısı hazır)",
+    "Terminal ve kod editörü açık"
+  ],
+  "tools_needed": [
+    "Terminal (Claude Code çalışır durumda)",
+    "Git (v2.20+)",
+    "GitHub CLI (gh) — PR pratiği için isteğe bağlı",
+    "VS Code veya tercih edilen editör (diff incelemesi için)"
+  ],
+  "objectives": [
+    "Claude Code'un git işlemlerini doğal dil ile yönetebilecek ve commit, branch, merge, PR komutlarını kullanabileceksin",
+    "Conventional commit formatında anlamlı commit mesajları yazdırabilecek ve atomic vs batch commit stratejilerini ayırt edebileceksin",
+    "Feature branch workflow'unu (oluşturma → geliştirme → commit → merge/PR) Claude Code ile uçtan uca uygulayabileceksin",
+    "Merge conflict durumlarını Claude Code ile tespit edip çözebileceksin",
+    "Checkpointing mekanizmasını anlayacak ve /rewind ile kod ve konuşma durumunu geri sarabileceksin",
+    "Oturum yönetimi araçlarını (--continue, --resume, --from-pr, /branch) kullanarak çalışmayı oturumlar arası sürdürebileceksin"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 Büyük Resim: Üç Güvenlik Katmanı"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code ile çalışırken üç farklı güvenlik mekanizması seni korur. Her birinin kapsamı ve kalıcılığı farklıdır; birbirinin yerine geçmez, birbirini tamamlar."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Katman",
+            "Ne korur?",
+            "Kalıcılık",
+            "Geri alma"
+          ],
+          "rows": [
+            [
+              "**Git commit**",
+              "Proje tarihçesi — tüm dosyalar, tüm katkıcılar",
+              "Kalıcı (remote'a push edildiğinde dağıtık)",
+              "`git revert`, `git reset`, branch stratejisi"
+            ],
+            [
+              "**Checkpoint (/rewind)**",
+              "Claude'un file edit tool ile yaptığı değişiklikler + konuşma durumu",
+              "Oturum bazlı (30 gün, ayarlanabilir)",
+              "Esc+Esc → menüden seç → Restore"
+            ],
+            [
+              "**Session**",
+              "Konuşma bağlamı — prompt'lar, dosya okumaları, komut çıktıları",
+              "Lokal diske kaydedilir (~/.claude/projects/)",
+              "`--continue`, `--resume`, `/branch`"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Git proje tarihçesini korur; checkpoint çalışma anındaki AI denemelerini geri alır; session yönetimi ise konuşma bağlamını sürdürür. Bu üçlüyü birbirine karıştırma — her biri farklı bir sorunu çözer."
+        },
+        {
+          "t": "h",
+          "text": "1.2 Claude Code ve Git: Nasıl Çalışır?"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code, Git işlemlerini çoğunlukla terminal komutları üzerinden yürütür. Doğal dilde verdiğin talimatı uygun `git` komutlarına çevirir, izin moduna bağlı olarak çalıştırır ve sonucu sana raporlar. Bu yüzden yaptığı işlemleri `git status`, `git diff`, `git log` gibi komutlarla doğrulamak iyi bir alışkanlıktır."
+        },
+        {
+          "t": "list",
+          "items": [
+            "**git status / diff / log:** Okuma işlemleri — genelde izin gerekmez.",
+            "**git add / commit:** Yazma işlemleri — izin moduna göre onay gerekebilir.",
+            "**git push / pull / merge:** Ağ ve birleştirme işlemleri — yüksek etkili, genelde onay gerektirir.",
+            "**git checkout / branch:** Branch yönetimi — düşük riskli, auto mode'da çoğunlukla otomatik."
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Claude Code bir GUI git client değil. Arka planda terminal komutları çalıştırır. Bu avantajdır: Claude'un yaptığı her işlem standart git komutları olduğu için sonuçları her zaman `git log`, `git diff` veya VS Code Git panelinde doğrulayabilirsin."
+        },
+        {
+          "t": "h",
+          "text": "1.3 Commit Stratejileri ve Mesaj Yazdırma"
+        },
+        {
+          "t": "p",
+          "text": "İyi bir commit stratejisi, proje tarihçesini okunabilir ve geri alınabilir kılar. Claude Code ile iki temel strateji kullanabilirsin:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Strateji",
+            "Ne zaman?",
+            "Avantaj",
+            "Risk"
+          ],
+          "rows": [
+            [
+              "**Atomic commit**",
+              "Her mantıksal değişiklik ayrı commit",
+              "Geri alma kolay, PR review temiz",
+              "Daha fazla commit, daha sık onay"
+            ],
+            [
+              "**Batch commit**",
+              "Birkaç ilişkili değişiklik tek commit",
+              "Hızlı, az gürültü",
+              "Geri alma zor, review karışık"
+            ]
+          ]
+        },
+        {
+          "t": "p",
+          "text": "**Conventional Commit formatı** takımlar arası standart bir dil sağlar:"
+        },
+        {
+          "t": "code",
+          "lang": "",
+          "text": "type(scope): kısa açıklama\n\n[opsiyonel gövde]\n\n[opsiyonel footer: BREAKING CHANGE, Closes #123]"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Tip",
+            "Anlam",
+            "Örnek"
+          ],
+          "rows": [
+            [
+              "feat",
+              "Yeni özellik",
+              "feat(auth): add JWT token validation"
+            ],
+            [
+              "fix",
+              "Hata düzeltme",
+              "fix(api): handle null response in /users"
+            ],
+            [
+              "refactor",
+              "Davranış değiştirmeden yapı iyileştirme",
+              "refactor(db): extract query builder"
+            ],
+            [
+              "docs",
+              "Dokümantasyon",
+              "docs(readme): add setup instructions"
+            ],
+            [
+              "test",
+              "Test ekleme/düzeltme",
+              "test(auth): add edge case for expired token"
+            ],
+            [
+              "chore",
+              "Build, CI, bağımlılık",
+              "chore(deps): bump express to 4.19"
+            ],
+            [
+              "ci",
+              "CI/CD değişikliği",
+              "ci(github): add lint step to PR workflow"
+            ],
+            [
+              "perf",
+              "Performans iyileştirme",
+              "perf(query): add index on created_at"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Commit mesajını İngilizce mi Türkçe mi yazmalı? Takım standardına bağlı. Açık kaynak veya uluslararası takımlarda İngilizce tercih edilir. Claude Code'a CLAUDE.md'de dil tercihi belirtirsen otomatik uyar."
+        },
+        {
+          "t": "h",
+          "text": "1.4 Branch Workflow"
+        },
+        {
+          "t": "p",
+          "text": "Feature branch pattern, paralel geliştirmenin temel taşıdır. Akış şöyle işler:"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "`main` branch'ten yeni bir feature branch oluştur (`git checkout -b feature/add-priority`)",
+            "Feature branch'te çalış, commit'ler at",
+            "İş bitince `main`'e dön ve feature branch'i merge et (`git merge feature/add-priority`)",
+            "Conflict varsa çöz, merge commit'i oluştur",
+            "Feature branch'i sil (`git branch -d feature/add-priority`)"
+          ]
+        },
+        {
+          "t": "p",
+          "text": "**Merge conflict** iki branch'te aynı dosyanın aynı bölümü farklı değiştirildiğinde oluşur. Git hangi değişikliğin geçerli olduğuna karar veremez ve conflict marker'ları ile seni bilgilendirir:"
+        },
+        {
+          "t": "code",
+          "lang": "text",
+          "text": "<<<<<<< HEAD\nfunction formatTodo(todo) {\n  return `[${todo.priority}] ${todo.title}`;\n}\n=======\nfunction formatTodo(todo) {\n  return `${todo.title} (due: ${todo.dueDate})`;\n}\n>>>>>>> feature/add-duedate"
+        },
+        {
+          "t": "keypoint",
+          "text": "Claude Code conflict marker'larını okur, her iki tarafın amacını analiz eder, uygun bir birleştirme önerir ve uygular. Ama sonucu mutlaka kendin doğrula — Claude her iki değişikliğin iş mantığını her zaman tam kavrayamayabilir."
+        },
+        {
+          "t": "h",
+          "text": "1.5 Checkpointing: Oturum İçi Güvenlik Ağı"
+        },
+        {
+          "t": "p",
+          "text": "Checkpointing, Claude Code'un dosya düzenleme araçları (file edit tools) ile yaptığı her değişikliği otomatik olarak kaydeder. Her kullanıcı prompt'u yeni bir checkpoint oluşturur. Checkpoint'ler oturumlar arası da erişilebilir kalır — resumed bir session'da bile önceki checkpoint'lere dönebilirsin."
+        },
+        {
+          "t": "p",
+          "text": "**`/rewind` menüsü** altı aksiyon sunar:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Aksiyon",
+            "Dosyalar",
+            "Konuşma",
+            "Ne zaman kullan?"
+          ],
+          "rows": [
+            [
+              "Restore code and conversation",
+              "⬅ Geri alınır",
+              "⬅ Geri alınır",
+              "Hem kodu hem konuşmayı o noktaya döndürmek istiyorsan"
+            ],
+            [
+              "Restore conversation",
+              "Değişmez",
+              "⬅ Geri alınır",
+              "Kod doğru ama konuşma yanlış yöne gittiyse"
+            ],
+            [
+              "Restore code",
+              "⬅ Geri alınır",
+              "Değişmez",
+              "Konuşma doğru ama kod bozulduysa"
+            ],
+            [
+              "Summarize from here",
+              "Değişmez",
+              "Seçilen noktadan sonrası özetlenir",
+              "Gereksiz konuşmayı sıkıştırıp context kazanmak"
+            ],
+            [
+              "Summarize up to here",
+              "Değişmez",
+              "Seçilen noktadan öncesi özetlenir",
+              "Erken tartışmayı sıkıştırıp son çalışmayı korumak"
+            ],
+            [
+              "Never mind",
+              "Değişmez",
+              "Değişmez",
+              "Vazgeçtim, menüden çık"
+            ]
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Checkpoint'in izlemediği üç kritik durum:\n\n1. **Bash komutları ile dosya değişiklikleri izlenmez.** Claude `rm`, `mv`, `cp` çalıştırırsa /rewind bu değişiklikleri geri alamaz.\n2. **Dışarıdan yapılan değişiklikler izlenmez.** Editörde veya başka terminalde yaptığın değişiklikler checkpoint kapsamı dışındadır.\n3. **Checkpoint, versiyon kontrol yerine geçmez.** Checkpoint'i 'lokal undo', Git'i 'kalıcı tarihçe' olarak düşün."
+        },
+        {
+          "t": "tip",
+          "text": "`/clear` sonrası bile /rewind menüsü önceki session'a dönme seçeneği sunar (menüde \"/resume <session-id> (previous session)\" girişi). Bu özellik Claude Code v2.1.191 veya sonrası gerektirir; eski sürümlerde /resume ile önceki session'ı seçebilirsin."
+        },
+        {
+          "t": "h",
+          "text": "1.6 Oturum (Session) Yönetimi"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code her konuşmayı otomatik olarak diske kaydeder (`~/.claude/projects/<proje>/<session-id>.jsonl`). Bu sayede bir göreve dönebilir, alternatif bir yaklaşım deneyebilir veya görevler arası geçiş yapabilirsin."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Komut / Flag",
+            "İşlev",
+            "Tipik kullanım"
+          ],
+          "rows": [
+            [
+              "`claude --continue`",
+              "Son oturumu devam ettir",
+              "Terminal kapandı, kaldığın yerden devam"
+            ],
+            [
+              "`claude --resume`",
+              "Oturum seçici aç",
+              "Birden fazla görev arası geçiş"
+            ],
+            [
+              "`claude --resume <isim>`",
+              "İsimle doğrudan devam",
+              "Paralel çalışmada hızlı erişim"
+            ],
+            [
+              "`claude --from-pr <no>`",
+              "PR'a bağlı oturumu bul",
+              "PR review'dan oturuma dönme"
+            ],
+            [
+              "`/resume`",
+              "Aktif session içinden geçiş",
+              "Görev değiştirme"
+            ],
+            [
+              "`/branch [isim]`",
+              "Oturumu dallandır (fork)",
+              "Alternatif yaklaşım denemesi"
+            ],
+            [
+              "`/export`",
+              "Konuşmayı dışa aktar",
+              "Arşivleme, paylaşma"
+            ],
+            [
+              "`/rename <isim>`",
+              "Oturumu isimlendir",
+              "Session picker'da kolay bulma"
+            ],
+            [
+              "`claude -n <isim>`",
+              "Başlangıçta isim ver",
+              "Paralel görevlerde ayrışma"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Session'ları isimlendirmek (claude -n veya /rename) paralel çalışmada hayati önem taşır. 'claude --resume auth-refactor' yazmak, session picker'da eski konuşmaları taramaktan çok daha hızlıdır."
+        },
+        {
+          "t": "p",
+          "text": "**Session picker kısayolları:** `Ctrl+W` = tüm worktree'leri göster, `Ctrl+A` = makinedeki tüm projeleri göster, `Ctrl+B` = mevcut branch'e filtrele, `Ctrl+R` = session'ı yeniden adlandır, `Space` = önizleme."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "Pre-flight Checklist"
+        },
+        {
+          "t": "p",
+          "text": "Pratiğe başlamadan önce ortamın hazır olduğundan emin ol:"
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# Claude Code güncel mi?\nclaude --version\n\n# Git kurulu mu?\ngit --version\n\n# Proje dizininde misin?\ncd ~/todo-app && git status\n\n# (Opsiyonel) GitHub CLI hazır mı?\ngh --version\ngh auth status\n\n# Remote repo var mı?\ngit remote -v"
+        },
+        {
+          "t": "warn",
+          "text": "PR oluşturma pratiği için GitHub CLI (gh) kurulu, `gh auth login` yapılmış, remote repository tanımlı ve branch upstream'e push edilmiş olmalıdır. Bunlar hazır değilse PR bölümünü atlayıp diğer pratiklere devam edebilirsin."
+        },
+        {
+          "t": "h",
+          "text": "2.1 İlk Commit: Diff Gör, Onayla, Commit Et"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code ile commit atmanın güvenli yolu: önce değişiklikleri görmek, sonra onaylamak. Bu 'güvenlik kapısı' alışkanlığını bugünden başlat."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Claude Code'u Todo App dizininde başlat: `claude`",
+            "Bir değişiklik yap: \"README.md'ye proje açıklaması ve kurulum talimatları ekle\"",
+            "Commit isteği ver — ama önce diff görmek iste:\n\"Değişiklikleri analiz et. Önce git status ve git diff özetini göster. Ben onaylamadan commit atma. Commit mesajını conventional commit formatında öner.\"",
+            "Claude diff'i gösterecek ve commit mesajı önerecek — onayladığında commit atar",
+            "Sonucu doğrula: `git log --oneline -3`"
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# Claude'un oluşturacağı tipik çıktı:\n$ git log --oneline -3\na1b2c3d docs(readme): add project description and setup instructions\nf4e5d6c feat(init): initialize todo-app project structure\n1234567 Initial commit"
+        },
+        {
+          "t": "keypoint",
+          "text": "\"Önce diff göster, onaylamadan commit atma\" alışkanlığı profesyonel workflow'un temelidir. CLAUDE.md'ye bu kuralı ekleyerek Claude Code'un her zaman bu akışı izlemesini sağlayabilirsin."
+        },
+        {
+          "t": "h",
+          "text": "2.2 Feature Branch Oluşturma ve Geliştirme"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Claude'a branch oluşturmasını söyle:\n\"feature/add-priority adında yeni bir branch oluştur ve geçiş yap\"",
+            "Claude'un çalıştıracağı komutu ve çıktıyı gözlemle",
+            "Branch'te bir özellik implement et:\n\"Todo'lara priority (low/medium/high) alanı ekle. Mevcut todo oluşturma ve listeleme fonksiyonlarını buna göre güncelle.\"",
+            "Değişiklikleri commit et:\n\"Bu değişiklikleri atomic commit'ler halinde commit et. Her mantıksal değişiklik ayrı commit olsun.\""
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# Branch oluşturma çıktısı:\n$ git checkout -b feature/add-priority\nSwitched to a new branch 'feature/add-priority'\n\n# Sonuç:\n$ git log --oneline feature/add-priority ^main\nb7c8d9e feat(todo): add priority field to todo model\ne0f1a2b feat(todo): display priority in list view"
+        },
+        {
+          "t": "h",
+          "text": "2.3 Deterministik Merge Conflict Oluşturma ve Çözme"
+        },
+        {
+          "t": "p",
+          "text": "Conflict'i rastlantıya bırakmayacağız. Adım adım, kontrollü bir conflict oluşturup Claude Code ile çözeceğiz."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "**main branch'e dön:** \"main branch'e geçiş yap\" → `git checkout main`",
+            "**main'de aynı dosyayı değiştir:** \"src/todo.js (veya .py) dosyasındaki formatTodo fonksiyonunu düzenle: çıktıya oluşturulma tarihini ekle\" (Claude main'de bu değişikliği yapar ve commit eder)",
+            "**feature branch'i merge et:** \"feature/add-priority branch'ini main ile merge et\"",
+            "**Conflict gözlemle:** formatTodo fonksiyonu her iki branch'te farklı değiştirildiği için Git conflict oluşturacak",
+            "**Claude'dan çözüm iste:** \"Bu merge conflict'i çöz. Her iki tarafın amacını analiz et: main'deki tarih alanını ve feature'daki priority alanını birleştir.\"",
+            "**Sonucu doğrula:** Claude çözüm uyguladıktan sonra dosyayı aç ve her iki özelliğin de (tarih + priority) korunduğunu kontrol et"
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Conflict çözdükten sonra testi çalıştırmayı unutma. Claude'a \"merge conflict'i çözdükten sonra testleri çalıştır\" dersen hem çözüm hem doğrulamayı tek adımda halleder."
+        },
+        {
+          "t": "h",
+          "text": "2.4 /rewind ile Geri Sarma Pratiği"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Claude'a kasıtlı bir hatalı değişiklik yaptır:\n\"formatTodo fonksiyonunun return ifadesini sil ve yerine boş string döndür\"",
+            "Değişikliğin yapıldığını doğrula — dosyayı editörde aç",
+            "Geri sar: **Esc tuşuna iki kez bas** (prompt boşken) veya `/rewind` yaz",
+            "Rewind menüsünde hatalı prompt'u bul, seç",
+            "**\"Restore code and conversation\"** seçeneğini seç",
+            "Dosyayı tekrar aç — formatTodo fonksiyonunun eski haline döndüğünü gör"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Eğer Claude hatalı değişikliği Bash komutuyla yaptıysa (örneğin `sed` ile), /rewind bunu geri alamaz. Bu durumda `git checkout -- <dosya>` veya `git stash` kullan."
+        },
+        {
+          "t": "code",
+          "lang": "text",
+          "text": "# /rewind menüsü yaklaşık şöyle görünür:\n#\n# Select a message to rewind to:\n#\n# > formatTodo fonksiyonunun return ifadesini sil...  (2 min ago)\n#   Bu değişiklikleri atomic commit'ler halinde...     (8 min ago)\n#   feature/add-priority adında yeni branch oluştur... (12 min ago)\n#\n# Select action:\n#   Restore code and conversation\n#   Restore conversation\n#   Restore code\n#   Summarize from here\n#   Summarize up to here\n#   Never mind"
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — DERİNLEŞ / UYGULAMA",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 Oturum Yönetimi Pratiği"
+        },
+        {
+          "t": "p",
+          "text": "Aşağıdaki alıştırmalar session yönetimini günlük workflow'una yerleştirir. Her adımı sırayla dene."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "**Oturumu isimlendir:** `/rename todo-priority` yazarak mevcut session'a isim ver",
+            "**Çıkış yap:** `Ctrl+C` ile Claude Code'dan çık",
+            "**Devam et:** `claude --continue` ile son oturuma dön — context'in korunduğunu gör",
+            "**Tekrar çık** ve bu sefer `claude --resume` ile oturum seçiciyi aç",
+            "**Kısayolları dene:** `Ctrl+W` ile worktree'leri göster, `Space` ile önizle",
+            "**İsimle devam et:** `claude --resume todo-priority` ile doğrudan dön"
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Paralel çalışma senaryosu: bir terminalde 'claude -n backend-api' ile backend, diğerinde 'claude -n frontend-ui' ile frontend geliştir. İki session birbirinden bağımsızdır ve ikisi de isimle resumable."
+        },
+        {
+          "t": "h",
+          "text": "3.2 /branch ile Oturum Dallandırma"
+        },
+        {
+          "t": "p",
+          "text": "Farklı bir yaklaşım denemek istiyorsun ama mevcut çalışmayı kaybetmek istemiyorsun. `/branch` tam bunu yapar: konuşmayı kopyalar, yeni bir session açar, orijinali korur."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Todo App session'ında `/branch try-streaming` yaz",
+            "Yeni branch'te alternatif implementasyon dene: \"Todo listesini streaming response ile gösterecek şekilde yeniden yaz\"",
+            "Sonuç beğenmediysen: `/resume todo-priority` ile orijinal session'a dön",
+            "Sonuç beğendiysen: yeni session'da devam et — orijinal hâlâ session picker'da"
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "/branch konuşmayı dallandırır, dosya sistemini değil. Dallanmış session'da yapılan dosya değişiklikleri gerçektir ve aynı dizinde çalışan diğer session'lar tarafından görülür. Dosya izolasyonu istiyorsan worktree kullan (Gün 16)."
+        },
+        {
+          "t": "h",
+          "text": "3.3 PR Oluşturma (GitHub CLI ile)"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code, GitHub CLI (gh) kuruluysa doğrudan PR oluşturabilir. Bu bölüm gh kurulu olmayanlar için opsiyoneldir."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Feature branch'e geçiş yap ve push et: \"feature/add-priority branch'ine geçip remote'a push et\"",
+            "PR oluştur: \"Bu branch için bir PR oluştur. PR açıklamasında ne değiştiğini, neden değiştiğini ve test talimatlarını yaz.\"",
+            "PR sonrası oturuma dönme pratiği: terminal kapat, sonra `claude --from-pr 1` ile PR'a bağlı session'ı bul"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "PR pratiği için gerekli ön koşullar: (1) `gh` kurulu ve `gh auth login` yapılmış, (2) remote repository tanımlı (`git remote -v`), (3) branch push edilmiş, (4) diff ve test review yapılmış. Bunlar hazır değilse bu bölümü atla — diğer pratikler gh gerektirmez."
+        },
+        {
+          "t": "h",
+          "text": "3.4 .gitignore Yönetimi"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code ile .gitignore yönetimi doğal dil kadar basit. Ama hangi dosyaların ignore edilmesi gerektiğini bilmek senin sorumluluğun."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Claude'a: \".gitignore dosyasına node_modules, .env, __pycache__, .claude/ worktree dizinleri ve IDE ayarlarını ekle\"",
+            "Sonucu doğrula: `cat .gitignore`",
+            "CLAUDE.md'ye .gitignore kuralı ekle: \"Yeni dosya oluştururken .gitignore'u kontrol et ve gerekiyorsa güncelle\""
+          ]
+        },
+        {
+          "t": "tip",
+          "text": ".claude/worktrees/ dizinini .gitignore'a ekle — worktree içerikleri main checkout'ta untracked dosya olarak görünmesini istemezsin."
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "Güvenli Commit (Diff Gate)",
+      "prompt": "Değişiklikleri analiz et. Önce git status ve git diff özetini göster. Mantıksal olarak ayrılabilecek değişiklikler varsa commit planı öner. Ben onaylamadan commit atma. Commit mesajlarını conventional commit formatında yaz.",
+      "note": "Bu prompt 'güvenlik kapısı' mantığıyla çalışır: önce görüntüle, sonra onayla. CLAUDE.md'ye kalıcı kural olarak eklenmesi önerilir."
+    },
+    {
+      "title": "Branch Workflow Başlatıcı",
+      "prompt": "feature/<isim> adında yeni bir branch oluştur, bu branch'e geçiş yap, ve mevcut proje durumunu kısaca bildir (hangi branch'teyiz, kaç commit farkımız var)."
+    },
+    {
+      "title": "Conflict Çözücü",
+      "prompt": "Bu branch'i main ile merge et. Conflict oluşursa her iki tarafı analiz et, her iki değişikliğin amacını koru ve uygun bir birleştirme uygula. Çözüm sonrası testleri çalıştır.",
+      "note": "Claude conflict marker'larını okuyup çözüm önerir, ama sonucu mutlaka doğrula."
+    },
+    {
+      "title": "PR Hazırlayıcı",
+      "prompt": "Son commit'lerdeki değişiklikleri analiz et. PR açıklaması yaz: ne değişti, neden değişti, nasıl test edilir. Sonra gh cli ile PR oluştur.",
+      "note": "gh CLI kurulu ve auth yapılmış olmalı. Yoksa sadece PR açıklamasını yazdır."
+    },
+    {
+      "title": "Git Dedektifi",
+      "prompt": "Son 10 commit'i analiz et. Hangi dosyalar en çok değişmiş, commit pattern'leri nasıl, conventional commit formatına uyum oranı nedir? Kısa bir rapor çıkar.",
+      "note": "Mevcut projenin git tarihçesini anlamak ve iyileştirme noktalarını bulmak için."
+    }
+  ],
+  "challenge": {
+    "title": "Çok-Branch'li Geliştirme ve Rewind Simülasyonu",
+    "task": "Todo App projesinde çok-branch'li bir geliştirme simülasyonu gerçekleştir. Üç farklı feature'ı branch'lerde geliştir, merge et, en az bir conflict çöz ve /rewind ile geri sarma pratiği yap.",
+    "requirements": [
+      "Todo App projesinde 3 feature branch oluştur: feature/add-priority, feature/add-duedate, feature/add-categories",
+      "Her branch'te ilgili özelliği Claude Code ile implement et",
+      "Her branch'te en az 1 commit (conventional commit formatında) at",
+      "Branch'leri sırayla main'e merge et — en az bir merge conflict oluştur ve Claude Code ile çöz",
+      "Bir branch'teki değişikliği bilinçli olarak boz, /rewind ile geri sar",
+      "Tüm merge'ler sonrası 'git log --oneline --graph --all' ile branch/merge tarihçesini incele",
+      "Session'ı isimlendir ve --resume ile geri dönmeyi dene"
+    ],
+    "success": [
+      "3 feature branch başarıyla oluşturuldu ve her birinde en az 1 conventional commit var",
+      "En az 1 merge conflict Claude Code ile çözüldü ve çözüm sonrası fonksiyonellik korunuyor",
+      "/rewind ile en az 1 geri sarma yapıldı ve önceki kod durumuna dönüldü",
+      "Tüm branch'ler main'e merge edildi ve proje çalışır durumda (hata yok)",
+      "`git log --oneline --graph` çıktısında branch/merge geçmişi görünüyor",
+      "Session isimlendirildi ve `claude --resume <isim>` ile geri dönüldü"
+    ],
+    "solution": {
+      "intro": "Bu challenge'ı adım adım çözmek için aşağıdaki akışı izle. Önemli olan sıralama: branch'leri sırayla merge etmen gerekir ki conflict oluşsun.",
+      "prompts": [
+        {
+          "title": "1. Priority branch",
+          "prompt": "feature/add-priority branch'i oluştur. Todo model'ine priority alanı (low/medium/high) ekle, listeleme ve oluşturma fonksiyonlarını güncelle."
+        },
+        {
+          "title": "2. Conflict tohumu (main)",
+          "prompt": "main'e dön. src/todo dosyasındaki formatTodo fonksiyonuna created_at tarihi ekle ve commit et.",
+          "note": "Bu, sonraki merge'de conflict yaratır."
+        },
+        {
+          "title": "3. İlk merge (conflict çöz)",
+          "prompt": "feature/add-priority'yi main ile merge et. Conflict varsa her iki tarafı (priority + tarih) koru."
+        },
+        {
+          "title": "4. Due date branch",
+          "prompt": "feature/add-duedate branch'i oluştur. Todo'lara due date alanı ekle."
+        },
+        {
+          "title": "5. Categories branch",
+          "prompt": "feature/add-categories branch'i oluştur. Todo'lara kategori (work/personal/urgent) ekle."
+        },
+        {
+          "title": "6. Bilinçli bozma + rewind",
+          "prompt": "Bir değişikliği kasıtlı olarak boz: formatTodo fonksiyonunu tamamen sil.",
+          "note": "Sonra Esc+Esc ile /rewind menüsünü aç ve 'Restore code and conversation' seç."
+        },
+        {
+          "title": "7. Kalan merge'ler",
+          "prompt": "Kalan branch'leri sırayla main ile merge et."
+        }
+      ],
+      "notes": [
+        "Conflict'i garanti etmek için main'de ve feature branch'te aynı fonksiyonun aynı satırlarını değiştir. Önerilen hedef: formatTodo (veya eşdeğeri) fonksiyonu.",
+        "Merge sırası önemlidir — ilk merge conflict yaratır, sonrakiler genelde temiz geçer (farklı dosya/satır).",
+        "/rewind pratiğini merge'lerden önce yap ki geri sarılacak temiz bir checkpoint olsun."
+      ],
+      "pitfalls": [
+        "Bash ile dosya silme (rm, mv) checkpoint'te izlenmez — /rewind bunları geri alamaz. Bu durumda 'git checkout -- <dosya>' kullan.",
+        "Merge conflict çözdükten sonra test çalıştırmayı unutma — Claude iki tarafı birleştirse bile iş mantığı bozulmuş olabilir.",
+        "PR oluşturmak için gh CLI kurulu ve auth yapılmış olmalı — kurulu değilse sadece PR açıklaması yazdır ve commit'leri push etmekle yetin.",
+        "Session'ları isimlendirmezsen /resume menüsünde hangi konuşmanın hangisi olduğunu ayırt edemezsin.",
+        "/branch dosya sistemini dallandırmaz, sadece konuşmayı dallandırır — iki dallanmış session aynı dosyaları düzenleyebilir."
+      ]
+    }
+  },
+  "takeaways": [
+    "Git kalıcı proje tarihçesi, checkpoint oturum içi geri alma, session konuşma bağlamı sürdürme — üçü birbirini tamamlar, yerine geçmez",
+    "Claude Code git komutlarını terminal üzerinden yürütür; sonuçları git log, git diff ile doğrulamak her zaman iyi pratiktir",
+    "\"Önce diff göster, onaylamadan commit atma\" güvenlik kapısı profesyonel workflow'un temelidir",
+    "Conventional commit formatı (feat/fix/refactor/docs/test/chore) takım iletişimini standartlaştırır",
+    "/rewind menüsü 6 aksiyon sunar: 3 restore + 2 summarize + never mind — her birinin farklı kullanım senaryosu var",
+    "Checkpoint yalnızca Claude'un file edit tool değişikliklerini izler; Bash komutları ve dışarıdan yapılan değişiklikler kapsam dışıdır",
+    "Session'ları isimlendirmek (claude -n veya /rename) paralel çalışmada zaman kazandırır",
+    "/branch konuşmayı dallandırır ama dosya sistemini değil — dosya izolasyonu için worktree gerekir"
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Checkpointing — /rewind menüsü, checkpoint limitleri ve kullanım senaryoları",
+        "url": "https://code.claude.com/docs/en/checkpointing"
+      },
+      {
+        "label": "Manage Sessions — --continue, --resume, --from-pr, /branch, session picker, naming",
+        "url": "https://code.claude.com/docs/en/sessions"
+      },
+      {
+        "label": "Common Workflows — Resume, PR oluşturma ve günlük git workflow reçeteleri",
+        "url": "https://code.claude.com/docs/en/common-workflows"
+      },
+      {
+        "label": "Best Practices — Rewind with checkpoints, session yönetimi stratejileri",
+        "url": "https://code.claude.com/docs/en/best-practices"
+      }
+    ],
+    "community": [
+      {
+        "label": "Conventional Commits — commit mesaj formatı spesifikasyonu",
+        "url": "https://www.conventionalcommits.org/"
+      }
+    ],
+    "extra": [
+      {
+        "label": "Git Branching Strategies (Atlassian) — Git Flow, GitHub Flow, Trunk-based Development karşılaştırması",
+        "url": "https://www.atlassian.com/git/tutorials/comparing-workflows"
+      }
+    ]
+  },
+  "next_preview": "Yarın (Gün 6) Claude Code'un slash komutlarını ve bundled skill'lerini keşfedeceğiz. Tekrarlayan işleri bir kez tanımlayıp /commit, /test, /review gibi kendi custom komutlarını yazmayı öğreneceksin.",
+  "checklist": [
+    "Üç güvenlik katmanını (Git commit / checkpoint / session) ve farklarını açıklayabiliyorum",
+    "Claude Code ile en az 3 farklı commit yaptım (conventional commit formatında)",
+    "Feature branch oluşturup main'e merge ettim",
+    "En az 1 merge conflict'i Claude Code ile çözdüm",
+    "/rewind menüsünü açtım ve en az bir geri sarma (Restore code and conversation) yaptım",
+    "Checkpoint'in Bash komutlarını ve dışarıdan yapılan değişiklikleri izlemediğini biliyorum",
+    "--continue veya --resume ile bir oturumu devam ettirdim",
+    "Session'ımı isimlendirdim (/rename veya claude -n) ve isimle resume ettim",
+    "Günün challenge'ını tamamladım (3 branch → merge → conflict çözümü → /rewind)",
+    "Resmi docs'tan Checkpointing ve Sessions sayfalarını okudum"
+  ]
+}

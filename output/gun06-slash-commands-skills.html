@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 6 — Slash Commands &amp; Skills: Tekrarlayan İşleri Otomatize Et · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><span class="cur"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></span><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><span class="locked" title="yakında"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></span><span class="locked" title="yakında"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></span></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></span><span class="locked" title="yakında"><span class="num">12</span><span>Hooks ve Sandboxing</span></span><span class="locked" title="yakında"><span class="num">13</span><span>Skills &amp; Plugins</span></span><span class="locked" title="yakında"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></span><span class="locked" title="yakında"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></span></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 2 — Orta · Gün 06 / 20</div><h1>Slash Commands &amp; Skills: Tekrarlayan İşleri Otomatize Et</h1><p class="tagline">“Günde 10 kez yaptığın şeyi bir kez tanımla”</p><p class="intro">Bugüne kadar Claude Code&#x27;a her seferinde aynı talimatları tekrar tekrar yazdın: &#x27;testleri çalıştır&#x27;, &#x27;commit at&#x27;, &#x27;şu formatta review yap&#x27;. Bu tekrarlayan rutinleri bir kez tanımlayıp tek komutla çağırmanın yolu skill&#x27;ler. Gün sonunda Todo App için çalışan bir workflow skill pack yazmış olacaksın.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Mental Model</div><div class="du">35 dk</div><div class="de">Slash command, built-in command, bundled skill, custom skill farkı; commands→skills evrimi; ne zaman skill yazılır?</div></div><div class="step"><div class="ph">2 · İlk Çalışan Skill</div><div class="du">50 dk</div><div class="de">commit skill, SKILL.md frontmatter, /skills, /reload-skills, $ARGUMENTS ile parametre alan skill</div></div><div class="step"><div class="ph">3 · Derinleş</div><div class="du">40 dk</div><div class="de">Dinamik context injection, tool izinleri, scope/paylaşım, troubleshooting ve ileri seviye teaser&#x27;lar</div></div><div class="step"><div class="ph">4 · Challenge</div><div class="du">25 dk</div><div class="de">Todo App Developer Workflow Skill Pack (3 zorunlu + 2 bonus skill)</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1–5 tamamlanmış (Claude Code kurulu, CLAUDE.md hazır, Git workflow biliniyor); Terminal ve kod editörü açık; Todo App projesi çalışır durumda (Gün 4&#x27;te oluşturulan yapı)</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); VS Code veya tercih edilen editör; Git (skill&#x27;leri commitlemek için)</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Slash command, built-in command, bundled skill ve custom skill arasındaki mimari farkı açıklayabileceksin</li><li><code>.claude/skills/&lt;name&gt;/SKILL.md</code> formatında çalışan bir skill yazabileceksin</li><li><code>/skills</code> ve <code>/reload-skills</code> ile skill&#x27;leri keşfedip test edebileceksin</li><li><code>$ARGUMENTS</code>, <code>$0</code> ve named arguments ile parametre alan skill yazabileceksin</li><li>`<code> !</code>command<code> </code>` ile dinamik context injection kullanabileceksin</li><li><code>disable-model-invocation</code> ve <code>allowed-tools</code>/<code>disallowed-tools</code> alanlarının davranış farkını açıklayabileceksin</li><li>Tekrarlayan bir developer workflow&#x27;unu Git&#x27;e commitlenebilir takım standardına çevirebileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Neden Skill? — Prompt Tekrarından Workflow Standardına</h3><p>Bir projede düzinelerce kez aynı talimatı yapıştırdığını düşün: &#x27;testleri çalıştır, başarısız olanları analiz et, düzelt&#x27;; &#x27;conventional commit mesajı yaz&#x27;; &#x27;PR açıklaması oluştur&#x27;. Her seferinde aynı metni yazmak zaman kaybıdır ve tutarsızlık riski taşır. Skill&#x27;ler bu tekrarı ortadan kaldırır: talimatı bir kez yazarsın, sonra <code>/skill-name</code> ile çağırırsın. Claude bu talimatı her seferinde aynı kalitede uygular.</p><p>Peki skill ile CLAUDE.md arasındaki fark ne? CLAUDE.md kalıcı proje bilgisidir: teknoloji stack&#x27;i, naming convention, klasör yapısı — her oturumda yüklenir. Skill ise bir workflow paketidir: belirli bir görevi baştan sona yürüten talimat seti. CLAUDE.md&#x27;ye &#x27;testleri her zaman pytest ile çalıştır&#x27; yaz; ama &#x27;testleri çalıştır, başarısız olanları analiz et, düzelt ve tekrar çalıştır&#x27; gibi çok adımlı bir workflow&#x27;u skill olarak paketle.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>CLAUDE.md = kalıcı proje bilgisi (her oturumda yüklenir). Skill = workflow paketi (sadece çağrıldığında veya tetiklendiğinde yüklenir). İkisi birbirini tamamlar, yerine geçmez.</div><h3 class="sub">1.2 Claude Code&#x27;da Komut Tipleri</h3><p>Claude Code&#x27;da <code>/</code> ile başlayan her şey bir komuttur ama her komut aynı mekanizmayı kullanmaz. Dört temel tip vardır:</p><table><thead><tr><th>Tip</th><th>Mekanizma</th><th>Tetikleme</th><th>Örnek</th></tr></thead><tbody><tr><td>Built-in command</td><td>Sabit logic (Claude Code&#x27;un kendi kodu)</td><td>Sadece manuel <code>/komut</code></td><td>/clear, /compact, /config, /model</td></tr><tr><td>Bundled skill</td><td>Claude Code ile gelen prompt tabanlı skill</td><td>Manuel <code>/skill</code> veya Claude otomatik</td><td>/code-review, /debug, /init</td></tr><tr><td>Custom skill</td><td>Kullanıcının yazdığı SKILL.md</td><td>Manuel <code>/skill</code> veya Claude otomatik</td><td>/commit, /test-runner, /fix-issue</td></tr><tr><td>MCP prompt</td><td>MCP server&#x27;dan gelen komut</td><td>Manuel <code>/mcp__server__prompt</code></td><td>Server bağlantısına göre dinamik</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Komut listesi Claude Code sürümüne, plana ve ortama göre değişir. Sabit bir liste ezberlemek yerine <code>/</code> menüsünü ve resmi Commands referansını kaynak kabul et. Aşağıdaki tablo temsili bir seçkidir — tamamı değildir.</div><h3 class="sub">1.3 Kategori Bazlı Komut Seçkisi</h3><p>Built-in komutları ve bundled skill&#x27;leri kategori bazında tanımak, günlük çalışmada doğru komutu hızla bulmana yardımcı olur. Tam listeye <code>/</code> menüsünden veya resmi docs&#x27;tan ulaşabilirsin.</p><table><thead><tr><th>Kategori</th><th>Komutlar (seçki)</th><th>Açıklama</th></tr></thead><tbody><tr><td>Oturum Yönetimi</td><td>/clear, /compact, /resume, /rewind</td><td>Context temizleme, sıkıştırma, oturum devam ettirme, geri sarma</td></tr><tr><td>Context &amp; Teşhis</td><td>/context, /skills, /doctor, /usage, /cost</td><td>Context analizi, skill listesi, teşhis, kullanım/maliyet bilgisi</td></tr><tr><td>Geliştirme Workflow</td><td>/code-review, /debug, /init, /loop, /batch</td><td>Kod inceleme, hata ayıklama, proje başlatma, tekrar eden görevler</td></tr><tr><td>Yapılandırma</td><td>/config, /model, /effort, /fast, /permissions</td><td>Ayarlar, model seçimi, effort seviyesi, hız modu, izin yönetimi</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span>Gün 6&#x27;nın merkezi komutları <code>/skills</code> (mevcut skill&#x27;leri listele) ve <code>/reload-skills</code> (değişiklik sonrası yeniden yükle). Bu ikisini sık kullanacaksın.</div><h3 class="sub">1.4 Custom Commands&#x27;dan Skills&#x27;e Genişleyen Model</h3><p>Claude Code&#x27;un eski custom command sistemi <code>.claude/commands/</code> dizininde Markdown dosyaları kullanıyordu. Bu format hâlâ destekleniyor ve çalışıyor — <code>.claude/commands/deploy.md</code> yazdığında <code>/deploy</code> komutu oluşuyor. Ancak skills sistemi (<code>.claude/skills/</code>) daha zengin bir model sunuyor:</p><table><thead><tr><th>Özellik</th><th>Commands (.claude/commands/)</th><th>Skills (.claude/skills/)</th></tr></thead><tbody><tr><td>Slash ile çağırma</td><td>✅ /komut-adı</td><td>✅ /skill-adı</td></tr><tr><td>Claude otomatik tetikleme</td><td>❌</td><td>✅ (description + when_to_use eşleşirse)</td></tr><tr><td>YAML frontmatter</td><td>Opsiyonel (sadece description, argument-hint)</td><td>Tam destek (model, effort, tools, context, agent vb.)</td></tr><tr><td>Destek dosyaları</td><td>❌ Sadece tek .md</td><td>✅ Klasör yapısı (template, script, example)</td></tr><tr><td>Tool izin kontrolü</td><td>❌</td><td>✅ allowed-tools, disallowed-tools</td></tr><tr><td>Forked context</td><td>❌</td><td>✅ context: fork + agent seçimi</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span><code>.claude/commands/</code> hâlâ desteklenen eski command formatıdır. <code>.claude/skills/</code> ise daha zengin metadata, destek dosyaları ve davranış kontrolü sunar. İkisi aynı isimde varsa skill kazanır. Yeni workflow&#x27;lar için <code>.claude/skills/</code> tercih et.</div><h3 class="sub">1.5 SKILL.md Anatomisi: Frontmatter + Markdown</h3><p>Her skill iki parçadan oluşur: YAML frontmatter (--- ile ayrılan bölüm) ve Markdown içerik. Frontmatter Claude&#x27;a skill&#x27;in ne olduğunu, ne zaman tetikleneceğini ve hangi kısıtlamaların geçerli olduğunu söyler. Markdown içerik ise Claude&#x27;un çalıştıracağı talimatları içerir.</p><pre><code># .claude/skills/commit/SKILL.md
+---
+name: commit
+description: Staged değişiklikleri analiz edip conventional commit mesajı önerir
+argument-hint: [mesaj-notu]
+disable-model-invocation: true
+---
+
+## Commit Workflow
+
+1. `git status` ve `git diff --cached` çalıştır
+2. Değişiklikleri analiz et
+3. Conventional commit mesajı öner: type(scope): description
+4. Kullanıcı onaylarsa commit et
+5. $ARGUMENTS varsa commit mesajına not olarak ekle</code></pre><p>Tüm frontmatter alanlarını bir anda öğrenmeye çalışma. Bugün temel alanları öğreneceksin; ileri alanlarla sonraki günlerde tanışacaksın.</p><table><thead><tr><th>Katman</th><th>Alanlar</th><th>Ne yapar?</th></tr></thead><tbody><tr><td>Temel (bugün)</td><td>name, description, argument-hint, arguments, disable-model-invocation, allowed-tools, disallowed-tools</td><td>Skill&#x27;in kimliği, parametreleri, tetikleme kontrolü ve tool izinleri</td></tr><tr><td>İleri (sonraki günler)</td><td>context, agent (Gün 11), model, effort, paths, shell, hooks (Gün 12), user-invocable, when_to_use</td><td>Forked context, subagent, model/effort override, path filtreleme, hook bağlama</td></tr></tbody></table><h3 class="sub">1.6 Ne Zaman Skill Yazılır, Ne Zaman Yazılmaz?</h3><p>Her şeyi skill yapmak da kötü pratiktir. Skill bir mühendislik kararıdır; doğru aracı doğru yerde kullanmak gerekir.</p><table><thead><tr><th>Skill yaz ✅</th><th>Skill yazma ❌</th></tr></thead><tbody><tr><td>Aynı talimatı tekrar tekrar yapıştırıyorsan</td><td>Tek seferlik bir işse → doğrudan prompt yaz</td></tr><tr><td>Workflow 3+ adımdan oluşuyorsa</td><td>Kalıcı proje bilgisi ise → CLAUDE.md&#x27;ye ekle</td></tr><tr><td>Takımda aynı rutin paylaşılacaksa</td><td>Deterministik bir script yeterliyse → shell script yaz</td></tr><tr><td>Destek dosyası/template gerekiyorsa</td><td>Basit bir alias yeterliyse → shell alias tanımla</td></tr><tr><td>Claude&#x27;un otomatik tetiklemesini istiyorsan</td><td>İş mantığı her seferinde farklıysa → prompt&#x27;u o an yaz</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span>Challenge&#x27;a başlamadan önce her skill fikrin için şu soruyu sor: &#x27;Bu gerçekten skill olmalı mı, yoksa CLAUDE.md, script veya tek seferlik prompt yeterli mi?&#x27;</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 İlk Custom Skill: commit</h3><p>İlk skill&#x27;ini yazacaksın: değişiklikleri analiz edip conventional commit mesajı öneren bir workflow. Bu skill otomatik tetiklenmemeli — commit kararı bilinçli olmalı. Bu yüzden <code>disable-model-invocation: true</code> ayarlayacağız.</p><ol><li>Skill dizinini oluştur: <code>mkdir -p .claude/skills/commit</code></li><li>SKILL.md dosyasını yaz (editörde veya Claude&#x27;a yazdır):
+``<code>
+---
+name: commit
+description: Staged değişiklikleri analiz edip conventional commit mesajı önerir
+argument-hint: [mesaj-notu]
+disable-model-invocation: true
+---
+
+## Commit Workflow
+
+1. </code>git status<code> ve </code>git diff --cached<code> çalıştır
+2. Değişiklikleri mantıksal gruplara ayır
+3. Her grup için conventional commit mesajı öner: type(scope): description
+4. Commit planını kullanıcıya göster ve onay bekle
+5. Kullanıcı onaylarsa commit et, onaylamazsa revize et
+6. $ARGUMENTS varsa commit mesajına ek not olarak ekle
+</code>``</li><li><code>/skills</code> yaz — commit skill&#x27;inin listede göründüğünü doğrula</li><li><code>/commit</code> yaz — skill&#x27;i çalıştır ve sonucu gözlemle</li><li>Commit mesajını incele: conventional commit formatına uyuyor mu?</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Commit skill&#x27;i otomatik commit atmamalı — önce mesaj önersin, kullanıcı onayladıktan sonra commit yapsın. Bu &#x27;güvenlik kapısı&#x27; yaklaşımı state-changing işlemler için iyi pratiktir.</div><div class="callout tip"><span class="lbl">💡 İpucu</span>SKILL.md&#x27;yi değiştirdikten sonra <code>/reload-skills</code> çalıştır. Bu komut skill&#x27;leri yeniden yükler ve değişikliklerin etkisini hemen görmeni sağlar.</div><h3 class="sub">2.2 Parametre Alan Skill: fix-issue</h3><p>Bazı skill&#x27;ler her çağrıda farklı girdi almalıdır. Örneğin <code>/fix-issue 42</code> dediğinde Claude 42 numaralı issue&#x27;yu çözmeli. Bunu <code>$ARGUMENTS</code> veya indexed parametreler (<code>$0</code>, <code>$1</code>) ile yaparsın.</p><pre><code># .claude/skills/fix-issue/SKILL.md
+---
+name: fix-issue
+description: Verilen issue numarasını okuyup çözer
+argument-hint: [issue-number]
+---
+
+## Issue Çözme Workflow&#x27;u
+
+Issue numarası: $ARGUMENTS
+
+1. Issue açıklamasını oku ve anla
+2. İlgili dosyaları bul ve analiz et
+3. Çözüm planı oluştur ve kullanıcıya sun
+4. Onay alınca implementasyonu yap
+5. İlgili testleri çalıştır
+6. Değişiklik özetini hazırla</code></pre><p><code>$ARGUMENTS</code> skill&#x27;e verilen tüm metni içerir. Eğer birden fazla parametreye ihtiyaç varsa indexed form kullanabilirsin: <code>$0</code> birinci, <code>$1</code> ikinci argüman olur. Ancak çoğu durumda <code>$ARGUMENTS</code> yeterlidir.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Skill&#x27;e argüman verirsen (<code>/fix-issue 123</code>) <code>$ARGUMENTS</code> = &#x27;123&#x27; olur. Argüman vermezsen Claude Code <code>$ARGUMENTS</code> yerine boş bırakmaz; skill içeriğinin sonuna <code>ARGUMENTS: &lt;input&gt;</code> ekler. Skill&#x27;ini her iki durumu da karşılayacak şekilde yaz.</div><h3 class="sub">2.3 test-runner Skill&#x27;i: Tool İzinleri</h3><p>Bazı skill&#x27;ler belirli tool&#x27;ları onay istemeden kullanmalıdır. Örneğin test çalıştıran bir skill her seferinde &#x27;Bash çalıştırayım mı?&#x27; diye sormamalı. <code>allowed-tools</code> bunu sağlar.</p><pre><code># .claude/skills/test-runner/SKILL.md
+---
+name: test-runner
+description: Testleri çalıştırır, başarısız olanları analiz edip düzeltir
+argument-hint: [test-path]
+allowed-tools:
+  - Bash
+---
+
+## Test Workflow
+
+1. $ARGUMENTS verilmişse sadece o path&#x27;teki testleri çalıştır
+2. $ARGUMENTS boşsa tüm testleri çalıştır
+3. Başarısız testleri listele ve her birinin hata nedenini analiz et
+4. Düzeltilebilecek hataları düzelt
+5. Testleri tekrar çalıştır ve sonucu raporla</code></pre><div class="callout kp"><span class="lbl">🔑 Önemli</span>allowed-tools ve disallowed-tools birbirinden farklı şeyler yapar:
+
+• allowed-tools: Bu skill aktifken listelenen tool&#x27;ları approval istemeden kullanma izni verir. Diğer tool&#x27;lar hâlâ kullanılabilir ama onay gerektirir.
+
+• disallowed-tools: Bu skill aktifken listelenen tool&#x27;ları tamamen engeller. Claude o tool&#x27;ları çağıramaz.
+
+Kısaca: allowed-tools onay atlar, disallowed-tools tool&#x27;u kaldırır.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>allowed-tools: [&quot;Bash&quot;] eğitimde basitlik için kullanılır. Production ve takım ortamında mümkünse daha dar tool izinleri, hook&#x27;lar (Gün 12) veya explicit approval tercih edilmelidir. &#x27;Bash&#x27;i allow et, rahat et&#x27; güvenli bir alışkanlık değildir.</div><h3 class="sub">2.4 Dinamik Context Injection</h3><p>Bazı skill&#x27;lerin çalışma anında güncel bilgiye ihtiyacı vardır. Örneğin PR özeti yazan bir skill, o andaki diff&#x27;i bilmeli. `<code> !</code>command<code> </code>` söz dizimi bunu sağlar: SKILL.md yüklenirken komut çalıştırılır ve çıktısı prompt&#x27;a enjekte edilir.</p><pre><code># .claude/skills/pr-summary/SKILL.md
+---
+name: pr-summary
+description: Mevcut branch&#x27;in diff&#x27;ini analiz edip PR açıklaması üretir
+---
+
+## Mevcut Değişiklikler
+
+!`git diff main...HEAD --stat`
+
+## Detaylı Diff
+
+```!
+git diff main...HEAD
+```
+
+## Görev
+
+Yukarıdaki değişiklikleri analiz et ve bir PR açıklaması yaz:
+- Ne değişti (özet)
+- Neden değişti (motivasyon)
+- Nasıl test edilir
+- Breaking change var mı</code></pre><p>İki farklı söz dizimi var: satır içi `<code> !</code>command<code> </code><code> tek satırlık komutlar için; </code> ``<code>! </code> ile açılan fenced block çok satırlı komutlar için. Her ikisi de preprocessing aşamasında çalışır — Claude sonucu değil, komutu değil, yalnızca çıktıyı görür.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Dinamik context injection güçlüdür ama güvenlik sorumluluğu sende. Shell çıktısı doğrudan Claude&#x27;un prompt&#x27;una girer. Hassas bilgi döndüren komutlar kullanma. Gerekirse settings&#x27;ten <code>disableSkillShellExecution: true</code> ile bu özelliği kapatabilirsin.</div><h3 class="sub">2.5 Destek Dosyaları ve ${CLAUDE_SKILL_DIR}</h3><p>Skill tek bir SKILL.md olmak zorunda değil — template, example, script gibi destek dosyaları ekleyebilirsin. Skill klasörü içindeki dosyalara <code>${CLAUDE_SKILL_DIR}</code> ile referans verirsin.</p><pre><code># Skill klasör yapısı:
+.claude/skills/api-design/
+├── SKILL.md          # Ana talimatlar
+├── template.md       # API endpoint şablonu
+├── examples/
+│   ├── rest-crud.md  # Örnek CRUD endpoint
+│   └── error-codes.md
+└── scripts/
+    └── validate.sh   # OpenAPI doğrulama scripti</code></pre><p>SKILL.md içinde destek dosyalarına şöyle referans verirsin:
+<code>${CLAUDE_SKILL_DIR}/template.md</code> dosyasını oku ve bu şablona göre endpoint yaz. Bu sayede skill self-contained bir paket olur — başka projeye taşıdığında tüm destek dosyaları birlikte gelir.</p><h3 class="sub">2.6 Skill Stacking (Bonus)</h3><p>v2.1.199 itibarıyla birden fazla skill&#x27;i tek komutta zincirleyebilirsin: <code>/code-review /fix-issue 123</code> yazarsan her iki skill de yüklenir ve trailing text (&#x27;123&#x27;) her birine <code>$ARGUMENTS</code> olarak aktarılır. En fazla 6 skill zincirlenebilir.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Skill stacking ileri bir tekniktir. Önce tek skill&#x27;in nasıl çalıştığını net anla, sonra stacking&#x27;e geç.</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ / UYGULAMA</h2><h3 class="sub">3.1 Skill Scope ve Paylaşım Stratejisi</h3><p>Skill&#x27;ler iki ana scope&#x27;ta yaşar: personal ve project. Doğru scope seçimi takım çalışmasında kritiktir.</p><table><thead><tr><th>Scope</th><th>Konum</th><th>Kim görür?</th><th>Ne zaman kullan?</th></tr></thead><tbody><tr><td>Personal</td><td>~/.claude/skills/</td><td>Sadece sen, tüm projelerinde</td><td>Kişisel workflow&#x27;lar: commit tarzı, editor tercihleri</td></tr><tr><td>Project</td><td>.claude/skills/</td><td>Projeyi klonlayan herkes</td><td>Takım standardları: test, review, deploy workflow&#x27;ları</td></tr></tbody></table><p>Project skill&#x27;lerini Git&#x27;e commitleyerek takımla paylaşırsın. Bu sayede yeni takım üyesi projeyi klonladığında tüm skill&#x27;ler hazır olur. <code>.claude/skills/</code> dizinini <code>.gitignore</code>&#x27;a ekleme — paylaşılması amaçlanmıştır.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Enterprise ortamlarda skill öncelik sırası: Enterprise (managed settings) &gt; Personal (~/.claude/) &gt; Project (.claude/) &gt; Plugin. Aynı isimde skill varsa üst scope kazanır.</div><h3 class="sub">3.2 Rol Bazlı Skill Tasarımı</h3><p>Farklı SDLC rolleri farklı skill&#x27;lerden faydalanır. Takım genelinde bir &#x27;workflow skill pack&#x27; standardı oluşturmak, herkesin aynı kalitede çalışmasını sağlar.</p><table><thead><tr><th>Rol</th><th>Örnek Skill Fikirleri</th><th>Odak</th></tr></thead><tbody><tr><td>Developer</td><td>commit, fix-issue, refactor, api-scaffold</td><td>Kod üretim ve bakım workflow&#x27;ları</td></tr><tr><td>QA / Tester</td><td>test-runner, edge-case-finder, regression-check</td><td>Test kapsamı ve kalite kontrol</td></tr><tr><td>DevOps / SRE</td><td>deploy-check, health-monitor, incident-report</td><td>Deployment güvenliği ve izleme</td></tr><tr><td>Tech Lead</td><td>code-review, pr-summary, architecture-check</td><td>Kod kalitesi ve mimari tutarlılık</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span>Takımda herkes kendi skill&#x27;ini yazmasın — birkaç temel skill üzerinde uzlaşın ve bunları project scope&#x27;ta yayınlayın. Kişisel tercihler personal scope&#x27;ta kalsın.</div><h3 class="sub">3.3 Skill Teşhis ve Troubleshooting</h3><p>Skill&#x27;ler beklendiği gibi çalışmadığında teşhis araçları devreye girer.</p><table><thead><tr><th>Sorun</th><th>Komut / Çözüm</th></tr></thead><tbody><tr><td>Skill&#x27;im listede görünmüyor</td><td><code>/reload-skills</code> çalıştır; dosya yolunu ve frontmatter söz dizimini kontrol et</td></tr><tr><td>Claude skill&#x27;imi otomatik tetiklemiyor</td><td>description alanının kullanıcının doğal dildeki isteğiyle eşleştiğini doğrula</td></tr><tr><td>Çok fazla skill var, bazıları kısaltılıyor</td><td><code>/doctor</code> çalıştır — listing budget uyarısı varsa önceliği düşük skill&#x27;lere skillOverrides ile &#x27;name-only&#x27; ata</td></tr><tr><td>Skill istemediğim zaman tetikleniyor</td><td>description&#x27;ı daralt veya <code>disable-model-invocation: true</code> ekle</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>İleri teşhis notu: Çok fazla skill varsa <code>/doctor</code> listing budget uyarısı verebilir. Skill listeleme bütçesi context window&#x27;un yaklaşık %1&#x27;i kadardır. <code>skillListingBudgetFraction</code> ayarı veya <code>skillOverrides</code> ile görünürlük kontrol edilebilir. Bu konu Gün 13&#x27;te plugin/skill yönetimi bağlamında derinleşecek.</div><h3 class="sub">3.4 İleri Seviye Teaser&#x27;lar</h3><p>Aşağıdaki özellikler bugün sadece tanıtılıyor — tam derinlikleri ilgili günlerde işlenecek.</p><table><thead><tr><th>Özellik</th><th>Ne yapar?</th><th>Hangi gün?</th></tr></thead><tbody><tr><td><code>context: fork</code> + <code>agent: Explore</code></td><td>Skill&#x27;i izole subagent context&#x27;inde çalıştırır; ana konuşmayı kirletmez</td><td>Gün 11 (Subagent&#x27;lar)</td></tr><tr><td>Plugin olarak paketleme</td><td>Skill + agent + hook + MCP server&#x27;ı tek pakette birleştirip dağıtır</td><td>Gün 13 (Skills &amp; Plugins)</td></tr><tr><td>Skill stacking (v2.1.199+)</td><td>6&#x27;ya kadar skill&#x27;i tek komutta zincirleme</td><td>Gün 13 (ileri workflow&#x27;lar)</td></tr></tbody></table><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Skill Keşfedici</div><pre><code>Projemde hangi slash komutlarını ve skill&#x27;leri kullanabilirim? /skills çalıştır ve sonuçları kategorize et: built-in komutlar, bundled skill&#x27;ler ve custom skill&#x27;ler ayrı ayrı listele.</code></pre><div class="note">Gün 6&#x27;nın ilk adımı: mevcut durumu keşfet.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Commit Skill Oluşturucu</div><pre><code>`.claude/skills/commit/SKILL.md` oluştur: staged değişiklikleri analiz et, conventional commit mesajı öner, kullanıcı onaylarsa commit et. disable-model-invocation: true olsun. Format: type(scope): description. $ARGUMENTS varsa commit mesajına ek not olarak ekle.</code></pre><div class="note">İlk custom skill. Otomatik tetiklenmez, sadece /commit ile çağrılır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Test Runner Skill Oluşturucu</div><pre><code>`.claude/skills/test-runner/SKILL.md` oluştur: $ARGUMENTS ile spesifik test path alabilsin, varsayılan olarak tüm testleri çalıştırsın, başarısız olanları analiz edip düzeltsin. allowed-tools: [&quot;Bash&quot;] ekle.</code></pre><div class="note">allowed-tools ile onaysız test çalıştırma.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Fix-Issue Skill Oluşturucu</div><pre><code>`.claude/skills/fix-issue/SKILL.md` oluştur: $ARGUMENTS ile issue numarası alsın. Workflow: issue&#x27;yu oku → plan yap → implement et → test et → özet ver.</code></pre><div class="note">Parametre alan skill örneği. /fix-issue 42 şeklinde çağrılır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">PR Summary Skill (Dinamik Context)</div><pre><code>`.claude/skills/pr-summary/SKILL.md` oluştur: !`git diff main...HEAD --stat` ile değişiklikleri dinamik olarak inject etsin. PR açıklaması üretsin: ne değişti, neden değişti, nasıl test edilir, breaking change var mı.</code></pre><div class="note">Dinamik context injection (!<code>command</code>) ile çalışma anında güncel bilgi.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>Todo App Developer Workflow Skill Pack</h3><p>Todo App projesi için bir &#x27;Developer Workflow Skill Pack&#x27; oluştur. Tekrarlayan developer rutinlerini custom skill&#x27;lere dönüştür ve Git&#x27;e commitleyerek takımla paylaşılabilir hale getir.</p><p><strong>Gereksinimler:</strong></p><ul><li>3 zorunlu skill <code>.claude/skills/&lt;name&gt;/SKILL.md</code> formatında yazılmış olsun</li><li>Zorunlu: commit — conventional commit mesajı öneren, disable-model-invocation: true, !<code>git diff --cached</code> ile dinamik context</li><li>Zorunlu: test-runner — $ARGUMENTS ile spesifik test path alan, allowed-tools: [&quot;Bash&quot;]</li><li>Zorunlu: fix-issue — $ARGUMENTS ile issue numarası alan, plan → implement → test → summary akışı</li><li>Bonus: pr-summary — !<code>git diff main...HEAD</code> ile dinamik context injection</li><li>Bonus: deploy-check — release öncesi checklist, disallowed-tools ile push/publish engelleme</li><li>Tüm skill&#x27;ler Git&#x27;e commitlenmiş olsun</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>3 zorunlu SKILL.md dosyası <code>.claude/skills/</code> altında mevcut</span></label></li><li><label><input type="checkbox" data-k="succ1"><span><code>/skills</code> çıktısında 3 skill de görünüyor</span></label></li><li><label><input type="checkbox" data-k="succ2"><span><code>/commit</code> staged değişikliklerden conventional commit mesajı öneriyor (otomatik commit atmıyor)</span></label></li><li><label><input type="checkbox" data-k="succ3"><span><code>/test-runner src/tests/</code> sadece belirtilen path için test çalıştırıyor</span></label></li><li><label><input type="checkbox" data-k="succ4"><span><code>/fix-issue 42</code> issue numarasını doğru alıp plan → implement → test → summary akışını başlatıyor</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>Skill dosyaları Git&#x27;e commitlenmiş durumda</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ı adım adım çözmek için aşağıdaki akışı izle. Her skill için önce dizin oluştur, SKILL.md yaz, <code>/reload-skills</code> ile yükle ve <code>/skill-name</code> ile test et. Challenge&#x27;a başlamadan önce her skill için sor: &#x27;Bu gerçekten skill olmalı mı?&#x27; — commit, test, fix-issue rutinleri tekrarlayan, çok adımlı ve takımla paylaşılabilir: evet, skill olmalı.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) commit skill&#x27;ini oluştur</div><pre><code>mkdir -p .claude/skills/commit &amp;&amp; Claude&#x27;a: &#x27;.claude/skills/commit/SKILL.md oluştur. Staged değişiklikleri analiz et, conventional commit mesajı öner, onay al, commit et. disable-model-invocation: true. Dynamic context: !`git diff --cached`&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) test-runner skill&#x27;ini oluştur</div><pre><code>&#x27;.claude/skills/test-runner/SKILL.md oluştur. $ARGUMENTS ile test path alsın, varsayılan tüm testleri çalıştırsın, başarısız olanları analiz edip düzeltsin. allowed-tools: [&quot;Bash&quot;]&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) fix-issue skill&#x27;ini oluştur</div><pre><code>&#x27;.claude/skills/fix-issue/SKILL.md oluştur. $ARGUMENTS ile issue numarası alsın. Workflow: issue oku → plan yap → implement et → test et → değişiklik özeti yaz.&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4) Skill&#x27;leri doğrula</div><pre><code>&#x27;/skills çalıştır — 3 skill de görünüyor mu? Sonra /commit ile staged bir değişiklik üzerinde test et. /test-runner src/tests/ ile spesifik path testi dene. /fix-issue 1 ile bir örnek issue çöz.&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">5) Git&#x27;e commitle</div><pre><code>&#x27;Skill dosyalarını Git&#x27;e commitle: git add .claude/skills/ &amp;&amp; git commit -m &quot;feat(skills): add developer workflow skill pack&quot;&#x27;</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>T</li><li>e</li><li>m</li><li>e</li><li>l</li><li> </li><li>f</li><li>r</li><li>o</li><li>n</li><li>t</li><li>m</li><li>a</li><li>t</li><li>t</li><li>e</li><li>r</li><li> </li><li>a</li><li>l</li><li>a</li><li>n</li><li>l</li><li>a</li><li>r</li><li>ı</li><li>:</li><li> </li><li>n</li><li>a</li><li>m</li><li>e</li><li> </li><li>(</li><li>s</li><li>k</li><li>i</li><li>l</li><li>l</li><li> </li><li>a</li><li>d</li><li>ı</li><li>,</li><li> </li><li>/</li><li>n</li><li>a</li><li>m</li><li>e</li><li> </li><li>i</li><li>l</li><li>e</li><li> </li><li>ç</li><li>a</li><li>ğ</li><li>r</li><li>ı</li><li>l</li><li>ı</li><li>r</li><li>)</li><li>,</li><li> </li><li>d</li><li>e</li><li>s</li><li>c</li><li>r</li><li>i</li><li>p</li><li>t</li><li>i</li><li>o</li><li>n</li><li> </li><li>(</li><li>C</li><li>l</li><li>a</li><li>u</li><li>d</li><li>e</li><li>&#x27;</li><li>u</li><li>n</li><li> </li><li>o</li><li>t</li><li>o</li><li>m</li><li>a</li><li>t</li><li>i</li><li>k</li><li> </li><li>t</li><li>e</li><li>t</li><li>i</li><li>k</li><li>l</li><li>e</li><li>m</li><li>e</li><li> </li><li>k</li><li>a</li><li>r</li><li>a</li><li>r</li><li>ı</li><li>n</li><li>d</li><li>a</li><li> </li><li>k</li><li>u</li><li>l</li><li>l</li><li>a</li><li>n</li><li>d</li><li>ı</li><li>ğ</li><li>ı</li><li> </li><li>m</li><li>e</li><li>t</li><li>i</li><li>n</li><li>)</li><li>,</li><li> </li><li>a</li><li>r</li><li>g</li><li>u</li><li>m</li><li>e</li><li>n</li><li>t</li><li>-</li><li>h</li><li>i</li><li>n</li><li>t</li><li> </li><li>(</li><li>k</li><li>u</li><li>l</li><li>l</li><li>a</li><li>n</li><li>ı</li><li>c</li><li>ı</li><li>y</li><li>a</li><li> </li><li>g</li><li>ö</li><li>s</li><li>t</li><li>e</li><li>r</li><li>i</li><li>l</li><li>e</li><li>n</li><li> </li><li>p</li><li>a</li><li>r</li><li>a</li><li>m</li><li>e</li><li>t</li><li>r</li><li>e</li><li> </li><li>i</li><li>p</li><li>u</li><li>c</li><li>u</li><li>)</li><li>,</li><li> </li><li>d</li><li>i</li><li>s</li><li>a</li><li>b</li><li>l</li><li>e</li><li>-</li><li>m</li><li>o</li><li>d</li><li>e</li><li>l</li><li>-</li><li>i</li><li>n</li><li>v</li><li>o</li><li>c</li><li>a</li><li>t</li><li>i</li><li>o</li><li>n</li><li> </li><li>(</li><li>t</li><li>r</li><li>u</li><li>e</li><li> </li><li>i</li><li>s</li><li>e</li><li> </li><li>C</li><li>l</li><li>a</li><li>u</li><li>d</li><li>e</li><li> </li><li>o</li><li>t</li><li>o</li><li>m</li><li>a</li><li>t</li><li>i</li><li>k</li><li> </li><li>t</li><li>e</li><li>t</li><li>i</li><li>k</li><li>l</li><li>e</li><li>m</li><li>e</li><li>z</li><li>)</li><li>,</li><li> </li><li>a</li><li>l</li><li>l</li><li>o</li><li>w</li><li>e</li><li>d</li><li>-</li><li>t</li><li>o</li><li>o</li><li>l</li><li>s</li><li> </li><li>(</li><li>o</li><li>n</li><li>a</li><li>y</li><li>s</li><li>ı</li><li>z</li><li> </li><li>k</li><li>u</li><li>l</li><li>l</li><li>a</li><li>n</li><li>ı</li><li>m</li><li> </li><li>i</li><li>z</li><li>n</li><li>i</li><li> </li><li>—</li><li> </li><li>t</li><li>o</li><li>o</li><li>l</li><li>&#x27;</li><li>u</li><li> </li><li>k</li><li>a</li><li>l</li><li>d</li><li>ı</li><li>r</li><li>m</li><li>a</li><li>z</li><li>)</li><li>,</li><li> </li><li>d</li><li>i</li><li>s</li><li>a</li><li>l</li><li>l</li><li>o</li><li>w</li><li>e</li><li>d</li><li>-</li><li>t</li><li>o</li><li>o</li><li>l</li><li>s</li><li> </li><li>(</li><li>t</li><li>o</li><li>o</li><li>l</li><li>&#x27;</li><li>u</li><li> </li><li>t</li><li>a</li><li>m</li><li>a</li><li>m</li><li>e</li><li>n</li><li> </li><li>e</li><li>n</li><li>g</li><li>e</li><li>l</li><li>l</li><li>e</li><li>r</li><li> </li><li>—</li><li> </li><li>o</li><li>n</li><li>a</li><li>y</li><li> </li><li>a</li><li>t</li><li>l</li><li>a</li><li>m</li><li>a</li><li>z</li><li>,</li><li> </li><li>k</li><li>a</li><li>l</li><li>d</li><li>ı</li><li>r</li><li>ı</li><li>r</li><li>)</li><li>.</li><li> </li><li>c</li><li>o</li><li>m</li><li>m</li><li>i</li><li>t</li><li> </li><li>s</li><li>k</li><li>i</li><li>l</li><li>l</li><li>&#x27;</li><li>i</li><li>n</li><li>d</li><li>e</li><li> </li><li>d</li><li>i</li><li>s</li><li>a</li><li>b</li><li>l</li><li>e</li><li>-</li><li>m</li><li>o</li><li>d</li><li>e</li><li>l</li><li>-</li><li>i</li><li>n</li><li>v</li><li>o</li><li>c</li><li>a</li><li>t</li><li>i</li><li>o</li><li>n</li><li>:</li><li> </li><li>t</li><li>r</li><li>u</li><li>e</li><li> </li><li>ö</li><li>n</li><li>e</li><li>m</li><li>l</li><li>i</li><li> </li><li>ç</li><li>ü</li><li>n</li><li>k</li><li>ü</li><li> </li><li>c</li><li>o</li><li>m</li><li>m</li><li>i</li><li>t</li><li> </li><li>s</li><li>t</li><li>a</li><li>t</li><li>e</li><li>-</li><li>c</li><li>h</li><li>a</li><li>n</li><li>g</li><li>i</li><li>n</li><li>g</li><li> </li><li>b</li><li>i</li><li>r</li><li> </li><li>i</li><li>ş</li><li>l</li><li>e</li><li>m</li><li> </li><li>—</li><li> </li><li>C</li><li>l</li><li>a</li><li>u</li><li>d</li><li>e</li><li>&#x27;</li><li>u</li><li>n</li><li> </li><li>&#x27;</li><li>y</li><li>a</li><li>r</li><li>d</li><li>ı</li><li>m</li><li>c</li><li>ı</li><li> </li><li>o</li><li>l</li><li>m</li><li>a</li><li>k</li><li> </li><li>i</li><li>ç</li><li>i</li><li>n</li><li>&#x27;</li><li> </li><li>o</li><li>t</li><li>o</li><li>m</li><li>a</li><li>t</li><li>i</li><li>k</li><li> </li><li>c</li><li>o</li><li>m</li><li>m</li><li>i</li><li>t</li><li> </li><li>a</li><li>t</li><li>m</li><li>a</li><li>s</li><li>ı</li><li>n</li><li>ı</li><li> </li><li>i</li><li>s</li><li>t</li><li>e</li><li>m</li><li>e</li><li>z</li><li>s</li><li>i</li><li>n</li><li>.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ ⚠️ SKILL.md&#x27;yi değiştirip /reload-skills çalıştırmayı unutma — eski versiyon yüklenmiş kalır.</li><li>⚠️ ⚠️ allowed-tools: [&quot;Bash&quot;] çok geniş bir izindir. Production&#x27;da daha dar izinler kullan.</li><li>⚠️ ⚠️ $ARGUMENTS boş geldiğinde skill&#x27;in ne yapacağını planla — argümansız çağrıda fallback davranışı tanımla.</li><li>⚠️ ⚠️ Dinamik context injection (!<code>command</code>) preprocessing&#x27;dir — komut başarısız olursa hata mesajı prompt&#x27;a enjekte edilir.</li><li>⚠️ ⚠️ disallowed-tools ile deploy-check skill&#x27;i tasarlarken hangi tool&#x27;ları engellediğini somutlaştır: örneğin Bash(git push*), Bash(npm publish*), Bash(kubectl apply*) gibi pattern&#x27;ler kullanılabilir.</li><li>⚠️ ⚠️ Personal ve project scope skill&#x27;ler aynı isimde olursa personal kazanır — isim çakışmalarına dikkat et.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Skill, tekrar eden çok adımlı workflow&#x27;ları bir kez tanımlayıp <code>/skill-name</code> ile çağırmanın yoludur — CLAUDE.md ile karıştırma: biri kalıcı bilgi, diğeri workflow paketi.</li><li><code>.claude/commands/</code> hâlâ desteklenen eski command formatıdır; <code>.claude/skills/</code> daha zengin metadata, destek dosyaları ve davranış kontrolü sunar. Aynı isimde varsa skill kazanır.</li><li>Temel frontmatter alanları (name, description, argument-hint, disable-model-invocation, allowed-tools, disallowed-tools) çoğu skill için yeterlidir; ileri alanlar (context, agent, model) sonraki günlerde.</li><li>allowed-tools onay atlar ama tool&#x27;u kaldırmaz; disallowed-tools tool&#x27;u tamamen engeller — bu fark güvenlik açısından kritiktir.</li><li>Dinamik context injection (`<code> !</code>command<code> </code>`) skill&#x27;e çalışma anında güncel bilgi kazandırır: git diff, test sonuçları, API yanıtları.</li><li>Her şeyi skill yapma — &#x27;Bu gerçekten skill olmalı mı?&#x27; sorusu mühendislik kararıdır. Tek seferlik iş → prompt, kalıcı bilgi → CLAUDE.md, tekrarlayan workflow → skill.</li><li>Skill&#x27;leri <code>.claude/skills/</code> dizininde Git&#x27;e commitle — takımda herkes projeyi klonladığında aynı workflow standardını kullanır.</li><li>Skill&#x27;in çalışmadığında: <code>/reload-skills</code> ile yeniden yükle, <code>/skills</code> ile görünürlüğü kontrol et, <code>/doctor</code> ile bütçe teşhisi yap.</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noopener">Extend Claude with skills — SKILL.md yapısı, frontmatter alanları, substitution, context fork, destek dosyaları</a></li><li>⭐ <a href="https://code.claude.com/docs/en/commands" target="_blank" rel="noopener">Commands Reference — tüm built-in komutlar ve bundled skill&#x27;lerin tam referansı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/interactive-mode" target="_blank" rel="noopener">Interactive Mode — / menüsü, Tab autocomplete, shell mode, skill çağırma</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://www.anthropic.com/engineering/claude-code-best-practices" target="_blank" rel="noopener">Claude Code Best Practices (Anthropic Engineering) — skill, CLAUDE.md ve workflow organizasyonu için resmi öneriler</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://www.conventionalcommits.org/" target="_blank" rel="noopener">Conventional Commits — commit skill&#x27;inde referans alınan commit mesajı formatı standardı</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 7)</span>Yarın (Gün 7) Claude Code&#x27;un context window&#x27;unu yönetmeyi öğreneceksin: 200K → 1M token aralığında verimli çalışma, /compact stratejileri, /context ile kullanım analizi ve büyük projelerde context taşmasını önleme teknikleri.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Slash command, built-in command, bundled skill ve custom skill arasındaki farkı açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span><code>.claude/commands/</code> (eski format) ile <code>.claude/skills/</code> (güncel) ilişkisini ve öncelik kuralını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span><code>.claude/skills/&lt;name&gt;/SKILL.md</code> formatında çalışan bir skill yazabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span><code>/skills</code> ile mevcut skill&#x27;leri listeleyip <code>/reload-skills</code> ile yeniden yükleyebiliyorum</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span><code>$ARGUMENTS</code>, <code>$0</code> ve <code>argument-hint</code> ile parametre alan skill yazabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>`<code> !</code>command<code> </code><code> ve </code>`` ! ile dinamik context injection yapabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span><code>disable-model-invocation</code> (otomatik tetikleme kontrolü) ile <code>allowed-tools</code> / <code>disallowed-tools</code> (tool izin/engelleme) farkını açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>&#x27;Ne zaman skill yazılır, ne zaman CLAUDE.md yeter?&#x27; kararını verebiliyorum</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Skill&#x27;leri Git&#x27;e commitleyerek takımla paylaşabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Todo App için en az 3 custom skill yazıp çalıştığını doğruladım</span></label></li></ul><div class="pager"><a href="gun05-git-checkpointing-workflow.html"><div class="dir">← Önceki</div><div class="tt">Gün 5</div><div>Git Entegrasyonu, Checkpointing ve Workflow</div></a><a class="next" href="gun07-context-window-auto-mode.html"><div class="dir">Sonraki →</div><div class="tt">Gün 7</div><div>Context Window Yönetimi ve Verimli Çalışma</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 6/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=6;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>
