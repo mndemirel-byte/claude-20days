@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 9 — MCP (Model Context Protocol) Temelleri · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><span class="cur"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></span><span class="locked" title="yakında"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></span></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></span><span class="locked" title="yakında"><span class="num">12</span><span>Hooks ve Sandboxing</span></span><span class="locked" title="yakında"><span class="num">13</span><span>Skills &amp; Plugins</span></span><span class="locked" title="yakında"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></span><span class="locked" title="yakında"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></span></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 2 — Orta · Gün 09 / 20</div><h1>MCP (Model Context Protocol) Temelleri</h1><p class="tagline">“Claude&#x27;a yeni yetenekler kazandır”</p><p class="intro">Dün Claude Code&#x27;u QA mühendisi olarak çalıştırdın; bugün onu dış dünyaya bağlıyorsun. MCP (Model Context Protocol), Claude Code&#x27;un GitHub, veritabanları, issue tracker&#x27;lar ve daha yüzlerce araçla konuşmasını sağlayan açık standarttır — artık bir hata mesajını veya issue içeriğini elle kopyalayıp yapıştırmak yerine, Claude doğrudan o sisteme erişip üzerinde işlem yapabilir. Gün sonunda GitHub MCP server&#x27;ını bağlamış, gerçek bir issue lifecycle&#x27;ı (oluştur → bul → kapat) çalıştırmış ve MCP güvenlik/organizasyon kontrolünü tanımış olacaksın.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Mental Model</div><div class="du">30 dk</div><div class="de">MCP nedir, client-server mimarisi, built-in vs MCP tool farkı, ne zaman server bağlanmalı, tool search ile context yönetimi</div></div><div class="step"><div class="ph">2 · Config ve Komutlar</div><div class="du">40 dk</div><div class="de">Transport türleri (HTTP/SSE/stdio), /mcp vs claude mcp list/get/remove, scope katmanları (local/project/user), secret yönetimi</div></div><div class="step"><div class="ph">3 · GitHub Hands-on</div><div class="du">50 dk</div><div class="de">Fine-grained PAT oluşturma, GitHub MCP server bağlama, issue listeleme/oluşturma/kapatma</div></div><div class="step"><div class="ph">4 · Güvenlik ve Bonus</div><div class="du">30 dk</div><div class="de">Prompt injection ve tool poisoning riski, Managed MCP (allowlist/denylist/managed-mcp.json), bonus: web search MCP</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1–8 tamamlanmış (Claude Code kurulu, CLAUDE.md hazır, debugging/review pratiği yapılmış); Terminal ve Claude Code çalışır durumda; GitHub hesabı (fine-grained personal access token oluşturabilecek yetkide); Test/sandbox amaçlı kullanılabilecek bir GitHub repo&#x27;su (kişisel veya boş bir repo)</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); GitHub hesabı ve web tarayıcı (token oluşturma için); Sandbox/test GitHub repo&#x27;su</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>MCP mimarisini (client-server, tool discovery) açıklayabileceksin</li><li>/mcp panelini ve claude mcp list/get/remove/add komutlarını doğru durumda kullanabileceksin</li><li>.mcp.json, ~/.claude.json ve settings.json&#x27;ın farklı rollerini ve project-scope approval akışını anlayabileceksin</li><li>GitHub MCP server&#x27;ını fine-grained PAT ile bağlayıp issue listeleme/oluşturma/kapatma işlemlerini Claude Code üzerinden yapabileceksin</li><li>MCP server güvenlik risklerini (prompt injection, tool poisoning) değerlendirip minimum-yetki ilkesini uygulayabileceksin</li><li>Managed MCP (allowlist/denylist/managed-mcp.json) kavramını organizasyonel bir kontrol mekanizması olarak tanıyacaksın</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 MCP Nedir ve Hangi Problemi Çözer</h3><p>MCP (Model Context Protocol), Claude Code&#x27;u harici araçlara, veritabanlarına ve API&#x27;lere bağlamak için kullanılan açık kaynaklı bir entegrasyon standardıdır. MCP olmadan her araç entegrasyonu özel bir bağlantı gerektirirdi; MCP bu sorunu tek bir protokolle çözer — bir kez yazılan bir MCP server, Claude Code dahil protokolü destekleyen her istemciyle çalışır.</p><table><thead><tr><th>Bileşen</th><th>Rol</th><th>Örnek</th></tr></thead><tbody><tr><td>Client</td><td>İstekleri başlatır, tool sonuçlarını konuşmaya entegre eder</td><td>Claude Code (senin terminalin)</td></tr><tr><td>Server</td><td>Tool, resource ve prompt&#x27;ları expose eder</td><td>GitHub MCP server, Postgres MCP server</td></tr><tr><td>Transport</td><td>Client-server iletişim kanalı</td><td>HTTP (önerilen), stdio (lokal süreç), WebSocket</td></tr></tbody></table><p>Pratikte kural basit: kendini başka bir araçtan (issue tracker, monitoring dashboard, tasarım aracı) veriyi elle kopyalayıp chat&#x27;e yapıştırırken bulduğun an, o araç için bir MCP server bağlamayı düşünmelisin. Bağlandıktan sonra Claude o sisteme doğrudan erişip üzerinde işlem yapabilir — &#x27;JIRA&#x27;daki ENG-4521 issue&#x27;sunda tarif edilen özelliği ekle ve GitHub&#x27;da PR aç&#x27; gibi bir istek tek adımda çalışır.</p><h3 class="sub">1.2 Built-in Tool&#x27;lar vs MCP Tool&#x27;ları</h3><table><thead><tr><th></th><th>Built-in tool (Read, Bash, Edit...)</th><th>MCP tool</th></tr></thead><tbody><tr><td>Kaynak</td><td>Claude Code&#x27;a gömülü</td><td>Harici server, ayrıca bağlanmalı</td></tr><tr><td>Kimlik doğrulama</td><td>Gerekmez</td><td>Çoğunlukla gerekir (OAuth, PAT, header)</td></tr><tr><td>Kapsam</td><td>Dosya sistemi, terminal, düzenleme</td><td>GitHub, veritabanı, Slack, Figma, monitoring vb. — sınırsız</td></tr><tr><td>Bağlantı</td><td>Her zaman aktif</td><td>Proje/kullanıcı bazında yapılandırılır</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>MCP server sayısı arttıkça context şişmesinden korkmana gerek yok: tool search (varsayılan aktif) server&#x27;ların tool tanımlarını oturum başında context&#x27;e yüklemek yerine, Claude ihtiyaç duyduğunda arayarak keşfeder. Gün 7&#x27;de öğrendiğin context bütçesi disiplini burada da geçerli.</div><div class="callout tip"><span class="lbl">💡 İpucu</span>Yeni bir MCP server bağlamadan önce her zaman güven değerlendirmesi yap: harici içerik çeken server&#x27;lar prompt injection riski taşır. Bu konuyu BÖLÜM 3&#x27;te derinleştireceğiz.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 Transport Türleri ve Server Ekleme</h3><p>HTTP, uzak MCP server&#x27;lar için önerilen transport&#x27;tur — en yaygın desteklenen yöntemdir ve OAuth&#x27;u destekler. SSE (Server-Sent Events) artık deprecated; mevcut server&#x27;lar için hâlâ çalışır ama yeni bağlantılarda HTTP tercih et. stdio, lokal makinede çalışan süreçler (örn. bir Python script&#x27;i) için kullanılır.</p><pre><code># HTTP (önerilen)
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+
+# Header ile kimlik doğrulama (örn. Bearer token)
+claude mcp add --transport http secure-api https://api.example.com/mcp \
+  --header &quot;Authorization: Bearer your-token&quot;
+
+# Lokal stdio server
+claude mcp add --env AIRTABLE_API_KEY=YOUR_KEY --transport stdio airtable \
+  -- npx -y airtable-mcp-server</code></pre><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>SSE artık deprecated olarak işaretlendi — yeni server bağlarken HTTP&#x27;yi tercih et, SSE&#x27;yi yalnızca server başka transport sunmuyorsa kullan.</div><h3 class="sub">2.2 Server Yönetimi: /mcp vs CLI Komutları</h3><table><thead><tr><th>Kullanım</th><th>Komut</th><th>Amaç</th></tr></thead><tbody><tr><td>Oturum içi (Claude Code içinde)</td><td>/mcp</td><td>Bağlı server durumunu görmek, OAuth login akışını başlatmak</td></tr><tr><td>Terminal / CLI</td><td>claude mcp list</td><td>Tüm yapılandırılmış server&#x27;ları listelemek</td></tr><tr><td>Terminal / CLI</td><td>claude mcp get &lt;name&gt;</td><td>Tek bir server&#x27;ın detayını görmek</td></tr><tr><td>Terminal / CLI</td><td>claude mcp remove &lt;name&gt;</td><td>Server&#x27;ı kaldırmak</td></tr><tr><td>Terminal / CLI</td><td>claude mcp login &lt;name&gt;</td><td>OAuth destekleyen server için CLI&#x27;dan kimlik doğrulama</td></tr></tbody></table><p>Not: claude mcp login yalnızca OAuth destekleyen server&#x27;lar için kullanılır ve komut kullanılabilirliği Claude Code sürümüne göre değişebilir — sorun yaşarsan claude mcp --help ile güncel komut setini kontrol et.</p><h3 class="sub">2.3 Config Katmanları: Nerede Ne Tutulur</h3><table><thead><tr><th>Scope</th><th>Nerede yüklenir?</th><th>Ekiple paylaşılır mı?</th><th>Saklandığı yer</th></tr></thead><tbody><tr><td>local (varsayılan)</td><td>Sadece bu projede</td><td>Hayır</td><td>~/.claude.json</td></tr><tr><td>project</td><td>Sadece bu projede</td><td>Evet (Git ile)</td><td>.mcp.json (proje kökü)</td></tr><tr><td>user</td><td>Tüm projelerinde</td><td>Hayır</td><td>~/.claude.json</td></tr></tbody></table><p>settings.json ise MCP server tanımlamak için kullanılmaz — izinler, environment değişkenleri ve organizasyon davranış ayarları için ayrı bir katmandır.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>.mcp.json ile eklenen project-scope server&#x27;lar kullanılmadan önce onay ister (güvenlik amaçlı); onay kararlarını sıfırlamak için <code>claude mcp reset-project-choices</code> çalıştır. Sırrı asla .mcp.json&#x27;a düz metin yazma — ${VAR} veya ${VAR:-default} expansion sözdizimiyle her kullanıcının kendi ortam değişkeninden oku.</div><pre><code>{
+  &quot;mcpServers&quot;: {
+    &quot;api-server&quot;: {
+      &quot;type&quot;: &quot;http&quot;,
+      &quot;url&quot;: &quot;${API_BASE_URL:-https://api.example.com}/mcp&quot;,
+      &quot;headers&quot;: { &quot;Authorization&quot;: &quot;Bearer ${API_KEY}&quot; }
+    }
+  }
+}</code></pre><h3 class="sub">2.4 GitHub MCP Server Bağlama</h3><ol><li>github.com/settings/personal-access-tokens adresinden <strong>fine-grained</strong> bir token oluştur; sadece çalışacağın sandbox/test repo&#x27;ya erişim ver (tüm repo&#x27;lara değil).</li><li>Server&#x27;ı HTTP transport ile ekle: <code>claude mcp add --transport http github https://api.githubcopilot.com/mcp/ --header &quot;Authorization: Bearer YOUR_GITHUB_PAT&quot;</code></li><li><code>claude mcp list</code> ile server&#x27;ın listede göründüğünü doğrula.</li><li>Claude Code oturumunda <code>/mcp</code> çalıştırıp bağlantı durumunu ve tool sayısını kontrol et.</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>GitHub MCP için burada gösterilen PAT/header akışı, resmi dokümantasyondaki örnektir — tek yol bu değil. GitHub&#x27;ın resmi MCP Server reposu local/remote farklı kurulum seçenekleri de sunar (bkz. Ekstra Okuma). claude mcp login ise bu senaryoda kullanılmaz çünkü GitHub&#x27;ın remote server&#x27;ı OAuth değil, PAT header ile kimlik doğruluyor.</div><h3 class="sub">2.5 Issue Lifecycle: Listele, Oluştur, Kapat</h3><p>Server bağlandıktan sonra GitHub ile doğal dille çalışabilirsin — Claude arka planda ilgili MCP tool&#x27;larını çağırır:</p><ul><li><strong>Listeleme:</strong> &quot;Bu repo&#x27;daki açık issue&#x27;ları listele&quot;</li><li><strong>Oluşturma:</strong> &quot;Şu bug tanımını issue formatına çevirip repo&#x27;da oluştur&quot;</li><li><strong>Kapatma:</strong> &quot;Az önce oluşturduğun issue&#x27;yu bul ve kapat&quot;</li></ul><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ / UYGULAMA</h2><h3 class="sub">3.1 MCP Güvenlik Değerlendirmesi</h3><p>Her MCP server, Claude Code&#x27;un tool setine yeni bir yetenek ekler — ve her yetenek bir risk yüzeyidir. Bir server&#x27;ı bağlamadan önce güvenip güvenmediğini sorgula, çünkü Anthropic Directory&#x27;deki server&#x27;lar listeleme kriterlerine göre incelense de, hiçbir MCP server&#x27;ın güvenlik denetimini Anthropic yapmaz.</p><table><thead><tr><th>Risk</th><th>Ne demek?</th><th>Azaltma</th></tr></thead><tbody><tr><td>Prompt injection</td><td>Harici içerik çeken bir server (örn. web&#x27;den veri okuyan), o içerik içine gizlenmiş talimatları Claude&#x27;a taşıyabilir</td><td>Yalnızca güvendiğin server&#x27;ları bağla; şüpheli çıktıları sorgula</td></tr><tr><td>Tool poisoning</td><td>Kötü niyetli/ele geçirilmiş bir server, tool açıklamasını yanıltıcı yazıp Claude&#x27;u istenmeyen bir aksiyona yönlendirebilir</td><td>Kaynağı bilinmeyen server&#x27;lardan kaçın; minimum-yetki token kullan</td></tr><tr><td>Secret sızıntısı</td><td>Token&#x27;lar .mcp.json&#x27;a düz metin yazılırsa Git geçmişine sızabilir</td><td>${VAR} expansion veya headersHelper kullan, asla commit etme</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Her server&#x27;ı bağlamadan önce güvenip güvenmediğini değerlendir — harici içerik çeken server&#x27;lar prompt injection riski taşır.</div><h3 class="sub">3.2 Managed MCP: Organizasyon Kontrolü</h3><p>Varsayılan olarak herkes istediği MCP server&#x27;ı bağlayabilir. Orion TR gibi bir organizasyonda yöneticiler bunu merkezi olarak sınırlayabilir — sıfır kısıtlamadan tam kilitli bir server setine kadar bir yelpazede:</p><table><thead><tr><th>Desen</th><th>Ne yapar?</th><th>Mekanizma</th></tr></thead><tbody><tr><td>MCP&#x27;yi tamamen kapat</td><td>Hiçbir server yüklenmez</td><td>Boş mcpServers ile managed-mcp.json</td></tr><tr><td>Sabit dağıtım</td><td>Herkese aynı server set&#x27;i, başkası eklenemez</td><td>Dolu managed-mcp.json</td></tr><tr><td>Onaylı katalog</td><td>Kullanıcılar listeden seçer, listede olmayan engellenir</td><td>allowedMcpServers + allowManagedMcpServersOnly</td></tr><tr><td>Sadece denylist</td><td>Bilinen kötü server&#x27;lar engellenir, gerisi serbest</td><td>deniedMcpServers</td></tr></tbody></table><pre><code>{
+  &quot;mcpServers&quot;: {
+    &quot;github&quot;: { &quot;type&quot;: &quot;http&quot;, &quot;url&quot;: &quot;https://api.githubcopilot.com/mcp/&quot; },
+    &quot;sentry&quot;: { &quot;type&quot;: &quot;http&quot;, &quot;url&quot;: &quot;https://mcp.sentry.dev/mcp&quot; }
+  }
+}</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>DevOps/Manager Notu: Fazla derine inmene gerek yok — bugünlük yeterli olan, bu mekanizmaların var olduğunu ve managed-mcp.json&#x27;ın (platform bazlı sistem yoluna, MDM/GPO ile) exclusive kontrol sağladığını, allowedMcpServers/deniedMcpServers&#x27;ın ise daha esnek allowlist/denylist filtresi olduğunu bilmen. Detaylı rollout planlaması Gün 19 Enterprise Patterns&#x27;te işlenecek.</div><h3 class="sub">3.3 Bonus: Web Search MCP Ekleme</h3><p>Zaman kalırsa, aynı <code>claude mcp add --transport http</code> deseniyle bir web search MCP server&#x27;ı da ekleyip test edebilirsin. Bu, günün ana hands-on hedefi değil — GitHub issue lifecycle&#x27;ına odaklan, ekstra zamanın varsa dene.</p><ol><li>Anthropic Directory&#x27;de (claude.ai/directory) veya bilinen bir web search MCP server&#x27;ı seç.</li><li><code>claude mcp add --transport http &lt;name&gt; &lt;url&gt;</code> ile ekle.</li><li>&quot;Son bir haftadaki [konu] hakkındaki gelişmeleri araştır ve özetle&quot; gibi bir prompt ile test et.</li></ol><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Sunucu Keşfi</div><pre><code>Claude Code oturumunda /mcp çalıştır, bağlı server&#x27;ları ve her birinin expose ettiği tool sayısını listele.</code></pre><div class="note">/mcp bir komut değil, oturum içi panel; terminaldeki <code>claude mcp list</code> çıktısıyla karşılaştır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">GitHub Issue Listeleme</div><pre><code>GitHub MCP üzerinden bu repo&#x27;daki açık issue&#x27;ları listele ve label&#x27;lara göre grupla.</code></pre><div class="note">Server bağlı değilse önce claude mcp list ile durumu kontrol et.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">GitHub Issue Oluşturma</div><pre><code>Bu bug tanımını GitHub issue formatına çevir (başlık + repro adımları + beklenen davranış) ve repo&#x27;da issue olarak oluştur.</code></pre><div class="note">Claude&#x27;un ürettiği başlık/etiketleri oluşturmadan önce gözden geçir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">GitHub Issue Kapatma</div><pre><code>Az önce oluşturduğun issue&#x27;yu bul, acceptance criteria karşılandıysa bir kapanış notuyla kapat.</code></pre><div class="note">Bu, challenge&#x27;ın &#x27;bul + kapat&#x27; adımı için doğrudan kullanılabilir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">MCP Server Güvenlik Değerlendirmesi</div><pre><code>Bu MCP server konfigürasyonunu güvenlik açısından değerlendir: hangi scope&#x27;ta tanımlı, hangi header/env kullanıyor, secret nerede tutuluyor, minimum yetki ilkesine uyuyor mu?</code></pre><div class="note">Bir .mcp.json dosyasını veya claude mcp get çıktısını yapıştırıp isteyebilirsin.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>GitHub MCP ile Issue Lifecycle</h3><p>Bir eğitim/sandbox GitHub repo&#x27;sunda GitHub MCP server&#x27;ını Claude Code&#x27;a bağla; Claude Code üzerinden bir issue oluştur, listele ve sonra kapat.</p><p><strong>Gereksinimler:</strong></p><ul><li>Fine-grained PAT oluştur, yalnızca sandbox/test repo&#x27;ya erişim ver</li><li>GitHub MCP server&#x27;ını HTTP transport ile bağla</li><li>claude mcp list ve /mcp ile bağlantı durumunu doğrula</li><li>En az 1 issue Claude Code üzerinden oluştur</li><li>Oluşturulan issue&#x27;yu Claude Code üzerinden tekrar bul (listele/ara)</li><li>Issue&#x27;yu Claude Code üzerinden kapat</li><li>Token&#x27;ı repo&#x27;ya commit etme; .mcp.json kullanıyorsan ${VAR} expansion ile sakla</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>claude mcp list çıktısında GitHub server görünüyor</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>/mcp panelinde server bağlantı durumu ve tool sayısı doğrulandı</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>En az 1 issue Claude Code üzerinden oluşturuldu</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>Oluşturulan issue Claude Code üzerinden tekrar bulundu</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>Issue Claude Code üzerinden kapatıldı</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>Token repo&#x27;ya commit edilmedi (git log / git diff ile doğrulandı)</span></label></li><li><label><input type="checkbox" data-k="succ6"><span>Token minimum gerekli yetkilerle (belirli repo(lar)a sınırlı) oluşturuldu</span></label></li><li><label><input type="checkbox" data-k="succ7"><span>Test/sandbox repo kullanıldı, üretim repo&#x27;su değil</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ı adım adım çözmek için aşağıdaki prompt dizisini izle. Her adımda bir öncekinin çıktısını kontrol et.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1. Token ve bağlantı</div><pre><code>GitHub MCP server&#x27;ını sandbox repo&#x27;m için bağlamak istiyorum. claude mcp add --transport http github https://api.githubcopilot.com/mcp/ --header &quot;Authorization: Bearer $GITHUB_PAT&quot; komutunu çalıştırmadan önce, bu komutun ne yaptığını ve token&#x27;ımın nerede saklanacağını açıkla.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2. Issue oluştur</div><pre><code>GitHub MCP üzerinden [sandbox-repo] reposunda şu başlıkla bir issue oluştur: &#x27;Test: MCP entegrasyon doğrulaması&#x27;. Açıklamaya bugünün tarihini ve oluşturma amacını ekle.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3. Issue&#x27;yu bul</div><pre><code>Az önce oluşturduğun issue&#x27;yu repo&#x27;daki açık issue&#x27;lar arasından bul ve numarasını doğrula.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4. Issue&#x27;yu kapat</div><pre><code>Bu issue&#x27;yu &#x27;Doğrulama tamamlandı&#x27; notuyla kapat. Kapatma işleminin başarılı olduğunu teyit et.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Token&#x27;ı ortam değişkeni olarak ($GITHUB_PAT) tut, komuta düz metin yazma.</li><li>/mcp panelinde server&#x27;ın &#x27;connected&#x27; durumuna geçtiğini görmeden issue işlemlerine geçme.</li><li>Bonus için managed-mcp.json örneğini gerçek bir sisteme deploy etmene gerek yok — yalnızca taslak yaz.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ Token&#x27;a repo-genelinde (tüm repo&#x27;lar) erişim vermek — fine-grained token&#x27;da yalnızca sandbox repo&#x27;yu seç.</li><li>⚠️ Token&#x27;ı .mcp.json&#x27;a düz metin yazıp yanlışlıkla commit etmek — ${VAR} expansion kullan ve .gitignore&#x27;u kontrol et.</li><li>⚠️ claude mcp login komutunu GitHub için denemek — GitHub remote server&#x27;ı OAuth değil, header/PAT ile çalışır.</li><li>⚠️ Production/gerçek bir repo üzerinde denemek — daima sandbox/test repo kullan.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>MCP, tool entegrasyonlarını standartlaştıran açık bir protokoldür: Claude Code client, MCP server tool/resource/prompt sağlar</li><li>HTTP transport önerilen yöntemdir; SSE deprecated, yeni bağlantılarda tercih etme</li><li>/mcp oturum içi bir panel (durum görüntüleme + OAuth login), claude mcp list/get/remove ise CLI&#x27;dan server yönetimi — ikisi farklı amaçlara hizmet eder</li><li>Üç config scope&#x27;u var: local (varsayılan, özel), project (.mcp.json, ekiple paylaşılır, approval gerektirir), user (tüm projelerinde, özel) — settings.json MCP server tanımlamaz</li><li>GitHub&#x27;ın remote MCP server&#x27;ı OAuth değil, fine-grained PAT header ile kimlik doğrular; claude mcp login yalnızca OAuth destekleyen server&#x27;lar içindir</li><li>Sırları asla .mcp.json&#x27;a düz metin yazma — ${VAR} expansion veya headersHelper ile her kullanıcının kendi ortamından oku</li><li>MCP güvenlik riskleri gerçek: prompt injection (harici içerik çeken server&#x27;lardan) ve tool poisoning (yanıltıcı tool açıklamaları) — bağlamadan önce her server&#x27;a güven değerlendirmesi yap</li><li>Managed MCP, organizasyonun MCP kullanımını merkezi kontrol altına almasını sağlar: tam kapatmadan sabit server set&#x27;ine, allowlist/denylist&#x27;e kadar farklı sıkılık seviyeleri mevcut</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener">Connect Claude Code to tools via MCP — transport türleri, scope&#x27;lar, GitHub örneği, güvenlik uyarısı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/managed-mcp" target="_blank" rel="noopener">Control MCP server access for your organization — managed-mcp.json, allowlist/denylist, enterprise kontrol desenleri</a></li><li>⭐ <a href="https://code.claude.com/docs/en/mcp-quickstart" target="_blank" rel="noopener">MCP quickstart — ilk server bağlantısı için adım adım rehber</a></li><li>⭐ <a href="https://modelcontextprotocol.io/docs/getting-started/intro" target="_blank" rel="noopener">Model Context Protocol — resmi protokol tanıtımı ve mimarisi</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://claude.ai/directory" target="_blank" rel="noopener">Anthropic Directory — incelenmiş (reviewed) MCP connector kataloğu</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://github.com/github/github-mcp-server" target="_blank" rel="noopener">GitHub MCP Server (resmi repo) — local/remote kurulum seçenekleri, toolset detayları</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 10)</span>Yarın (Gün 10) öğrendiklerini birleştirip Todo App&#x27;i full-stack olarak tamamlayıp deploy edeceksin. Bugün kurduğun GitHub MCP bağlantısı, projenin feature/bug/chore kayıtlarını doğrudan GitHub issue&#x27;ları olarak yönetmeni sağlayacak.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>MCP mimarisini (client-server, tool discovery) açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>/mcp panelini ve claude mcp list/get/remove komutlarını kullandım</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>HTTP transport ile en az bir MCP server ekledim</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>local/project/user scope farkını ve approval akışını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>Sırları .mcp.json&#x27;a düz metin yazmadan ${VAR} expansion ile sakladım</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>GitHub MCP server&#x27;ını fine-grained PAT ile bağladım</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>GitHub MCP üzerinden issue oluşturdum</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>GitHub MCP üzerinden issue&#x27;yu bulup kapattım</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>MCP güvenlik risklerini (prompt injection, tool poisoning) değerlendirdim</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Managed MCP (allowlist/denylist/managed-mcp.json) kavramını tanıyorum</span></label></li></ul><div class="pager"><a href="gun08-debugging-test-kod-inceleme.html"><div class="dir">← Önceki</div><div class="tt">Gün 8</div><div>Debugging, Test Yazma ve Kod İncelemesi</div></a><a class="next disabled">&nbsp;</a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 9/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=9;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>
