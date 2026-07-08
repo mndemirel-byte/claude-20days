@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 12 — Hooks ve Sandboxing · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><a href="gun11-subagentlar.html"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></a><span class="cur"><span class="num">12</span><span>Hooks ve Sandboxing</span></span><a href="gun13-skills-plugins.html"><span class="num">13</span><span>Skills &amp; Plugins</span></a><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 3 — İleri · Gün 12 / 20</div><h1>Hooks ve Sandboxing</h1><p class="tagline">“Claude her adım attığında sen de bir şey yap”</p><p class="intro">Dün subagent&#x27;larla Claude&#x27;un işi kime devredeceğine karar vermesini öğrendin. Bugün farklı bir soruna eğiliyorsun: Claude bir şey yaparken (dosya değiştirirken, komut çalıştırırken, bitirdiğini düşünürken) senin de her seferinde, modelin hatırlamasına bağlı olmadan devreye girecek deterministik bir mekanizma. Hooks, Claude Code&#x27;un yaşam döngüsündeki belirli noktalarda otomatik olarak tetiklenen script/istek/agent çağrılarıdır. Sandboxing ise bunun tamamlayıcısı: Claude otonom çalışırken Bash komutlarının işletim sistemi seviyesinde neye dokunabileceğini sınırlayan bir güvenlik katmanı. İkisi birlikte, &#x27;ne olursa olsun her seferinde çalışsın&#x27; ve &#x27;yanlış giderse bile zararı sınırlı kalsın&#x27; sorularına cevap verir.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Teorik: Hooks</div><div class="du">35 dk</div><div class="de">Hook nedir, event taksonomisi, 5 handler tipi, exit code + JSON decision semantiği</div></div><div class="step"><div class="ph">2 · Pratik: Hook Yazımı</div><div class="du">55 dk</div><div class="de">Format hook&#x27;u, güvenlik hook&#x27;u, /hooks ile denetim, Ctrl+O verbose mode</div></div><div class="step"><div class="ph">3 · Stop Hook + Sandboxing</div><div class="du">40 dk</div><div class="de">Test-gate hook&#x27;u, /sandbox, filesystem/network izolasyonu, permissions ile ilişki</div></div><div class="step"><div class="ph">4 · Mini Challenge</div><div class="du">35 dk</div><div class="de">Todo App&#x27;e hook seti ekleme + sandbox izolasyonunu doğrulama</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-11 tamamlanmış: Claude Code kurulu, CLAUDE.md hazır, git workflow, MCP temelleri, subagent&#x27;lar; Todo App (Gün 10) çalışır durumda ve lokal repo&#x27;da erişilebilir; Terminalde temel <code>jq</code> kullanımına aşinalık faydalı olur (zorunlu değil)</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal + Claude Code çalışır durumda; Todo App proje dizini (Gün 10&#x27;dan); macOS/Linux/WSL2 — sandboxing için (native Windows desteklenmiyor); Linux/WSL2 kullanıyorsan: <code>bubblewrap</code> ve <code>socat</code> paketleri</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Hook kavramını ve deterministik otomasyonun modelin &#x27;hatırlamasına&#x27; dayanan yaklaşımdan farkını açıklayabileceksin</li><li>5 handler tipini (<code>command</code>, <code>http</code>, <code>mcp_tool</code>, <code>prompt</code>, <code>agent</code>) ayırt edip pratikte <code>command</code> ağırlıklı çalışabileceksin</li><li>Exit code semantiğini (<code>0</code>/<code>2</code>/diğer) ve <code>permissionDecision</code> (<code>allow</code>/<code>deny</code>/<code>ask</code>/<code>defer</code>) ile JSON tabanlı kontrolü ayırt edebileceksin</li><li><code>matcher</code> ile <code>if</code> alanlarının farkını ve <code>if</code>&#x27;in best-effort/fail-open doğasını bileceksin</li><li><code>settings.json</code>&#x27;da hook konfigürasyonu yazıp <code>/hooks</code> ve verbose mode ile denetleyebileceksin</li><li>Sandboxed Bash tool&#x27;un filesystem/network izolasyonunu, varsayılan write/read asimetrisini ve permission sistemiyle tamamlayıcı ilişkisini açıklayabileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Hook Nedir?</h3><p>Bir hook, Claude Code&#x27;un yaşam döngüsündeki belirli noktalarda otomatik tetiklenen kullanıcı tanımlı bir event handler&#x27;dır — shell komutu, HTTP isteği, MCP tool çağrısı, model prompt&#x27;u veya bir subagent olabilir. Hook&#x27;lar modelin &#x27;formatı çalıştırmayı hatırlamasına&#x27; bağlı değildir: event gerçekleştiği her seferinde, koşulsuz çalışırlar. Bu, hook&#x27;ları CLAUDE.md&#x27;deki bir kuraldan temelden farklı kılar — CLAUDE.md tavsiye niteliğindedir, hook zorlayıcıdır.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>CLAUDE.md kuralları modelin dikkatine bağlıdır (&#x27;advisory&#x27;); hook&#x27;lar ise deterministik olarak her seferinde tetiklenir (&#x27;enforced&#x27;). Kritik bir kuralı (format, güvenlik, test) gerçekten garanti altına almak istiyorsan onu hook olarak yaz, sadece CLAUDE.md&#x27;ye yazma.</div><h3 class="sub">1.2 Event Taksonomisi</h3><p>Claude Code&#x27;un resmi dokümantasyonu geniş bir event seti tanımlar (30&#x27;dan fazla) — SessionStart/SessionEnd, PreToolUse/PostToolUse, UserPromptSubmit, Stop/SubagentStop, PermissionRequest, TaskCreated/TaskCompleted, PreCompact, WorktreeCreate ve daha fazlası. Bugün hepsini ezberlemeyeceksin — pratikte en çok kullanacakların küçük bir alt kümesi var.</p><table><thead><tr><th>Event</th><th>Ne zaman tetiklenir</th></tr></thead><tbody><tr><td>PreToolUse</td><td>Claude bir tool çağırmadan hemen önce — bloklayabilir/değiştirebilir</td></tr><tr><td>PostToolUse</td><td>Tool başarıyla çalıştıktan sonra — geri alamaz, sadece tepki verir</td></tr><tr><td>UserPromptSubmit</td><td>Kullanıcı prompt gönderdiğinde, Claude işlemeden önce</td></tr><tr><td>Stop</td><td>Claude, yanıtını bitirdiğini düşündüğünde</td></tr><tr><td>SubagentStart / SubagentStop</td><td>Bir subagent başladığında / bitirdiğinde</td></tr><tr><td>SessionStart / SessionEnd</td><td>Oturum başladığında / sonlandığında</td></tr><tr><td>TaskCreated / TaskCompleted</td><td>Görev takibi oluşturulduğunda / tamamlandığında</td></tr></tbody></table><h3 class="sub">1.3 Beş Handler Tipi</h3><p>Bir hook &#x27;tetiklendiğinde&#x27; aslında beş farklı tipte handler çalıştırılabilir. İlk ikisi (<code>command</code>, <code>http</code>) deterministik script/servis çağrılarıdır; son ikisi (<code>prompt</code>, <code>agent</code>) muhakeme gerektiren, regex/script ile ifade edilmesi zor kararlar için bir Claude modeli kullanır. <code>mcp_tool</code> ise bağlı bir MCP server&#x27;ın tool&#x27;unu doğrudan hook olarak çağırmayı sağlar.</p><table><thead><tr><th>Tip</th><th>Ne yapar</th><th>Girdi/Çıktı</th></tr></thead><tbody><tr><td>command</td><td>Shell komutu/script çalıştırır</td><td>stdin&#x27;den JSON alır, stdout/exit code ile cevap verir</td></tr><tr><td>http</td><td>Bir HTTP endpoint&#x27;e POST eder</td><td>Event JSON&#x27;u POST body&#x27;de gider, aynı JSON formatında cevap döner</td></tr><tr><td>mcp_tool</td><td>Bağlı bir MCP server&#x27;ın tool&#x27;unu çağırır</td><td>Örn. PostToolUse&#x27;da bir güvenlik tarama tool&#x27;u çalıştırma</td></tr><tr><td>prompt</td><td>Tek turlu bir Claude modeline (varsayılan Haiku) değerlendirtir</td><td>Prompt metninde <code>$ARGUMENTS</code> ile hook input JSON&#x27;u modele gösterilir</td></tr><tr><td>agent</td><td>Tool erişimi olan bir subagent doğurur (çoklu tur)</td><td>Dosya okuma/komut çalıştırma gerektiren derin doğrulamalar için</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span><code>$ARGUMENTS</code> placeholder&#x27;ı sadece <code>prompt</code> ve <code>agent</code> handler&#x27;ların prompt metninde geçerlidir — hook input JSON&#x27;unu modele göstermek için kullanılır. <code>command</code> hook&#x27;larda girdi stdin&#x27;den, <code>http</code> hook&#x27;larda POST body&#x27;den gelir; <code>$ARGUMENTS</code> orada bir kavram değildir.</div><div class="callout tip"><span class="lbl">💡 İpucu</span>Bugün ve çoğu pratik senaryoda <code>command</code> handler&#x27;ı yeterlidir — hızlı, ücretsiz ve öngörülebilir. <code>prompt</code>/<code>agent</code>&#x27;a, kararın &#x27;bu commit mesajı conventional format&#x27;a uyuyor mu&#x27; gibi regex ile ifade edilemeyecek kadar yargı gerektirdiği durumlarda geç.</div><h3 class="sub">1.4 Matcher vs if</h3><p>İki farklı filtreleme katmanı var ve karıştırılmamalı. <code>matcher</code>, hook&#x27;un hangi event/tool için tetikleneceğini belirler (ör. sadece <code>Bash</code> tool&#x27;u). <code>if</code> ise permission-rule sözdizimiyle (<code>Bash(rm *)</code>, <code>Edit(*.ts)</code> gibi) tool&#x27;un argümanlarına bakarak daha ince bir filtre uygular — hook process&#x27;inin gereksiz yere spawn edilmesini önler.</p><pre><code>{
+  &quot;hooks&quot;: {
+    &quot;PreToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          {&quot;type&quot;: &quot;command&quot;, &quot;if&quot;: &quot;Bash(rm *)&quot;,
+           &quot;command&quot;: &quot;$CLAUDE_PROJECT_DIR/.claude/hooks/block-rm.sh&quot;}
+        ]
+      }
+    ]
+  }
+}</code></pre><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>if</code> filtresi <strong>best-effort&#x27;tur, hard security gate değildir.</strong> Bash komutu parse edilemezse filtre fail-open olur — yani belirsizlik durumunda hook yine de çalışır (bu güvenlik tarafında iyi bir varsayılan). Ama tersi yönde net ol: &#x27;if&#x27; ile &#x27;bu asla tetiklenmesin&#x27; garantisi veremezsin. Sert allow/deny garantisi için hook değil, <strong>permission sistemindeki deny rule&#x27;ları</strong> kullan.</div><h3 class="sub">1.5 Exit Code ve JSON Decision</h3><p>Bir <code>command</code> hook&#x27;unun Claude Code&#x27;a geri bildirim vermesinin iki yolu vardır: basit exit code veya yapılandırılmış JSON çıktısı. Basit olan çoğu durumda yeterlidir; JSON çıktısı daha ince kontrol (belirli bir sebep, kısmi izin, girdi değiştirme) gerektiğinde devreye girer.</p><table><thead><tr><th>Exit code</th><th>Anlamı</th></tr></thead><tbody><tr><td>0</td><td>Başarı; stdout varsa Claude Code onu JSON olarak parse etmeyi dener</td></tr><tr><td>2</td><td>Bloklayıcı hata; PreToolUse için tool çalışmaz, stderr Claude&#x27;a &#x27;neden bloklandığı&#x27; olarak gösterilir</td></tr><tr><td>diğer</td><td>Bloklayıcı olmayan hata; aksiyon devam eder, hata verbose modda/transcript&#x27;te görünür</td></tr></tbody></table><p>PreToolUse için daha ince kontrol istiyorsan JSON çıktısında <code>hookSpecificOutput.permissionDecision</code> alanını dört değerden biriyle döndürebilirsin: <code>allow</code>, <code>deny</code>, <code>ask</code>, <code>defer</code>.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Bunu bir &#x27;ekstra izin mekanizması&#x27; olarak düşünme — pratikte hook&#x27;lar defense-in-depth&#x27;in doğrulama/bloklama katmanıdır. Hook sessiz kalırsa (çıktı yoksa) normal permission akışı olduğu gibi devam eder; bu otomatik onay anlamına gelmez. Ve birden fazla hook farklı kararlar dönerse, <strong>deny her zaman allow&#x27;u geçersiz kılar</strong> — bir hook asla permission sisteminin zaten vereceğinden daha fazla erişim açamaz.</div><h3 class="sub">1.6 Stop Hook ve Sonsuz Döngü Koruması</h3><p>Bir Stop hook&#x27;u, Claude yanıtını bitirdiğini düşündüğünde &#x27;hayır, devam et&#x27; diyebilir (exit 2 veya <code>decision: block</code>). Ama bunu dikkatsizce yazarsan sonsuz bir döngüye girersin: Claude her bitirdiğinde hook tekrar &#x27;devam et&#x27; der. Bunu önlemek için hook, girdi JSON&#x27;undaki <code>stop_hook_active</code> alanını kontrol edip <code>true</code> ise erken çıkmalıdır.</p><pre><code>#!/bin/bash
+INPUT=$(cat)
+if [ &quot;$(echo &quot;$INPUT&quot; | jq -r &#x27;.stop_hook_active&#x27;)&quot; = &quot;true&quot; ]; then
+  exit 0   # Claude&#x27;un durmasına izin ver
+fi
+# ... asıl kontrol mantığı (ör. npm test) ...</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>Kendi guard&#x27;ını unutsan bile Claude Code bir üst sınır uyguluyor: bir Stop hook&#x27;u ilerleme kaydetmeden art arda <strong>8 kez</strong> bloklarsa Claude Code o hook&#x27;u geçersiz kılıp turu bitirir. Bu eşik <code>CLAUDE_CODE_STOP_HOOK_BLOCK_CAP</code> ile yükseltilebilir — ama guard&#x27;ı doğru yazmak yine de senin sorumluluğun.</div><h3 class="sub">1.7 Konfigürasyon Katmanları</h3><table><thead><tr><th>Dosya</th><th>Kapsam</th><th>Git&#x27;e commit edilir mi?</th></tr></thead><tbody><tr><td><code>~/.claude/settings.json</code></td><td>Kullanıcı — tüm projelerde geçerli</td><td>Hayır (kişisel makine)</td></tr><tr><td><code>.claude/settings.json</code></td><td>Proje — repo köküne özel, takımla paylaşılır</td><td>Evet</td></tr><tr><td><code>.claude/settings.local.json</code></td><td>Kişisel proje override&#x27;ı</td><td>Hayır (genelde .gitignore&#x27;da)</td></tr></tbody></table><h3 class="sub">1.8 Üç Katmanlı Güvenlik Modeli</h3><p>Bugünün üç kavramını (permissions, hooks, sandbox) birbirinin alternatifi değil, birbirini tamamlayan katmanlar olarak gör:</p><table><thead><tr><th>Katman</th><th>Soruyu cevaplar</th></tr></thead><tbody><tr><td>Permissions</td><td>Bu tool hiç çalışabilir mi?</td></tr><tr><td>Hooks</td><td>Tool çalışmadan hemen önce/sonra ne kontrol edilmeli, ne otomatikleşmeli?</td></tr><tr><td>Sandbox</td><td>Bash çalıştıktan sonra dosya sistemine/ağa ne kadar dokunabilir?</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Permissions hangi tool&#x27;un çalışabileceğine karar verir; hooks lifecycle event&#x27;lerinde deterministik doğrulama/otomasyon yapar; sandbox ise özellikle Bash ve alt süreçlerinin işletim sistemi seviyesinde neye erişebileceğini sınırlar. Bölüm 3&#x27;te sandbox&#x27;ı işlerken bu tabloya geri döneceğiz.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 İlk Hook: Otomatik Format (PostToolUse)</h3><p>En basit ve en hemen faydalı hook, bir dosya yazıldığında/düzenlendiğinde otomatik formatlama çalıştırmaktır. Bu bir <code>PostToolUse</code> hook&#x27;udur — tool zaten çalıştı, sen sadece tepki veriyorsun, geri alamazsın.</p><ol><li>Todo App proje dizininde Claude Code&#x27;u başlat: claude</li><li>Prompt Kütüphanesi&#x27;ndeki 1. promptu ver: PostToolUse formatter hook&#x27;u yazdır</li><li>Oluşan .claude/settings.json içindeki hooks.PostToolUse girdisini incele</li><li>Bir dosyayı Claude&#x27;a değiştirt, formatter&#x27;ın otomatik çalıştığını gözlemle</li></ol><pre><code>{
+  &quot;hooks&quot;: {
+    &quot;PostToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Write|Edit&quot;,
+        &quot;hooks&quot;: [
+          {&quot;type&quot;: &quot;command&quot;,
+           &quot;command&quot;: &quot;npx prettier --write \&quot;$CLAUDE_TOOL_INPUT_FILE_PATH\&quot;&quot;}
+        ]
+      }
+    ]
+  }
+}</code></pre><h3 class="sub">2.2 Güvenlik Hook&#x27;u: Tehlikeli Komut Engelleyici (PreToolUse)</h3><p>Şimdi tersi yönde bir hook: tool çalışmadan <strong>önce</strong> devreye giren, bloklama yetkisi olan bir <code>PreToolUse</code> hook&#x27;u. <code>rm -rf</code> gibi yıkıcı komutları exit 2 ile durdurup nedenini Claude&#x27;a stderr üzerinden bildireceksin.</p><ol><li>Prompt Kütüphanesi&#x27;ndeki 2. promptu ver: dangerous command blocker hook&#x27;u yazdır</li><li>Hook script&#x27;ini oku — komut içinde rm -rf / drop table gibi desenleri arıyor mu?</li><li>Bilerek tehlikeli bir komut istet (ör. &quot;rm -rf /tmp/test klasörünü sil&quot;) ve bloklandığını doğrula</li><li>Blok mesajının Claude&#x27;a neden engellendiğini açıkça anlattığını kontrol et</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Bir deny hook&#x27;u <code>bypassPermissions</code> modunda bile çalışır — kullanıcı normal onay akışını atlasa dahi PreToolUse deny kararı geçerlidir. Bu, kurumsal politikaların (ör. &#x27;production dosyalarına asla yazma&#x27;) atlanamaz olmasını sağlayan bilinçli bir tasarım.</div><h3 class="sub">2.3 /hooks ile Denetim ve Debug</h3><p>Hook&#x27;ları yazdıktan sonra gerçekten kayıtlı olduklarını ve beklendiği gibi çalıştıklarını doğrulamak gerekir. <code>/hooks</code> komutu kayıtlı hook&#x27;ları event bazında listeler (salt-okunur bir görünümdür — değişiklik dosyadan yapılır); <code>Ctrl+O</code> verbose modu açıp hook çıktısını transcript&#x27;te gösterir.</p><ol><li>/hooks komutunu çalıştır, PostToolUse ve PreToolUse altında hook&#x27;larının göründüğünü doğrula</li><li>Ctrl+O ile verbose mode&#x27;a geç</li><li>Bir dosya düzenlemesi yaptır, hook&#x27;un stdout/stderr çıktısının transcript&#x27;te göründüğünü gözlemle</li><li>Gerekirse claude --debug ile hangi hook&#x27;ların eşleştiğini ve exit code&#x27;larını incele</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Bir hook manuel olarak test edilebilir: örnek JSON&#x27;u stdin&#x27;den ver ve exit code&#x27;u kontrol et — echo &#x27;{&quot;tool_name&quot;:&quot;Bash&quot;,&quot;tool_input&quot;:{&quot;command&quot;:&quot;ls&quot;}}&#x27; | ./my-hook.sh &amp;&amp; echo $?</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ</h2><h3 class="sub">3.1 Stop Hook: Test-Gate</h3><p>Şimdi bugünün en güçlü desenlerinden birini kuracaksın: Claude &#x27;bitirdim&#x27; dediğinde otomatik olarak test suite&#x27;ini çalıştıran bir Stop hook&#x27;u. Testler geçmezse Claude&#x27;u durdurmadan devam ettirebilirsin.</p><ol><li>Prompt Kütüphanesi&#x27;ndeki 3. promptu ver: stop_hook_active guard&#x27;lı bir test-gate hook&#x27;u yazdır</li><li>Script&#x27;in stop_hook_active kontrolünü doğru yaptığını incele</li><li>Claude&#x27;a bilerek testleri bozacak bir değişiklik yaptır, Stop hook&#x27;unun devam ettirdiğini gözlemle</li><li>Testleri düzelttir, hook&#x27;un artık durmasına izin verdiğini doğrula</li></ol><div class="callout kp"><span class="lbl">🔑 Önemli</span>Bu desen, &#x27;test yaz ve çalıştır&#x27; talimatını CLAUDE.md&#x27;de bırakmak yerine gerçekten zorunlu kılar — Claude bitirdiğini düşünse bile testler geçmeden tur bitmez.</div><h3 class="sub">3.2 Sandboxing&#x27;e Giriş: /sandbox</h3><p>Sandboxing, hook&#x27;lardan farklı bir katmandır: hook&#x27;lar &#x27;ne zaman ne kontrol edilsin&#x27; sorusuna cevap verirken, sandbox &#x27;Bash çalıştıktan sonra neye dokunabilsin&#x27; sorusuna cevap verir. <code>/sandbox</code> komutuyla etkinleştirilir ve <strong>bir permission mode değildir</strong> — iki çalışma biçimi sunar: <strong>auto-allow</strong> (sandbox sınırları içindeki komutlar onaysız çalışır) ve <strong>regular permissions</strong> (sandbox sınırları aynı ama normal onay akışı korunur).</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Ortam notu: macOS&#x27;ta ek kurulum gerekmez (Seatbelt kullanılır). Linux/WSL2&#x27;de <code>bubblewrap</code> ve <code>socat</code> paketleri gerekir. <strong>Native Windows desteklenmiyor</strong> — Windows&#x27;ta Claude Code&#x27;u WSL2 içinde çalıştırman gerekir.</div><h3 class="sub">3.3 Filesystem İzolasyonu — Write ve Read Farklı Davranır</h3><p>Sandbox açıkken varsayılan davranış write ve read için <strong>simetrik değildir</strong> — bu, dersin en kritik güvenlik notudur:</p><table><thead><tr><th>Erişim</th><th>Varsayılan kapsam</th></tr></thead><tbody><tr><td>Write</td><td>Sadece çalışma dizini (CWD) + oturum temp dizini; dışına yazmak engellenir</td></tr><tr><td>Read</td><td>Tüm bilgisayar — <code>~/.aws/credentials</code>, <code>~/.ssh/</code> gibi credential dosyaları dahil</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Sandbox tek başına credential okumasını engellemez! Hassas dosyaları korumak için <code>sandbox.filesystem.denyRead</code> ile açıkça engellemen ya da <code>sandbox.credentials</code> ile ortam değişkenlerini maskeleyen bir konfigürasyon eklemen gerekir. Bu izolasyonu &#x27;her şeyi kapatır&#x27; diye varsaymak, dersin en yaygın yanlış anlaşılmasıdır.</div><h3 class="sub">3.4 Network İzolasyonu</h3><p>Ağ erişimi, sandbox dışında çalışan bir proxy server üzerinden kontrol edilir: izin verilen domain listesi tanımlanır, yeni bir domain&#x27;e istek gittiğinde kullanıcıdan onay istenir. Alt süreçler (npm, pip gibi paket yöneticileri dahil) de aynı kısıtlamayı miras alır — bir build script&#x27;inin spawn ettiği alt süreç kuralları atlayamaz.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Filesystem ve network izolasyonu birlikte anlamlıdır: sadece filesystem korunursa saldırgan ağ üzerinden veri sızdırabilir; sadece network korunursa saldırgan sistem ikili dosyalarını değiştirerek ağ erişimi kazanabilir. İkisi birlikte kullanılmalı.</div><h3 class="sub">3.5 Sandbox vs Permissions — Tamamlayıcı Katmanlar</h3><p>Permissions tüm tool&#x27;lara (Bash, Read, Edit, WebFetch, MCP tool&#x27;ları dahil) uygulanır ve &#x27;bu tool hiç çalışsın mı&#x27; sorusuna cevap verir. Sandbox ise <strong>sadece Bash ve onun alt süreçlerini</strong> kapsar ve &#x27;çalıştıktan sonra neye dokunabilsin&#x27; sorusuna cevap verir. Built-in Read/Edit/Write tool&#x27;ları sandbox&#x27;ın değil, doğrudan permission sisteminin kapsamındadır.</p><ol><li>/sandbox çalıştır, auto-allow modunu seç</li><li>Claude&#x27;dan çalışma dizini dışına bir dosya yazmasını iste (ör. üst dizine touch)</li><li>İşletim sistemi seviyesinde reddedildiğini (Operation not permitted) doğrula</li><li>Aynı denemeyi sandbox kapalıyken tekrarla, farkı gözlemle</li></ol><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) PostToolUse Format Hook&#x27;u</div><pre><code>Todo App projesinde her Write veya Edit işleminden sonra otomatik olarak prettier (veya projenin kullandığı formatter) çalıştıran bir PostToolUse hook&#x27;u .claude/settings.json içine ekle. Hook&#x27;u ekledikten sonra bir dosyayı düzenleyip gerçekten çalıştığını doğrula.</code></pre><div class="note">Bugünün en basit ve en hemen faydalı hook&#x27;u — ana konuşmayı &#x27;prettier çalıştır&#x27; hatırlatmasından kurtarır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) Tehlikeli Komut Engelleyici</div><pre><code>rm -rf, DROP TABLE ve benzeri yıkıcı komut desenlerini tespit edip exit code 2 ile bloklayan bir PreToolUse hook&#x27;u yaz. Bash tool&#x27;una matcher ile bağla, stderr mesajının Claude&#x27;a neden engellendiğini net anlatmasını sağla.</code></pre><div class="note">Bu hook bypassPermissions modunda bile çalışır — kurumsal güvenlik politikasının teknik temelidir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) Stop Hook ile Test-Gate</div><pre><code>Claude her yanıtını bitirdiğinde otomatik test suite&#x27;imi çalıştıran bir Stop hook&#x27;u yaz. Testler geçmezse Claude&#x27;u devam ettir (exit 2 + açıklama), geçerse durmasına izin ver. Sonsuz döngüyü önlemek için stop_hook_active alanını kontrol eden bir guard ekle.</code></pre><div class="note">stop_hook_active guard&#x27;ı olmadan bu hook sonsuz döngüye girer — mutlaka ekle.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4) Sandbox&#x27;ı Etkinleştirip Doğrulama</div><pre><code>/sandbox komutunu çalıştır, auto-allow modunu seç. Sonra benden çalışma dizinim dışına bir test dosyası oluşturmamı iste ve bunun engellendiğini bana göster. Ardından ~/.ssh/ dizinini okumayı dene ve varsayılan read davranışının bunu engelleyip engellemediğini raporla.</code></pre><div class="note">Bu prompt bilerek write VE read davranışını ayrı ayrı test ettiriyor — ikisinin farklı olduğunu deneyimlemek için.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>Todo App&#x27;e Hook Seti + Sandbox Doğrulaması</h3><p>Todo App&#x27;e (Gün 10) üç hook ekle — güvenlik, format, test-gate — ve sandbox ile izolasyonun gerçekten çalıştığını kanıtla.</p><p><strong>Gereksinimler:</strong></p><ul><li>.claude/settings.json içinde en az 3 hook tanımlı olmalı: PreToolUse (dangerous command blocker), PostToolUse (format), Stop (test-gate)</li><li>Dangerous command blocker rm -rf veya benzeri bir komutu gerçekten bloklamalı</li><li>Stop hook&#x27;u stop_hook_active guard&#x27;ı içermeli</li><li>/hooks ile üç hook&#x27;un da doğru event altında göründüğü doğrulanmalı</li><li>/sandbox etkinleştirilip CWD dışına yazma denemesi engellenmiş olmalı</li><li>Sandbox&#x27;ın sadece Bash&#x27;i kapsadığı, Read/Edit/Write&#x27;ın permission sistemiyle yönetildiği açıklanmalı</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>.claude/settings.json içinde PreToolUse, PostToolUse ve Stop altında birer hook mevcut</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>Tehlikeli komut denemesi exit 2 ile bloklandı ve stderr mesajı nedeni açıkladı</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>Stop hook&#x27;u stop_hook_active kontrolü içeriyor, sonsuz döngüye girmedi</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>/hooks çıktısında üç hook da doğru event altında listeleniyor</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>Ctrl+O verbose mode ile en az bir hook çalışması gözlemlendi</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>/sandbox aktifken CWD dışına write denemesi &#x27;Operation not permitted&#x27; ile reddedildi</span></label></li><li><label><input type="checkbox" data-k="succ6"><span>Sandbox&#x27;ın Bash-only kapsamı ve read/write asimetrisi kendi cümleleriyle açıklandı</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ı üç aşamada ilerlet: önce hook&#x27;ları tek tek ekle ve her birini izole test et, sonra hepsini birlikte bir gerçek senaryoda (dosya düzenleme + test + commit) dene, son olarak sandbox&#x27;ı açıp aynı projede izolasyonu doğrula.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1. Güvenlik hook&#x27;u</div><pre><code>PreToolUse dangerous command blocker&#x27;ı ekle, rm -rf ile test et, blok mesajını oku.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2. Format hook&#x27;u</div><pre><code>PostToolUse formatter&#x27;ı ekle, bir dosyayı düzenlet, otomatik formatlandığını doğrula.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3. Test-gate hook&#x27;u</div><pre><code>Stop hook&#x27;unu stop_hook_active guard&#x27;ıyla ekle, testleri bilerek bozup düzelterek davranışı gözlemle.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4. Sandbox doğrulaması</div><pre><code>/sandbox aç, CWD dışına yazmayı ve ~/.ssh/ okumayı dene, write/read farkını raporlat.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Her hook&#x27;u eklendikten hemen sonra izole test et — üçünü birden yazıp sonda test etmek hangi hook&#x27;un neden çalışmadığını bulmayı zorlaştırır.</li><li>Stop hook&#x27;unu test ederken önce guard&#x27;sız bir versiyonla (kontrollü şekilde) sonsuz döngüyü gözlemlemek, guard&#x27;ın neden gerekli olduğunu somutlaştırır.</li><li>Sandbox denemesinde write ve read&#x27;i ayrı ayrı test et — ikisinin farklı sonuç vermesi bu dersin en önemli &#x27;aha&#x27; anıdır.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ ⚠️ Stop hook&#x27;una stop_hook_active guard&#x27;ı eklemeyi unutup sonsuz döngüye girmek.</li><li>⚠️ ⚠️ <code>if</code> filtresini &#x27;kesin güvenlik&#x27; sanıp permission deny rule&#x27;larını atlamak — if best-effort&#x27;tur, fail-open olabilir.</li><li>⚠️ ⚠️ Sandbox&#x27;ın credential dosyalarını da okunmaz yapacağını varsaymak — varsayılan read sınırsızdır, denyRead açıkça eklenmelidir.</li><li>⚠️ ⚠️ PreToolUse hook&#x27;unun sadece Bash&#x27;i değil Read/Edit/Write&#x27;ı da sandbox kapsadığını sanmak — bu tool&#x27;lar permission sisteminin, sandbox&#x27;ın değil.</li><li>⚠️ ⚠️ Hook&#x27;u settings.json&#x27;a elle ekleyip aynı oturumda <code>/hooks</code> ile görünmesini beklemek — bazı değişiklikler için reload/restart gerekebilir.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Hook&#x27;lar deterministiktir — modelin hatırlamasına değil, event&#x27;in gerçekleşmesine bağlıdır; CLAUDE.md tavsiye, hook zorlayıcıdır</li><li>5 handler tipi var: command, http, mcp_tool, prompt, agent — pratikte command ağırlıklı, diğerleri yargı gerektiren durumlar için</li><li>matcher event/tool seviyesinde filtreler, if ise argüman seviyesinde filtreler ama best-effort&#x27;tur — hard security için permission deny rule kullanılır</li><li>PreToolUse deny, bypassPermissions modunda bile geçerlidir; hook sessiz kalırsa normal permission akışı devam eder, bu otomatik onay değildir</li><li>Stop hook&#x27;ları stop_hook_active guard&#x27;ı gerektirir; guard&#x27;sız kalırsa Claude Code 8 ardışık bloktan sonra hook&#x27;u geçersiz kılar</li><li>Sandbox varsayılan olarak write&#x27;ı CWD+temp ile sınırlar ama read&#x27;i tüm bilgisayara açık bırakır — credential koruması için denyRead şart</li><li>Sandbox sadece Bash ve alt süreçlerini kapsar; Read/Edit/Write built-in tool&#x27;ları permission sisteminin kapsamındadır</li><li>Permissions/hooks/sandbox birbirinin alternatifi değil, defense-in-depth katmanlarıdır: hangi tool çalışabilir → ne kontrol edilmeli → çalıştıktan sonra neye dokunabilir</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Hooks reference — tüm event&#x27;ler, 5 handler tipi, JSON input/output şeması ve exit code semantiğinin resmi referansı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/hooks-guide" target="_blank" rel="noopener">Automate actions with hooks — hızlı başlangıç rehberi, stop_hook_active deseni ve yaygın hata giderme</a></li><li>⭐ <a href="https://code.claude.com/docs/en/sandboxing" target="_blank" rel="noopener">Configure the sandboxed Bash tool — filesystem/network izolasyonu, /sandbox modları ve platform desteğinin resmi referansı</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://www.anthropic.com/engineering/claude-code-sandboxing" target="_blank" rel="noopener">Making Claude Code more secure and autonomous with sandboxing — Anthropic mühendislik ekibinin sandbox mimarisini ve motivasyonunu anlattığı blog yazısı</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://code.claude.com/docs/en/agent-sdk/typescript" target="_blank" rel="noopener">Agent SDK reference (TypeScript) — hook input/output tiplerinin SDK tarafındaki programatik karşılığı</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 13)</span>Yarın (Gün 13) Skills &amp; Plugins&#x27;e geçiyorsun: yeniden kullanılabilir yetenek paketleri yazmayı, bunları command/agent/hook ile karşılaştırmayı ve marketplace üzerinden organizasyon içi dağıtımı öğreneceksin — bugünkü hook&#x27;lar bir plugin&#x27;in içine paketlenebilen bileşenlerden biri olacak.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Hook&#x27;ların deterministik olduğunu ve CLAUDE.md kurallarından farkını açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>5 handler tipini (command, http, mcp_tool, prompt, agent) sayabiliyorum ve ne zaman hangisini kullanacağımı biliyorum</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>matcher ile if farkını ve if&#x27;in best-effort/fail-open doğasını açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>Exit code semantiğini (0/2/diğer) ve permissionDecision (allow/deny/ask/defer) ayrımını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>Stop hook&#x27;larda stop_hook_active guard&#x27;ının neden gerekli olduğunu ve 8-blok cap&#x27;ini biliyorum</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>PostToolUse format hook&#x27;u ve PreToolUse güvenlik hook&#x27;u yazıp test ettim</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>/hooks ve Ctrl+O verbose mode ile hook&#x27;ları denetleyebiliyorum</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Sandbox&#x27;ın write/read asimetrisini (CWD+temp write, tüm bilgisayar read) açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Sandbox&#x27;ın sadece Bash&#x27;i kapsadığını, Read/Edit/Write&#x27;ın permission sisteminde olduğunu biliyorum</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Permissions/hooks/sandbox üçlü güvenlik modelini kendi cümlelerimle anlatabiliyorum</span></label></li></ul><div class="pager"><a href="gun11-subagentlar.html"><div class="dir">← Önceki</div><div class="tt">Gün 11</div><div>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</div></a><a class="next" href="gun13-skills-plugins.html"><div class="dir">Sonraki →</div><div class="tt">Gün 13</div><div>Skills &amp; Plugins</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 12/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=12;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>

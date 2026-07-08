@@ -1,0 +1,506 @@
+{
+  "day": 14,
+  "total_days": 20,
+  "week": 3,
+  "slug": "saas-dashboard",
+  "title": "İleri Seviye Proje: SaaS Dashboard",
+  "tagline": "Gerçek dünya karmaşıklığına adım at",
+  "tier": "🟠 Kademe 3",
+  "date_label": "Temmuz 2026",
+  "intro": "Gün 1-13'te tek dosyalı bir CLI Note App'ten başlayıp, backend'i olan bir Todo App'e kadar geldin; Claude Code'un temel araçlarını (CLAUDE.md, MCP, subagent'lar, hooks, skill/plugin) tek tek edindin. Bugün bu araçları bir araya getiren üçüncü kademeye geçiyorsun: SaaS Dashboard. Fark sadece 'daha fazla kod' değil — artık proje, Claude'a 'bitir' demeden önce dokümante edilmiş bir plan (PRD + ARCHITECTURE), ilişkili bir veritabanı şeması ve yazılı bir API contract'ı gerektiriyor. Bugünün sonunda projenin iskeletini, schema'sını, ilk iki endpoint'ini ve dashboard'un temel layout'unu kurmuş olacaksın — ayrıca subagent'ları review görevlerinde kullanıp, bağımsız arka plan oturumlarını (agent view) subagent'lardan ayırt edebileceksin.",
+  "flow": [
+    {
+      "phase": "1 · Teorik: Kademe 3 Zihinsel Modeli",
+      "dur": "30 dk",
+      "desc": "Modüler planlama, PRD/ARCHITECTURE/CLAUDE.md üçlüsü, schema ve API contract ilkeleri"
+    },
+    {
+      "phase": "2 · Pratik: Proje İskeleti + Schema",
+      "dur": "40 dk",
+      "desc": "SaaS Dashboard proje yapısı, veritabanı schema tasarımı, SQLite vs Postgres kararı"
+    },
+    {
+      "phase": "3 · Pratik: Endpoint'ler + Dashboard Layout",
+      "dur": "45 dk",
+      "desc": "İlk 2 API endpoint'i, dashboard'un temel görsel iskeleti"
+    },
+    {
+      "phase": "4 · Mini Challenge",
+      "dur": "35 dk",
+      "desc": "Subagent ile schema/API review, agent view teaser, hook'lu test safety rail"
+    }
+  ],
+  "prerequisites": [
+    "Gün 1-13 tamamlanmış: Claude Code kurulu, CLAUDE.md/Auto Memory, MCP, subagent'lar (Gün 11), hooks (Gün 12), skill/plugin (Gün 13)",
+    "Todo App (Gün 10) çalışır durumda — referans proje olarak kullanılacak",
+    "Terminal ve Claude Code çalışır durumda"
+  ],
+  "tools_needed": [
+    "Terminal (Claude Code çalışır durumda)",
+    "VS Code veya tercih edilen editör",
+    "Git (yeni proje için repository init)",
+    "Python/Node.js (backend + frontend için, Todo App'te kullanılan dile göre)"
+  ],
+  "objectives": [
+    "Büyük bir projeyi CLAUDE.md + PRD.md + ARCHITECTURE.md üçlüsüyle Claude Code'a doğru şekilde tanıtabileceksin",
+    "Modüler geliştirme stratejisini (özellik/katman bazlı parçalama) uygulayabileceksin",
+    "Claude Code ile bir veritabanı schema'sı (SQLite; ileri seçenek Postgres) tasarlayıp gerekçelendirebileceksin",
+    "REST API tasarım kararlarını (endpoint isimlendirme, response şekli, hata formatı) ARCHITECTURE.md içinde bir contract olarak dokümante edebileceksin",
+    "Frontend-backend koordinasyonunu (API contract, mock data → gerçek veri geçişi) planlayabileceksin",
+    "Subagent'ları uzmanlık bazlı, tek-session görevlerde (schema/API/layout review) kullanabileceksin; bağımsız arka plan işleri için agent view'ın ayrı bir mekanizma olduğunu ayırt edebileceksin"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 Neden 'Kademe 3'? Karmaşıklık Sıçraması"
+        },
+        {
+          "t": "p",
+          "text": "CLI Note App tek dosyaydı; Todo App'in bir backend'i ve bir frontend'i vardı ama tek bir kaynak (todo listesi) etrafında dönüyordu. SaaS Dashboard farklı: birden fazla ilişkili veri modeli (kullanıcı, proje/abonelik, aktivite), birden fazla ekran, ve bu ekranların bağlı olduğu bir API contract'ı var. Bu sıçrama tesadüfi değil — gerçek SaaS projelerinin çoğu tam olarak bu noktada karmaşıklaşır: veri modelleri birbirine bağımlı hale gelir, API'nin kararlı bir sözleşmesi olması gerekir, frontend artık backend'i 'tahmin ederek' değil contract'a bakarak geliştirilir."
+        },
+        {
+          "t": "keypoint",
+          "text": "Kademe 3'ün temel farkı kod miktarı değil, **dokümantasyon disiplinidir**. Claude Code'a 'bir dashboard yap' demek Todo App seviyesinde işe yarayabilir; ama birden fazla veri modeli ve ekran olduğunda, önce yazılı bir plan olmadan başlamak, günün ilerleyen saatlerinde tutarsız API'lere ve birbirini tekrar eden schema kararlarına yol açar."
+        },
+        {
+          "t": "h",
+          "text": "1.2 Modüler Geliştirme: Büyük Projeyi Parçalara Bölmek"
+        },
+        {
+          "t": "p",
+          "text": "Modüler geliştirme, projeyi bağımsız test edilebilir parçalara ayırmak demektir: veri katmanı (schema + migration), API katmanı (endpoint'ler), frontend katmanı (layout + component'ler). Her katman kendi başına doğrulanabilir olmalı — schema'yı API'den, API'yi frontend'den bağımsız test edebilmelisin. Bu ayrım, Claude Code'a görev verirken de işine yarar: 'schema'yı tasarla' ve 'bu schema'ya göre endpoint yaz' iki ayrı, net sınırlı görevdir; 'dashboard'u bitir' değildir."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Katman",
+            "Sorumluluk",
+            "Bağımsız doğrulama"
+          ],
+          "rows": [
+            [
+              "Veri",
+              "Schema, ilişkiler, migration",
+              "Tabloları oluştur, örnek veri ekle, sorgula"
+            ],
+            [
+              "API",
+              "Endpoint'ler, request/response şekli, hata formatı",
+              "curl / Postman ile schema'dan bağımsız test"
+            ],
+            [
+              "Frontend",
+              "Layout, component'ler, state",
+              "Mock data ile API olmadan render et"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.3 CLAUDE.md + PRD.md + ARCHITECTURE.md Üçlüsü"
+        },
+        {
+          "t": "p",
+          "text": "Üç dosyanın farklı bir rolü var ve karıştırılmamalı: CLAUDE.md Claude Code'a *nasıl* çalışacağını söyler (konvansiyonlar, komutlar, yasaklar) — Gün 3'te işlediğin dosya. PRD.md (Product Requirements Document) *ne* inşa edildiğini, hangi özelliklerin kapsamda olduğunu ve kullanıcı senaryolarını anlatır. ARCHITECTURE.md ise *nasıl* inşa edildiğini — veri modeli, API contract'ı, katmanlar arası sınırları — teknik olarak tarif eder."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Dosya",
+            "Soru",
+            "İçerik"
+          ],
+          "rows": [
+            [
+              "CLAUDE.md",
+              "Claude nasıl çalışmalı?",
+              "Konvansiyonlar, test komutu, yasaklı işlemler"
+            ],
+            [
+              "PRD.md",
+              "Ne inşa ediliyor?",
+              "Özellik listesi, kullanıcı senaryoları, kapsam dışı"
+            ],
+            [
+              "ARCHITECTURE.md",
+              "Nasıl inşa ediliyor?",
+              "Veri modeli, API contract, katman sınırları"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "PRD.md ve ARCHITECTURE.md'yi ayrı tutmak küçük bir formalite gibi görünebilir ama pratik bir faydası var: bir özelliği değiştirmek istediğinde (PRD) teknik kararları (ARCHITECTURE) yeniden yazmak zorunda kalmazsın — ikisi bağımsız evrilebilir."
+        },
+        {
+          "t": "h",
+          "text": "1.4 Veritabanı Tasarımı: Claude Code ile Schema Çıkarma"
+        },
+        {
+          "t": "p",
+          "text": "Schema tasarımını Claude'a devretmeden önce, hangi varlıkların (entity) birbirine nasıl bağlı olduğunu kendi cümlelerinle özetlemek işe yarar — bu özet, Claude'un ürettiği schema'yı değerlendirebileceğin bir referans olur. Bugün SQLite ile çalışacaksın (CRUD pratiği ve hızlı iterasyon için); ileri seçenek olarak PostgreSQL'e ne zaman geçilmesi gerektiğini de tartışacaksın."
+        },
+        {
+          "t": "warn",
+          "text": "Gün 10'da işlediğin Render ephemeral filesystem gerçeği burada da geçerli: SQLite dosyası, Render'ın ücretsiz/disksiz servisinde her redeploy'da sıfırlanır. SaaS Dashboard'u gerçek bir ortamda kalıcı veriyle çalıştırmak istersen iki seçenek var — Render'ın paid persistent disk'i ya da managed PostgreSQL servisi. Bugünkü pratik için SQLite yeterli; production kararını ARCHITECTURE.md'ye bir not olarak düş."
+        },
+        {
+          "t": "h",
+          "text": "1.5 API Tasarımı ve Dokümantasyonu: Contract-First Yaklaşım"
+        },
+        {
+          "t": "p",
+          "text": "Contract-first, frontend'i yazmadan önce API'nin şeklini (endpoint, request/response body, hata formatı) yazılı hale getirmek demektir. Bu, Bölüm 1.2'deki katman bağımsızlığını sağlayan somut araçtır: frontend geliştiricisi (bugün sen, ama ileride bir subagent veya takım arkadaşı) backend'in gerçek kodunu beklemeden, contract'a bakarak mock data ile ilerleyebilir."
+        },
+        {
+          "t": "keypoint",
+          "text": "API contract'ını ARCHITECTURE.md içinde kısa bir bölüm olarak tut: her endpoint için yöntem+yol, request/response şekli ve hata formatı. Bu üç bilgi eksikse, endpoint 'yazılmış' olsa bile frontend'in ona güvenli biçimde bağlanması zorlaşır."
+        },
+        {
+          "t": "h",
+          "text": "1.6 Frontend-Backend Koordinasyonu"
+        },
+        {
+          "t": "p",
+          "text": "Contract elindeyken frontend'i iki aşamada geliştirebilirsin: önce mock data ile layout ve state yönetimini kur, sonra mock'u gerçek API çağrılarıyla değiştir. Bu sıra, backend henüz hazır olmasa bile frontend ilerlemeni sağlar — ki bugünkü akışta da tam olarak bunu yapacaksın: 2. Bölüm'de önce schema+endpoint, sonra dashboard layout'u kuracaksın, ama contract sayesinde ikisi bağımsız ilerleyebilirdi."
+        },
+        {
+          "t": "h",
+          "text": "1.7 🆕 Subagent, Agent View ve Dynamic Workflows: Üç Farklı Katman"
+        },
+        {
+          "t": "p",
+          "text": "Gün 11'de subagent'ları öğrendin: **tek session içinde**, ana konuşmayı kirletmeden çalışan uzman yardımcılar. Bugün bunu bir adım öteye taşıyan iki kavramı tanıyorsun. **Agent view**, birden fazla **bağımsız** Claude Code oturumunu (background session) tek ekrandan yönetmeni sağlar — her biri kendi terminali/context'i olan ayrı bir konuşmadır, subagent gibi ana konuşmanın *içinde* değildir. **Dynamic workflows** ise bu bağımsız oturumları (veya çok sayıda subagent'ı) bir script üzerinden programatik olarak orkestre etme fikridir — tam derinliği Gün 17'de işlenecek."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Katman",
+            "Nerede çalışır?",
+            "Ne zaman kullanılır?"
+          ],
+          "rows": [
+            [
+              "Subagent (Gün 11)",
+              "Ana konuşmanın içinde, izole context",
+              "Tek session'da uzman görev delegasyonu (review, araştırma)"
+            ],
+            [
+              "Agent view (bugün, teaser)",
+              "Birden fazla bağımsız background session",
+              "Bağımlı olmayan işleri paralel, arka planda yürütmek"
+            ],
+            [
+              "Dynamic workflows (Gün 17)",
+              "Script ile orkestre edilen çoklu subagent/session",
+              "Büyük görevleri tekrarlanabilir bir pipeline'a dönüştürmek"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Bu üç katmanı karşılaştıran resmi sayfa 'Run agents in parallel' (code.claude.com/docs/en/agents) — bugünün okuma listesinde ilk sırada, çünkü ayrımı en net kuran kaynak budur."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "2.1 Proje İskeletini Oluştur"
+        },
+        {
+          "t": "p",
+          "text": "SaaS Dashboard için yeni bir proje dizini aç ve üç temel dosyayı Claude Code'a yazdır: CLAUDE.md (konvansiyonlar), PRD.md (özellik kapsamı) ve ARCHITECTURE.md (teknik plan — şimdilik iskelet, schema ve API contract sonraki adımlarda dolduracak)."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Yeni proje dizini oluştur ve git init yap",
+            "PRD Kütüphanesi'ndeki 1. promptla PRD.md taslağını çıkart — kapsam: kullanıcı girişi, bir dashboard özet ekranı, bir liste/tablo ekranı",
+            "ARCHITECTURE.md'yi boş bölüm başlıklarıyla (Veri Modeli / API Contract / Katmanlar) oluştur — içeriği 2.2 ve 2.3'te dolduracaksın",
+            "CLAUDE.md'ye proje konvansiyonlarını (dil/framework, test komutu, dizin yapısı) yaz"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "PRD.md'yi yazarken kapsamı bilinçli olarak dar tut: bir özet ekranı + bir liste ekranı yeterli. Kademe 3'ün amacı 'eksiksiz bir SaaS ürünü' değil, **çok katmanlı, dokümante edilmiş bir projeyi doğru sırayla inşa etme becerisi** kazanmak — kapsamı büyütmek bu günün süresini aşar."
+        },
+        {
+          "t": "h",
+          "text": "2.2 Veritabanı Schema'sını Tasarla"
+        },
+        {
+          "t": "p",
+          "text": "PRD.md'deki kapsama göre en az iki ilişkili tablo çıkar (örnek: kullanıcı + ona ait proje/abonelik kaydı). Claude'dan önce schema önerisini *açıklamasını*, sonra CREATE TABLE ifadelerini yazmasını iste — açıklama adımı, ilişkilerin (foreign key, cardinality) doğru kurulduğunu onaylamanı sağlar."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Schema Kütüphanesi'ndeki 2. promptla varlık ilişkilerini önce düz metinle çıkart, onayla",
+            "Onaylanan ilişkilere göre CREATE TABLE ifadelerini SQLite için yazdır",
+            "schema.sql'i çalıştırıp örnek (seed) veriyle doldur",
+            "ARCHITECTURE.md'nin Veri Modeli bölümüne şema özetini ekle"
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "sql",
+          "text": "-- örnek: users + projects ilişkisi\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  email TEXT UNIQUE NOT NULL,\n  created_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE projects (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  user_id INTEGER NOT NULL REFERENCES users(id),\n  name TEXT NOT NULL,\n  status TEXT NOT NULL DEFAULT 'active',\n  created_at TEXT NOT NULL DEFAULT (datetime('now'))\n);"
+        },
+        {
+          "t": "h",
+          "text": "2.3 İlk 2 API Endpoint'ini Geliştir"
+        },
+        {
+          "t": "p",
+          "text": "Schema hazır olduğuna göre önce contract'ı yaz (yöntem, yol, request/response şekli, hata formatı), sonra endpoint'i implemente et. Bu sırayı tersine çevirip önce kod yazmak, contract'ın kodun bir yan ürünü haline gelmesine ve dokümantasyonun gerçek davranıştan sapmasına yol açar."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "ARCHITECTURE.md'nin API Contract bölümüne 2 endpoint'i (ör. GET /api/dashboard/summary, GET /api/projects) yöntem+yol+request/response+hata formatıyla yaz",
+            "Contract'a göre endpoint'leri implemente et",
+            "curl veya benzer bir araçla her endpoint'i contract'a karşı test et",
+            "Sapma varsa: contract mi yanlıştı, kod mu — kaynağı belirle ve düzelt"
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "text",
+          "text": "GET /api/dashboard/summary\n→ 200 OK\n{ \"total_projects\": 3, \"active_projects\": 2 }\n\nGET /api/projects\n→ 200 OK\n[{ \"id\": 1, \"name\": \"Demo\", \"status\": \"active\" }, ...]\n\nHata formatı (her endpoint için ortak):\n→ 4xx/5xx\n{ \"error\": { \"code\": \"NOT_FOUND\", \"message\": \"...\" } }"
+        },
+        {
+          "t": "h",
+          "text": "2.4 Dashboard'un Temel Layout'unu Oluştur"
+        },
+        {
+          "t": "p",
+          "text": "Layout'u önce mock data ile kur — API contract'ı elinde olduğu için mock veri, gerçek response şekliyle birebir aynı olmalı. Bu, mock'tan gerçek veriye geçerken component'lerin değişmemesini sağlar."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Contract'taki response şekline birebir uyan mock data dosyası oluştur",
+            "Dashboard'u summary card'lar + bir liste/tablo alanıyla kur, mock data'yı kullan",
+            "Loading ve error state'lerini ekle (henüz gerçek API çağrısı olmadan da test edilebilir olmalı)",
+            "Son adımda mock data'yı 2.3'teki gerçek endpoint çağrılarıyla değiştir"
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Mock data'yı contract'tan kopyala-yapıştır ile üretmek yerine Claude'a 'ARCHITECTURE.md'deki contract'a göre mock data üret' dedirtmek, ikisinin senkron kalmasını kolaylaştırır."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — DERİNLEŞ",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 Subagent ile Schema/API Contract Review"
+        },
+        {
+          "t": "p",
+          "text": "Gün 11'deki code-reviewer agent'ına benzer, ama bugünün konusuna özel bir review subagent'ı kur: schema'nın ilişkilerini ve API contract'ının schema ile tutarlılığını kontrol etsin."
+        },
+        {
+          "t": "keypoint",
+          "text": "Review subagent'ının `tools` listesinden Edit/Write çıkarılır — yalnızca Read/Grep/Glob bırakılır. Amaç değişiklik yapmak değil, tutarlılık raporu üretmektir; bu kısıtlama Gün 11'deki 'salt-okunur agent' pattern'inin aynısıdır."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Yeni bir subagent tanımla: schema-reviewer, tools: Read, Grep, Glob (Edit/Write yok)",
+            "Subagent'a schema.sql ve ARCHITECTURE.md'nin API Contract bölümünü birlikte incelet",
+            "Bulguları oku: ilişkiler tutarlı mı, contract'taki alanlar schema'daki kolonlarla eşleşiyor mu"
+          ]
+        },
+        {
+          "t": "h",
+          "text": "3.2 Subagent ile Frontend/Layout Review"
+        },
+        {
+          "t": "p",
+          "text": "İkinci bir salt-okunur subagent, dashboard layout'unun mock data'yı contract'a uygun kullanıp kullanmadığını ve loading/error state'lerinin var olup olmadığını kontrol eder."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "layout-reviewer subagent'ını tanımla (yine yalnızca Read/Grep/Glob)",
+            "Mock data dosyasını ve dashboard component'lerini incelet",
+            "Bulguları oku: mock data contract'a uyuyor mu, loading/error state'i eksik mi"
+          ]
+        },
+        {
+          "t": "h",
+          "text": "3.3 Agent View Teaser: Bağımsız Arka Plan İşleri"
+        },
+        {
+          "t": "p",
+          "text": "İki review subagent'ı ana konuşmanın içinde, sırayla çalıştı. Şimdi kısaca agent view'ı dene: bağımsız bir arka plan oturumu başlat (ör. 'Todo App'in test suite'ini çalıştırıp özetle' gibi ilgisiz bir görev), onu arka plana al ve `claude agents` ile diğer oturumdan bağımsız ilerlediğini gözlemle."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Ayrı bir görev için arka plan oturumu başlat (`claude --bg` veya mevcut oturumu `/bg` ile arka plana taşı)",
+            "`claude agents` ile agent view'ı aç, oturumun durumunu gözlemle",
+            "Ana konuşmana geri dön — iki işin birbirini bloklamadığını doğrula"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Bunu subagent'larla karıştırma: subagent'lar (3.1, 3.2) ana konuşmanın *içinde*, senin bekleyip sonucu okuduğun görevlerdi. Agent view'daki oturum ise tamamen *bağımsız* bir konuşma — kendi context'i, kendi geçmişi var. Bu ayrımı net tutmak, Gün 17'deki dynamic workflows'u anlamanın ön koşulu."
+        },
+        {
+          "t": "h",
+          "text": "3.4 Hook'la Test/Lint Safety Rail"
+        },
+        {
+          "t": "p",
+          "text": "Gün 12'de kurduğun Stop Hook Test-Gate pattern'ini bugünkü projeye taşı: testler veya lint geçmeden oturum durmasın. Burada hook'u yeniden öğretmiyoruz — sadece dar kapsamlı bir safety rail olarak uyguluyoruz."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Gün 12'deki Stop Hook Test-Gate yapılandırmasını bu projeye kopyala",
+            "Test/lint komutunu SaaS Dashboard'un gerçek komutlarıyla güncelle",
+            "Bilerek bir testi boz, hook'un oturumu durdurmadığını (fail'i Claude'a geri bildirdiğini) doğrula"
+          ]
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "PRD.md Taslağı",
+      "prompt": "SaaS Dashboard için PRD.md yaz. Kapsam: kullanıcı girişi, bir dashboard özet ekranı (toplam/aktif proje sayısı), bir proje listesi ekranı. Kapsam dışı kalan özellikleri de ayrı bir bölümde listele.",
+      "note": "İlk adım — kapsamı bilinçli dar tutmak bugünün süresi için kritik."
+    },
+    {
+      "title": "Schema Çıkarımı (2 Aşamalı)",
+      "prompt": "PRD.md'deki kapsama göre önce varlıkları ve aralarındaki ilişkileri düz metinle özetle, onayımı bekle. Onayladıktan sonra SQLite için CREATE TABLE ifadelerini yaz."
+    },
+    {
+      "title": "API Contract + Endpoint",
+      "prompt": "ARCHITECTURE.md'nin API Contract bölümüne GET /api/dashboard/summary ve GET /api/projects için yöntem, request/response şekli ve ortak hata formatını yaz. Sonra bu contract'a göre iki endpoint'i implemente et."
+    },
+    {
+      "title": "Mock Data + Dashboard Layout",
+      "prompt": "ARCHITECTURE.md'deki API contract'ına birebir uyan bir mock data dosyası üret. Bu mock data ile dashboard'u summary card'lar + proje listesi + loading/error state olacak şekilde kur."
+    },
+    {
+      "title": "Review Subagent'ları",
+      "prompt": "schema-reviewer adında, yalnızca Read/Grep/Glob tool'larına sahip bir subagent oluştur. schema.sql ve ARCHITECTURE.md'nin API Contract bölümünü birlikte incelet, tutarsızlıkları raporlat.",
+      "note": "Salt-okunur subagent pattern'i — Gün 11'deki code-reviewer'ın devamı."
+    }
+  ],
+  "challenge": {
+    "title": "SaaS Dashboard Temeli",
+    "task": "PRD.md + ARCHITECTURE.md ile planlanmış, en az 2 ilişkili tablolu, contract-first 2 endpoint'i olan ve mock data ile çalışan bir dashboard layout'u kur.",
+    "requirements": [
+      "CLAUDE.md, PRD.md, ARCHITECTURE.md üçü de mevcut olmalı",
+      "En az 2 ilişkili tablo (ör. users + projects) — foreign key ile bağlı",
+      "En az 2 endpoint (ör. GET /api/dashboard/summary, GET /api/projects)",
+      "API contract kısa bir bölüm olarak ARCHITECTURE.md içinde yer alır: endpoint, request/response shape, error format",
+      "Dashboard layout: summary card'lar + liste/tablo alanı + loading/error state",
+      "Test/lint safety rail (hook veya manuel komut) fail durumunda görünür feedback üretmeli"
+    ],
+    "success": [
+      "PRD.md ve ARCHITECTURE.md birbirini çelişkisiz destekliyor — PRD'deki her özellik ARCHITECTURE'da bir karşılık buluyor",
+      "Schema'daki ilişkiler ile API contract'ındaki response şekli tutarlı",
+      "Endpoint'ler contract'a birebir uyuyor (curl ile doğrulanmış)",
+      "Dashboard mock data'dan gerçek API response'una sorunsuz geçebilecek şekilde tasarlanmış",
+      "Hook veya manuel test komutu fail durumunda görünür feedback üretiyor"
+    ],
+    "solution": {
+      "intro": "Bu challenge'ı katman sırasına göre ilerlet: önce plan (PRD+ARCHITECTURE), sonra veri (schema), sonra contract+API, en son frontend. Sırayı atlamak (ör. önce frontend'i yazıp sonra schema'ya uydurmaya çalışmak) katmanlar arası tutarsızlığa yol açar.",
+      "prompts": [
+        {
+          "title": "1. Plan",
+          "prompt": "PRD.md ve ARCHITECTURE.md'nin iskeletini (bölüm başlıklarıyla) oluştur, PRD kapsamını onayla."
+        },
+        {
+          "title": "2. Schema",
+          "prompt": "Onaylanan kapsama göre varlık ilişkilerini özetle, onayımı al, sonra CREATE TABLE ifadelerini yaz."
+        },
+        {
+          "title": "3. Contract + Endpoint",
+          "prompt": "ARCHITECTURE.md'ye API contract'ını yaz, sonra bu contract'a göre 2 endpoint'i implemente et ve curl ile test et."
+        },
+        {
+          "title": "4. Layout + Review",
+          "prompt": "Contract'a uyan mock data üret, dashboard layout'unu kur; sonra schema-reviewer ve layout-reviewer subagent'larıyla tutarlılığı denetlet."
+        }
+      ],
+      "notes": [
+        "Her katmanı onaylamadan bir sonrakine geçmemek (ör. schema onaysız endpoint yazmaya başlamak), Bölüm 1.2'deki modüler geliştirme ilkesinin pratikte uygulanmasıdır.",
+        "Mock data'yı contract'tan otomatik türetmek, layout ile API arasındaki senkronu garanti eder — elle yazılan mock data zamanla contract'tan sapabilir.",
+        "Review subagent'larını edit yetkisiz kurmak, 'düzeltmeyi de o yapsın' cazibesine karşı bilinçli bir sınırdır — düzeltme kararı sende kalmalı."
+      ],
+      "pitfalls": [
+        "⚠️ PRD.md ve ARCHITECTURE.md'yi tek dosyada birleştirmek — özellik değişikliği ile teknik karar değişikliğini birbirinden ayıramaz hale getirir.",
+        "⚠️ Schema'yı onaylamadan CREATE TABLE'a geçmek — ilişki hatası (yanlış foreign key yönü) sonradan fark edilirse endpoint'leri de bozar.",
+        "⚠️ Contract yazmadan doğrudan endpoint kodlamak — dokümantasyon kodun 'yan ürünü' haline gelir ve gerçek davranıştan sapar.",
+        "⚠️ Agent view'daki bağımsız oturumu subagent sanıp ana konuşmadan sonuç bekler gibi davranmak — sonuç otomatik dönmez, `claude agents` ile kontrol etmek gerekir.",
+        "⚠️ Review subagent'ına yanlışlıkla Edit/Write vermek — review'un salt-okunur amacını bozar, 'düzeltti mi bozdu mu' belirsizliği yaratır."
+      ]
+    }
+  },
+  "takeaways": [
+    "Kademe 3'ün farkı kod miktarı değil dokümantasyon disiplinidir: CLAUDE.md (nasıl çalışılır), PRD.md (ne inşa edilir), ARCHITECTURE.md (nasıl inşa edilir) ayrı rollere sahiptir",
+    "Modüler geliştirme, veri/API/frontend katmanlarını bağımsız doğrulanabilir tutar — Claude Code'a görev verirken de net sınırlı görevler üretir",
+    "Contract-first yaklaşım (önce endpoint şekli, sonra kod) frontend'in backend'i beklemeden mock data ile ilerlemesini sağlar",
+    "SQLite bugün pratik için yeterli; Render'ın ephemeral filesystem sınırı nedeniyle kalıcı production verisi için paid persistent disk veya managed Postgres gerekir",
+    "Subagent (Gün 11) ana konuşmanın içinde çalışır; agent view bağımsız arka plan oturumlarını yönetir; dynamic workflows (Gün 17) bunları script ile orkestre eder — üçü farklı katmanlardır",
+    "Review subagent'larından Edit/Write çıkarmak, 'tutarlılık raporu' ile 'otomatik düzeltme' arasındaki sınırı korur",
+    "Gün 12'deki Stop Hook Test-Gate pattern'i yeniden öğretilmeden, dar kapsamlı bir safety rail olarak yeni projeye taşınabilir",
+    "Mock data'yı contract'tan türetmek, layout ile gerçek API arasındaki geçişi sorunsuzlaştırır"
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Run agents in parallel — subagent, agent view, agent teams ve dynamic workflows'u karşılaştıran resmi köprü sayfa",
+        "url": "https://code.claude.com/docs/en/agents"
+      },
+      {
+        "label": "Create custom subagents — subagent tanımı, tool kısıtlama ve salt-okunur review agent kurgusunun resmi referansı",
+        "url": "https://code.claude.com/docs/en/sub-agents"
+      },
+      {
+        "label": "Manage multiple agents with agent view — bağımsız arka plan oturumlarının tek ekrandan yönetilmesinin resmi rehberi",
+        "url": "https://code.claude.com/docs/en/agent-view"
+      },
+      {
+        "label": "Automate actions with hooks — hook pattern'lerinin task-oriented walkthrough'u (Stop Hook Test-Gate dahil)",
+        "url": "https://code.claude.com/docs/en/hooks-guide"
+      },
+      {
+        "label": "Hooks reference — event şemaları, exit code ve JSON decision formatının tam referansı",
+        "url": "https://code.claude.com/docs/en/hooks"
+      }
+    ],
+    "community": [],
+    "extra": []
+  },
+  "next_preview": "Yarın (Gün 15) SaaS Dashboard'u sekiz SDLC rolü için tasarlanmış agent'larla genişletiyorsun — PM, Architect, Backend, Frontend, QA, Security, DevOps, Technical Writer. Bugün kurduğun schema-reviewer/layout-reviewer subagent pattern'i, yarının rol bazlı agent'larının temelini oluşturuyor.",
+  "checklist": [
+    "CLAUDE.md, PRD.md ve ARCHITECTURE.md'nin farklı rollerini kendi cümlelerimle açıklayabiliyorum",
+    "Modüler geliştirmede veri/API/frontend katmanlarını neden bağımsız doğrulanabilir tutmam gerektiğini biliyorum",
+    "Claude Code ile en az 2 ilişkili tablolu bir schema tasarladım ve onayladım",
+    "SQLite ile Postgres arasındaki production kararını Render'ın ephemeral filesystem sınırına bağlı olarak açıklayabiliyorum",
+    "Contract-first yaklaşımı uyguladım: önce API contract'ı yazdım, sonra endpoint'i kodladım",
+    "Mock data'yı API contract'ına birebir uyacak şekilde ürettim",
+    "Dashboard layout'unu summary card + liste + loading/error state ile kurdum",
+    "Subagent ile agent view arasındaki farkı (ana konuşma içi vs bağımsız oturum) açıklayabiliyorum",
+    "Salt-okunur bir review subagent'ı (Edit/Write olmadan) kurup çalıştırdım",
+    "Gün 12'deki Stop Hook Test-Gate pattern'ini bu projeye taşıdım"
+  ]
+}

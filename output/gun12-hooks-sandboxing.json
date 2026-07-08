@@ -1,0 +1,595 @@
+{
+  "day": 12,
+  "total_days": 20,
+  "week": 3,
+  "slug": "hooks-sandboxing",
+  "title": "Hooks ve Sandboxing",
+  "tagline": "Claude her adım attığında sen de bir şey yap",
+  "tier": null,
+  "date_label": "Temmuz 2026",
+  "intro": "Dün subagent'larla Claude'un işi kime devredeceğine karar vermesini öğrendin. Bugün farklı bir soruna eğiliyorsun: Claude bir şey yaparken (dosya değiştirirken, komut çalıştırırken, bitirdiğini düşünürken) senin de her seferinde, modelin hatırlamasına bağlı olmadan devreye girecek deterministik bir mekanizma. Hooks, Claude Code'un yaşam döngüsündeki belirli noktalarda otomatik olarak tetiklenen script/istek/agent çağrılarıdır. Sandboxing ise bunun tamamlayıcısı: Claude otonom çalışırken Bash komutlarının işletim sistemi seviyesinde neye dokunabileceğini sınırlayan bir güvenlik katmanı. İkisi birlikte, 'ne olursa olsun her seferinde çalışsın' ve 'yanlış giderse bile zararı sınırlı kalsın' sorularına cevap verir.",
+  "flow": [
+    {
+      "phase": "1 · Teorik: Hooks",
+      "dur": "35 dk",
+      "desc": "Hook nedir, event taksonomisi, 5 handler tipi, exit code + JSON decision semantiği"
+    },
+    {
+      "phase": "2 · Pratik: Hook Yazımı",
+      "dur": "55 dk",
+      "desc": "Format hook'u, güvenlik hook'u, /hooks ile denetim, Ctrl+O verbose mode"
+    },
+    {
+      "phase": "3 · Stop Hook + Sandboxing",
+      "dur": "40 dk",
+      "desc": "Test-gate hook'u, /sandbox, filesystem/network izolasyonu, permissions ile ilişki"
+    },
+    {
+      "phase": "4 · Mini Challenge",
+      "dur": "35 dk",
+      "desc": "Todo App'e hook seti ekleme + sandbox izolasyonunu doğrulama"
+    }
+  ],
+  "prerequisites": [
+    "Gün 1-11 tamamlanmış: Claude Code kurulu, CLAUDE.md hazır, git workflow, MCP temelleri, subagent'lar",
+    "Todo App (Gün 10) çalışır durumda ve lokal repo'da erişilebilir",
+    "Terminalde temel `jq` kullanımına aşinalık faydalı olur (zorunlu değil)"
+  ],
+  "tools_needed": [
+    "Terminal + Claude Code çalışır durumda",
+    "Todo App proje dizini (Gün 10'dan)",
+    "macOS/Linux/WSL2 — sandboxing için (native Windows desteklenmiyor)",
+    "Linux/WSL2 kullanıyorsan: `bubblewrap` ve `socat` paketleri"
+  ],
+  "objectives": [
+    "Hook kavramını ve deterministik otomasyonun modelin 'hatırlamasına' dayanan yaklaşımdan farkını açıklayabileceksin",
+    "5 handler tipini (`command`, `http`, `mcp_tool`, `prompt`, `agent`) ayırt edip pratikte `command` ağırlıklı çalışabileceksin",
+    "Exit code semantiğini (`0`/`2`/diğer) ve `permissionDecision` (`allow`/`deny`/`ask`/`defer`) ile JSON tabanlı kontrolü ayırt edebileceksin",
+    "`matcher` ile `if` alanlarının farkını ve `if`'in best-effort/fail-open doğasını bileceksin",
+    "`settings.json`'da hook konfigürasyonu yazıp `/hooks` ve verbose mode ile denetleyebileceksin",
+    "Sandboxed Bash tool'un filesystem/network izolasyonunu, varsayılan write/read asimetrisini ve permission sistemiyle tamamlayıcı ilişkisini açıklayabileceksin"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 Hook Nedir?"
+        },
+        {
+          "t": "p",
+          "text": "Bir hook, Claude Code'un yaşam döngüsündeki belirli noktalarda otomatik tetiklenen kullanıcı tanımlı bir event handler'dır — shell komutu, HTTP isteği, MCP tool çağrısı, model prompt'u veya bir subagent olabilir. Hook'lar modelin 'formatı çalıştırmayı hatırlamasına' bağlı değildir: event gerçekleştiği her seferinde, koşulsuz çalışırlar. Bu, hook'ları CLAUDE.md'deki bir kuraldan temelden farklı kılar — CLAUDE.md tavsiye niteliğindedir, hook zorlayıcıdır."
+        },
+        {
+          "t": "keypoint",
+          "text": "CLAUDE.md kuralları modelin dikkatine bağlıdır ('advisory'); hook'lar ise deterministik olarak her seferinde tetiklenir ('enforced'). Kritik bir kuralı (format, güvenlik, test) gerçekten garanti altına almak istiyorsan onu hook olarak yaz, sadece CLAUDE.md'ye yazma."
+        },
+        {
+          "t": "h",
+          "text": "1.2 Event Taksonomisi"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code'un resmi dokümantasyonu geniş bir event seti tanımlar (30'dan fazla) — SessionStart/SessionEnd, PreToolUse/PostToolUse, UserPromptSubmit, Stop/SubagentStop, PermissionRequest, TaskCreated/TaskCompleted, PreCompact, WorktreeCreate ve daha fazlası. Bugün hepsini ezberlemeyeceksin — pratikte en çok kullanacakların küçük bir alt kümesi var."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Event",
+            "Ne zaman tetiklenir"
+          ],
+          "rows": [
+            [
+              "PreToolUse",
+              "Claude bir tool çağırmadan hemen önce — bloklayabilir/değiştirebilir"
+            ],
+            [
+              "PostToolUse",
+              "Tool başarıyla çalıştıktan sonra — geri alamaz, sadece tepki verir"
+            ],
+            [
+              "UserPromptSubmit",
+              "Kullanıcı prompt gönderdiğinde, Claude işlemeden önce"
+            ],
+            [
+              "Stop",
+              "Claude, yanıtını bitirdiğini düşündüğünde"
+            ],
+            [
+              "SubagentStart / SubagentStop",
+              "Bir subagent başladığında / bitirdiğinde"
+            ],
+            [
+              "SessionStart / SessionEnd",
+              "Oturum başladığında / sonlandığında"
+            ],
+            [
+              "TaskCreated / TaskCompleted",
+              "Görev takibi oluşturulduğunda / tamamlandığında"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.3 Beş Handler Tipi"
+        },
+        {
+          "t": "p",
+          "text": "Bir hook 'tetiklendiğinde' aslında beş farklı tipte handler çalıştırılabilir. İlk ikisi (`command`, `http`) deterministik script/servis çağrılarıdır; son ikisi (`prompt`, `agent`) muhakeme gerektiren, regex/script ile ifade edilmesi zor kararlar için bir Claude modeli kullanır. `mcp_tool` ise bağlı bir MCP server'ın tool'unu doğrudan hook olarak çağırmayı sağlar."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Tip",
+            "Ne yapar",
+            "Girdi/Çıktı"
+          ],
+          "rows": [
+            [
+              "command",
+              "Shell komutu/script çalıştırır",
+              "stdin'den JSON alır, stdout/exit code ile cevap verir"
+            ],
+            [
+              "http",
+              "Bir HTTP endpoint'e POST eder",
+              "Event JSON'u POST body'de gider, aynı JSON formatında cevap döner"
+            ],
+            [
+              "mcp_tool",
+              "Bağlı bir MCP server'ın tool'unu çağırır",
+              "Örn. PostToolUse'da bir güvenlik tarama tool'u çalıştırma"
+            ],
+            [
+              "prompt",
+              "Tek turlu bir Claude modeline (varsayılan Haiku) değerlendirtir",
+              "Prompt metninde `$ARGUMENTS` ile hook input JSON'u modele gösterilir"
+            ],
+            [
+              "agent",
+              "Tool erişimi olan bir subagent doğurur (çoklu tur)",
+              "Dosya okuma/komut çalıştırma gerektiren derin doğrulamalar için"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "`$ARGUMENTS` placeholder'ı sadece `prompt` ve `agent` handler'ların prompt metninde geçerlidir — hook input JSON'unu modele göstermek için kullanılır. `command` hook'larda girdi stdin'den, `http` hook'larda POST body'den gelir; `$ARGUMENTS` orada bir kavram değildir."
+        },
+        {
+          "t": "tip",
+          "text": "Bugün ve çoğu pratik senaryoda `command` handler'ı yeterlidir — hızlı, ücretsiz ve öngörülebilir. `prompt`/`agent`'a, kararın 'bu commit mesajı conventional format'a uyuyor mu' gibi regex ile ifade edilemeyecek kadar yargı gerektirdiği durumlarda geç."
+        },
+        {
+          "t": "h",
+          "text": "1.4 Matcher vs if"
+        },
+        {
+          "t": "p",
+          "text": "İki farklı filtreleme katmanı var ve karıştırılmamalı. `matcher`, hook'un hangi event/tool için tetikleneceğini belirler (ör. sadece `Bash` tool'u). `if` ise permission-rule sözdizimiyle (`Bash(rm *)`, `Edit(*.ts)` gibi) tool'un argümanlarına bakarak daha ince bir filtre uygular — hook process'inin gereksiz yere spawn edilmesini önler."
+        },
+        {
+          "t": "code",
+          "lang": "json",
+          "text": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\"type\": \"command\", \"if\": \"Bash(rm *)\",\n           \"command\": \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-rm.sh\"}\n        ]\n      }\n    ]\n  }\n}"
+        },
+        {
+          "t": "warn",
+          "text": "`if` filtresi **best-effort'tur, hard security gate değildir.** Bash komutu parse edilemezse filtre fail-open olur — yani belirsizlik durumunda hook yine de çalışır (bu güvenlik tarafında iyi bir varsayılan). Ama tersi yönde net ol: 'if' ile 'bu asla tetiklenmesin' garantisi veremezsin. Sert allow/deny garantisi için hook değil, **permission sistemindeki deny rule'ları** kullan."
+        },
+        {
+          "t": "h",
+          "text": "1.5 Exit Code ve JSON Decision"
+        },
+        {
+          "t": "p",
+          "text": "Bir `command` hook'unun Claude Code'a geri bildirim vermesinin iki yolu vardır: basit exit code veya yapılandırılmış JSON çıktısı. Basit olan çoğu durumda yeterlidir; JSON çıktısı daha ince kontrol (belirli bir sebep, kısmi izin, girdi değiştirme) gerektiğinde devreye girer."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Exit code",
+            "Anlamı"
+          ],
+          "rows": [
+            [
+              "0",
+              "Başarı; stdout varsa Claude Code onu JSON olarak parse etmeyi dener"
+            ],
+            [
+              "2",
+              "Bloklayıcı hata; PreToolUse için tool çalışmaz, stderr Claude'a 'neden bloklandığı' olarak gösterilir"
+            ],
+            [
+              "diğer",
+              "Bloklayıcı olmayan hata; aksiyon devam eder, hata verbose modda/transcript'te görünür"
+            ]
+          ]
+        },
+        {
+          "t": "p",
+          "text": "PreToolUse için daha ince kontrol istiyorsan JSON çıktısında `hookSpecificOutput.permissionDecision` alanını dört değerden biriyle döndürebilirsin: `allow`, `deny`, `ask`, `defer`."
+        },
+        {
+          "t": "keypoint",
+          "text": "Bunu bir 'ekstra izin mekanizması' olarak düşünme — pratikte hook'lar defense-in-depth'in doğrulama/bloklama katmanıdır. Hook sessiz kalırsa (çıktı yoksa) normal permission akışı olduğu gibi devam eder; bu otomatik onay anlamına gelmez. Ve birden fazla hook farklı kararlar dönerse, **deny her zaman allow'u geçersiz kılar** — bir hook asla permission sisteminin zaten vereceğinden daha fazla erişim açamaz."
+        },
+        {
+          "t": "h",
+          "text": "1.6 Stop Hook ve Sonsuz Döngü Koruması"
+        },
+        {
+          "t": "p",
+          "text": "Bir Stop hook'u, Claude yanıtını bitirdiğini düşündüğünde 'hayır, devam et' diyebilir (exit 2 veya `decision: block`). Ama bunu dikkatsizce yazarsan sonsuz bir döngüye girersin: Claude her bitirdiğinde hook tekrar 'devam et' der. Bunu önlemek için hook, girdi JSON'undaki `stop_hook_active` alanını kontrol edip `true` ise erken çıkmalıdır."
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "#!/bin/bash\nINPUT=$(cat)\nif [ \"$(echo \"$INPUT\" | jq -r '.stop_hook_active')\" = \"true\" ]; then\n  exit 0   # Claude'un durmasına izin ver\nfi\n# ... asıl kontrol mantığı (ör. npm test) ..."
+        },
+        {
+          "t": "tip",
+          "text": "Kendi guard'ını unutsan bile Claude Code bir üst sınır uyguluyor: bir Stop hook'u ilerleme kaydetmeden art arda **8 kez** bloklarsa Claude Code o hook'u geçersiz kılıp turu bitirir. Bu eşik `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` ile yükseltilebilir — ama guard'ı doğru yazmak yine de senin sorumluluğun."
+        },
+        {
+          "t": "h",
+          "text": "1.7 Konfigürasyon Katmanları"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Dosya",
+            "Kapsam",
+            "Git'e commit edilir mi?"
+          ],
+          "rows": [
+            [
+              "`~/.claude/settings.json`",
+              "Kullanıcı — tüm projelerde geçerli",
+              "Hayır (kişisel makine)"
+            ],
+            [
+              "`.claude/settings.json`",
+              "Proje — repo köküne özel, takımla paylaşılır",
+              "Evet"
+            ],
+            [
+              "`.claude/settings.local.json`",
+              "Kişisel proje override'ı",
+              "Hayır (genelde .gitignore'da)"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.8 Üç Katmanlı Güvenlik Modeli"
+        },
+        {
+          "t": "p",
+          "text": "Bugünün üç kavramını (permissions, hooks, sandbox) birbirinin alternatifi değil, birbirini tamamlayan katmanlar olarak gör:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Katman",
+            "Soruyu cevaplar"
+          ],
+          "rows": [
+            [
+              "Permissions",
+              "Bu tool hiç çalışabilir mi?"
+            ],
+            [
+              "Hooks",
+              "Tool çalışmadan hemen önce/sonra ne kontrol edilmeli, ne otomatikleşmeli?"
+            ],
+            [
+              "Sandbox",
+              "Bash çalıştıktan sonra dosya sistemine/ağa ne kadar dokunabilir?"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Permissions hangi tool'un çalışabileceğine karar verir; hooks lifecycle event'lerinde deterministik doğrulama/otomasyon yapar; sandbox ise özellikle Bash ve alt süreçlerinin işletim sistemi seviyesinde neye erişebileceğini sınırlar. Bölüm 3'te sandbox'ı işlerken bu tabloya geri döneceğiz."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "2.1 İlk Hook: Otomatik Format (PostToolUse)"
+        },
+        {
+          "t": "p",
+          "text": "En basit ve en hemen faydalı hook, bir dosya yazıldığında/düzenlendiğinde otomatik formatlama çalıştırmaktır. Bu bir `PostToolUse` hook'udur — tool zaten çalıştı, sen sadece tepki veriyorsun, geri alamazsın."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Todo App proje dizininde Claude Code'u başlat: claude",
+            "Prompt Kütüphanesi'ndeki 1. promptu ver: PostToolUse formatter hook'u yazdır",
+            "Oluşan .claude/settings.json içindeki hooks.PostToolUse girdisini incele",
+            "Bir dosyayı Claude'a değiştirt, formatter'ın otomatik çalıştığını gözlemle"
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "json",
+          "text": "{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Write|Edit\",\n        \"hooks\": [\n          {\"type\": \"command\",\n           \"command\": \"npx prettier --write \\\"$CLAUDE_TOOL_INPUT_FILE_PATH\\\"\"}\n        ]\n      }\n    ]\n  }\n}"
+        },
+        {
+          "t": "h",
+          "text": "2.2 Güvenlik Hook'u: Tehlikeli Komut Engelleyici (PreToolUse)"
+        },
+        {
+          "t": "p",
+          "text": "Şimdi tersi yönde bir hook: tool çalışmadan **önce** devreye giren, bloklama yetkisi olan bir `PreToolUse` hook'u. `rm -rf` gibi yıkıcı komutları exit 2 ile durdurup nedenini Claude'a stderr üzerinden bildireceksin."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Prompt Kütüphanesi'ndeki 2. promptu ver: dangerous command blocker hook'u yazdır",
+            "Hook script'ini oku — komut içinde rm -rf / drop table gibi desenleri arıyor mu?",
+            "Bilerek tehlikeli bir komut istet (ör. \"rm -rf /tmp/test klasörünü sil\") ve bloklandığını doğrula",
+            "Blok mesajının Claude'a neden engellendiğini açıkça anlattığını kontrol et"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Bir deny hook'u `bypassPermissions` modunda bile çalışır — kullanıcı normal onay akışını atlasa dahi PreToolUse deny kararı geçerlidir. Bu, kurumsal politikaların (ör. 'production dosyalarına asla yazma') atlanamaz olmasını sağlayan bilinçli bir tasarım."
+        },
+        {
+          "t": "h",
+          "text": "2.3 /hooks ile Denetim ve Debug"
+        },
+        {
+          "t": "p",
+          "text": "Hook'ları yazdıktan sonra gerçekten kayıtlı olduklarını ve beklendiği gibi çalıştıklarını doğrulamak gerekir. `/hooks` komutu kayıtlı hook'ları event bazında listeler (salt-okunur bir görünümdür — değişiklik dosyadan yapılır); `Ctrl+O` verbose modu açıp hook çıktısını transcript'te gösterir."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "/hooks komutunu çalıştır, PostToolUse ve PreToolUse altında hook'larının göründüğünü doğrula",
+            "Ctrl+O ile verbose mode'a geç",
+            "Bir dosya düzenlemesi yaptır, hook'un stdout/stderr çıktısının transcript'te göründüğünü gözlemle",
+            "Gerekirse claude --debug ile hangi hook'ların eşleştiğini ve exit code'larını incele"
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Bir hook manuel olarak test edilebilir: örnek JSON'u stdin'den ver ve exit code'u kontrol et — echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls\"}}' | ./my-hook.sh && echo $?"
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — DERİNLEŞ",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 Stop Hook: Test-Gate"
+        },
+        {
+          "t": "p",
+          "text": "Şimdi bugünün en güçlü desenlerinden birini kuracaksın: Claude 'bitirdim' dediğinde otomatik olarak test suite'ini çalıştıran bir Stop hook'u. Testler geçmezse Claude'u durdurmadan devam ettirebilirsin."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Prompt Kütüphanesi'ndeki 3. promptu ver: stop_hook_active guard'lı bir test-gate hook'u yazdır",
+            "Script'in stop_hook_active kontrolünü doğru yaptığını incele",
+            "Claude'a bilerek testleri bozacak bir değişiklik yaptır, Stop hook'unun devam ettirdiğini gözlemle",
+            "Testleri düzelttir, hook'un artık durmasına izin verdiğini doğrula"
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Bu desen, 'test yaz ve çalıştır' talimatını CLAUDE.md'de bırakmak yerine gerçekten zorunlu kılar — Claude bitirdiğini düşünse bile testler geçmeden tur bitmez."
+        },
+        {
+          "t": "h",
+          "text": "3.2 Sandboxing'e Giriş: /sandbox"
+        },
+        {
+          "t": "p",
+          "text": "Sandboxing, hook'lardan farklı bir katmandır: hook'lar 'ne zaman ne kontrol edilsin' sorusuna cevap verirken, sandbox 'Bash çalıştıktan sonra neye dokunabilsin' sorusuna cevap verir. `/sandbox` komutuyla etkinleştirilir ve **bir permission mode değildir** — iki çalışma biçimi sunar: **auto-allow** (sandbox sınırları içindeki komutlar onaysız çalışır) ve **regular permissions** (sandbox sınırları aynı ama normal onay akışı korunur)."
+        },
+        {
+          "t": "warn",
+          "text": "Ortam notu: macOS'ta ek kurulum gerekmez (Seatbelt kullanılır). Linux/WSL2'de `bubblewrap` ve `socat` paketleri gerekir. **Native Windows desteklenmiyor** — Windows'ta Claude Code'u WSL2 içinde çalıştırman gerekir."
+        },
+        {
+          "t": "h",
+          "text": "3.3 Filesystem İzolasyonu — Write ve Read Farklı Davranır"
+        },
+        {
+          "t": "p",
+          "text": "Sandbox açıkken varsayılan davranış write ve read için **simetrik değildir** — bu, dersin en kritik güvenlik notudur:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Erişim",
+            "Varsayılan kapsam"
+          ],
+          "rows": [
+            [
+              "Write",
+              "Sadece çalışma dizini (CWD) + oturum temp dizini; dışına yazmak engellenir"
+            ],
+            [
+              "Read",
+              "Tüm bilgisayar — `~/.aws/credentials`, `~/.ssh/` gibi credential dosyaları dahil"
+            ]
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Sandbox tek başına credential okumasını engellemez! Hassas dosyaları korumak için `sandbox.filesystem.denyRead` ile açıkça engellemen ya da `sandbox.credentials` ile ortam değişkenlerini maskeleyen bir konfigürasyon eklemen gerekir. Bu izolasyonu 'her şeyi kapatır' diye varsaymak, dersin en yaygın yanlış anlaşılmasıdır."
+        },
+        {
+          "t": "h",
+          "text": "3.4 Network İzolasyonu"
+        },
+        {
+          "t": "p",
+          "text": "Ağ erişimi, sandbox dışında çalışan bir proxy server üzerinden kontrol edilir: izin verilen domain listesi tanımlanır, yeni bir domain'e istek gittiğinde kullanıcıdan onay istenir. Alt süreçler (npm, pip gibi paket yöneticileri dahil) de aynı kısıtlamayı miras alır — bir build script'inin spawn ettiği alt süreç kuralları atlayamaz."
+        },
+        {
+          "t": "tip",
+          "text": "Filesystem ve network izolasyonu birlikte anlamlıdır: sadece filesystem korunursa saldırgan ağ üzerinden veri sızdırabilir; sadece network korunursa saldırgan sistem ikili dosyalarını değiştirerek ağ erişimi kazanabilir. İkisi birlikte kullanılmalı."
+        },
+        {
+          "t": "h",
+          "text": "3.5 Sandbox vs Permissions — Tamamlayıcı Katmanlar"
+        },
+        {
+          "t": "p",
+          "text": "Permissions tüm tool'lara (Bash, Read, Edit, WebFetch, MCP tool'ları dahil) uygulanır ve 'bu tool hiç çalışsın mı' sorusuna cevap verir. Sandbox ise **sadece Bash ve onun alt süreçlerini** kapsar ve 'çalıştıktan sonra neye dokunabilsin' sorusuna cevap verir. Built-in Read/Edit/Write tool'ları sandbox'ın değil, doğrudan permission sisteminin kapsamındadır."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "/sandbox çalıştır, auto-allow modunu seç",
+            "Claude'dan çalışma dizini dışına bir dosya yazmasını iste (ör. üst dizine touch)",
+            "İşletim sistemi seviyesinde reddedildiğini (Operation not permitted) doğrula",
+            "Aynı denemeyi sandbox kapalıyken tekrarla, farkı gözlemle"
+          ]
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "1) PostToolUse Format Hook'u",
+      "prompt": "Todo App projesinde her Write veya Edit işleminden sonra otomatik olarak prettier (veya projenin kullandığı formatter) çalıştıran bir PostToolUse hook'u .claude/settings.json içine ekle. Hook'u ekledikten sonra bir dosyayı düzenleyip gerçekten çalıştığını doğrula.",
+      "note": "Bugünün en basit ve en hemen faydalı hook'u — ana konuşmayı 'prettier çalıştır' hatırlatmasından kurtarır."
+    },
+    {
+      "title": "2) Tehlikeli Komut Engelleyici",
+      "prompt": "rm -rf, DROP TABLE ve benzeri yıkıcı komut desenlerini tespit edip exit code 2 ile bloklayan bir PreToolUse hook'u yaz. Bash tool'una matcher ile bağla, stderr mesajının Claude'a neden engellendiğini net anlatmasını sağla.",
+      "note": "Bu hook bypassPermissions modunda bile çalışır — kurumsal güvenlik politikasının teknik temelidir."
+    },
+    {
+      "title": "3) Stop Hook ile Test-Gate",
+      "prompt": "Claude her yanıtını bitirdiğinde otomatik test suite'imi çalıştıran bir Stop hook'u yaz. Testler geçmezse Claude'u devam ettir (exit 2 + açıklama), geçerse durmasına izin ver. Sonsuz döngüyü önlemek için stop_hook_active alanını kontrol eden bir guard ekle.",
+      "note": "stop_hook_active guard'ı olmadan bu hook sonsuz döngüye girer — mutlaka ekle."
+    },
+    {
+      "title": "4) Sandbox'ı Etkinleştirip Doğrulama",
+      "prompt": "/sandbox komutunu çalıştır, auto-allow modunu seç. Sonra benden çalışma dizinim dışına bir test dosyası oluşturmamı iste ve bunun engellendiğini bana göster. Ardından ~/.ssh/ dizinini okumayı dene ve varsayılan read davranışının bunu engelleyip engellemediğini raporla.",
+      "note": "Bu prompt bilerek write VE read davranışını ayrı ayrı test ettiriyor — ikisinin farklı olduğunu deneyimlemek için."
+    }
+  ],
+  "challenge": {
+    "title": "Todo App'e Hook Seti + Sandbox Doğrulaması",
+    "task": "Todo App'e (Gün 10) üç hook ekle — güvenlik, format, test-gate — ve sandbox ile izolasyonun gerçekten çalıştığını kanıtla.",
+    "requirements": [
+      ".claude/settings.json içinde en az 3 hook tanımlı olmalı: PreToolUse (dangerous command blocker), PostToolUse (format), Stop (test-gate)",
+      "Dangerous command blocker rm -rf veya benzeri bir komutu gerçekten bloklamalı",
+      "Stop hook'u stop_hook_active guard'ı içermeli",
+      "/hooks ile üç hook'un da doğru event altında göründüğü doğrulanmalı",
+      "/sandbox etkinleştirilip CWD dışına yazma denemesi engellenmiş olmalı",
+      "Sandbox'ın sadece Bash'i kapsadığı, Read/Edit/Write'ın permission sistemiyle yönetildiği açıklanmalı"
+    ],
+    "success": [
+      ".claude/settings.json içinde PreToolUse, PostToolUse ve Stop altında birer hook mevcut",
+      "Tehlikeli komut denemesi exit 2 ile bloklandı ve stderr mesajı nedeni açıkladı",
+      "Stop hook'u stop_hook_active kontrolü içeriyor, sonsuz döngüye girmedi",
+      "/hooks çıktısında üç hook da doğru event altında listeleniyor",
+      "Ctrl+O verbose mode ile en az bir hook çalışması gözlemlendi",
+      "/sandbox aktifken CWD dışına write denemesi 'Operation not permitted' ile reddedildi",
+      "Sandbox'ın Bash-only kapsamı ve read/write asimetrisi kendi cümleleriyle açıklandı"
+    ],
+    "solution": {
+      "intro": "Bu challenge'ı üç aşamada ilerlet: önce hook'ları tek tek ekle ve her birini izole test et, sonra hepsini birlikte bir gerçek senaryoda (dosya düzenleme + test + commit) dene, son olarak sandbox'ı açıp aynı projede izolasyonu doğrula.",
+      "prompts": [
+        {
+          "title": "1. Güvenlik hook'u",
+          "prompt": "PreToolUse dangerous command blocker'ı ekle, rm -rf ile test et, blok mesajını oku."
+        },
+        {
+          "title": "2. Format hook'u",
+          "prompt": "PostToolUse formatter'ı ekle, bir dosyayı düzenlet, otomatik formatlandığını doğrula."
+        },
+        {
+          "title": "3. Test-gate hook'u",
+          "prompt": "Stop hook'unu stop_hook_active guard'ıyla ekle, testleri bilerek bozup düzelterek davranışı gözlemle."
+        },
+        {
+          "title": "4. Sandbox doğrulaması",
+          "prompt": "/sandbox aç, CWD dışına yazmayı ve ~/.ssh/ okumayı dene, write/read farkını raporlat."
+        }
+      ],
+      "notes": [
+        "Her hook'u eklendikten hemen sonra izole test et — üçünü birden yazıp sonda test etmek hangi hook'un neden çalışmadığını bulmayı zorlaştırır.",
+        "Stop hook'unu test ederken önce guard'sız bir versiyonla (kontrollü şekilde) sonsuz döngüyü gözlemlemek, guard'ın neden gerekli olduğunu somutlaştırır.",
+        "Sandbox denemesinde write ve read'i ayrı ayrı test et — ikisinin farklı sonuç vermesi bu dersin en önemli 'aha' anıdır."
+      ],
+      "pitfalls": [
+        "⚠️ Stop hook'una stop_hook_active guard'ı eklemeyi unutup sonsuz döngüye girmek.",
+        "⚠️ `if` filtresini 'kesin güvenlik' sanıp permission deny rule'larını atlamak — if best-effort'tur, fail-open olabilir.",
+        "⚠️ Sandbox'ın credential dosyalarını da okunmaz yapacağını varsaymak — varsayılan read sınırsızdır, denyRead açıkça eklenmelidir.",
+        "⚠️ PreToolUse hook'unun sadece Bash'i değil Read/Edit/Write'ı da sandbox kapsadığını sanmak — bu tool'lar permission sisteminin, sandbox'ın değil.",
+        "⚠️ Hook'u settings.json'a elle ekleyip aynı oturumda `/hooks` ile görünmesini beklemek — bazı değişiklikler için reload/restart gerekebilir."
+      ]
+    }
+  },
+  "takeaways": [
+    "Hook'lar deterministiktir — modelin hatırlamasına değil, event'in gerçekleşmesine bağlıdır; CLAUDE.md tavsiye, hook zorlayıcıdır",
+    "5 handler tipi var: command, http, mcp_tool, prompt, agent — pratikte command ağırlıklı, diğerleri yargı gerektiren durumlar için",
+    "matcher event/tool seviyesinde filtreler, if ise argüman seviyesinde filtreler ama best-effort'tur — hard security için permission deny rule kullanılır",
+    "PreToolUse deny, bypassPermissions modunda bile geçerlidir; hook sessiz kalırsa normal permission akışı devam eder, bu otomatik onay değildir",
+    "Stop hook'ları stop_hook_active guard'ı gerektirir; guard'sız kalırsa Claude Code 8 ardışık bloktan sonra hook'u geçersiz kılar",
+    "Sandbox varsayılan olarak write'ı CWD+temp ile sınırlar ama read'i tüm bilgisayara açık bırakır — credential koruması için denyRead şart",
+    "Sandbox sadece Bash ve alt süreçlerini kapsar; Read/Edit/Write built-in tool'ları permission sisteminin kapsamındadır",
+    "Permissions/hooks/sandbox birbirinin alternatifi değil, defense-in-depth katmanlarıdır: hangi tool çalışabilir → ne kontrol edilmeli → çalıştıktan sonra neye dokunabilir"
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Hooks reference — tüm event'ler, 5 handler tipi, JSON input/output şeması ve exit code semantiğinin resmi referansı",
+        "url": "https://code.claude.com/docs/en/hooks"
+      },
+      {
+        "label": "Automate actions with hooks — hızlı başlangıç rehberi, stop_hook_active deseni ve yaygın hata giderme",
+        "url": "https://code.claude.com/docs/en/hooks-guide"
+      },
+      {
+        "label": "Configure the sandboxed Bash tool — filesystem/network izolasyonu, /sandbox modları ve platform desteğinin resmi referansı",
+        "url": "https://code.claude.com/docs/en/sandboxing"
+      }
+    ],
+    "community": [
+      {
+        "label": "Making Claude Code more secure and autonomous with sandboxing — Anthropic mühendislik ekibinin sandbox mimarisini ve motivasyonunu anlattığı blog yazısı",
+        "url": "https://www.anthropic.com/engineering/claude-code-sandboxing"
+      }
+    ],
+    "extra": [
+      {
+        "label": "Agent SDK reference (TypeScript) — hook input/output tiplerinin SDK tarafındaki programatik karşılığı",
+        "url": "https://code.claude.com/docs/en/agent-sdk/typescript"
+      }
+    ]
+  },
+  "next_preview": "Yarın (Gün 13) Skills & Plugins'e geçiyorsun: yeniden kullanılabilir yetenek paketleri yazmayı, bunları command/agent/hook ile karşılaştırmayı ve marketplace üzerinden organizasyon içi dağıtımı öğreneceksin — bugünkü hook'lar bir plugin'in içine paketlenebilen bileşenlerden biri olacak.",
+  "checklist": [
+    "Hook'ların deterministik olduğunu ve CLAUDE.md kurallarından farkını açıklayabiliyorum",
+    "5 handler tipini (command, http, mcp_tool, prompt, agent) sayabiliyorum ve ne zaman hangisini kullanacağımı biliyorum",
+    "matcher ile if farkını ve if'in best-effort/fail-open doğasını açıklayabiliyorum",
+    "Exit code semantiğini (0/2/diğer) ve permissionDecision (allow/deny/ask/defer) ayrımını biliyorum",
+    "Stop hook'larda stop_hook_active guard'ının neden gerekli olduğunu ve 8-blok cap'ini biliyorum",
+    "PostToolUse format hook'u ve PreToolUse güvenlik hook'u yazıp test ettim",
+    "/hooks ve Ctrl+O verbose mode ile hook'ları denetleyebiliyorum",
+    "Sandbox'ın write/read asimetrisini (CWD+temp write, tüm bilgisayar read) açıklayabiliyorum",
+    "Sandbox'ın sadece Bash'i kapsadığını, Read/Edit/Write'ın permission sisteminde olduğunu biliyorum",
+    "Permissions/hooks/sandbox üçlü güvenlik modelini kendi cümlelerimle anlatabiliyorum"
+  ]
+}

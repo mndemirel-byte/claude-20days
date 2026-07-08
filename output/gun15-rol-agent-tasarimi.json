@@ -1,0 +1,463 @@
+{
+  "day": 15,
+  "total_days": 20,
+  "week": 3,
+  "slug": "sdlc-rol-agentlari",
+  "title": "Yazılım Rolleri İçin Agent Tasarımı",
+  "tagline": "Her yazılım rolü için bir AI asistan tasarla",
+  "tier": "🟠 Kademe 3",
+  "date_label": "Temmuz 2026",
+  "intro": "Gün 14'te SaaS Dashboard'un iskeletini kurdun ve schema/layout-reviewer gibi uzmanlaşmış subagent'ları tek-session review görevlerinde kullandın. Bugün aynı subagent mekanizmasını sekiz SDLC rolüne (PM, Architect, Backend, Frontend, QA, Security, DevOps, Technical Writer) genişletiyorsun. Amaç 'her role bir agent' demek değil — her agent'ın dar bir sorumluluğu, doğru model/effort seçimi ve bir sonraki role devredilebilir net bir çıktısı (handoff artifact) olması. Günün sonunda 4 core rol agent'ını yazmış, ikinci 4'ünü eklemiş, hepsini bir plugin altında paketlemiş ve PM→Architect→Backend→QA→Technical Writer zincirini SaaS Dashboard üzerinde uçtan uca çalıştırmış olacaksın.",
+  "flow": [
+    {
+      "phase": "1 · Teorik: Rol → Agent Eşlemesi",
+      "dur": "35 dk",
+      "desc": "SDLC rolleri, subagent izolasyonu, model/effort/tools, advisor pattern"
+    },
+    {
+      "phase": "2 · Pratik: Core Takım",
+      "dur": "55 dk",
+      "desc": "PM → Architect → Backend → QA agent'larını yaz ve SaaS Dashboard'da test et"
+    },
+    {
+      "phase": "3 · Pratik: Extended Takım + Paketleme",
+      "dur": "45 dk",
+      "desc": "Frontend, DevOps, Security, Technical Writer agent'ları; plugin 'takım kiti'"
+    },
+    {
+      "phase": "4 · Mini Challenge",
+      "dur": "30 dk",
+      "desc": "Tam zincir simülasyonu — her adım dosyalanmış bir artifact üretir"
+    }
+  ],
+  "prerequisites": [
+    "Gün 11 (subagent'lar) ve Gün 13 (skill/plugin) tamamlanmış",
+    "Gün 14'te SaaS Dashboard iskeleti, schema'sı ve ilk 2 endpoint'i kurulmuş",
+    "Terminal ve Claude Code çalışır durumda"
+  ],
+  "tools_needed": [
+    "Terminal (Claude Code çalışır durumda)",
+    "SaaS Dashboard proje dizini (Gün 14'ten)",
+    "VS Code veya tercih edilen editör"
+  ],
+  "objectives": [
+    "8 SDLC rolünü agent tasarımına eşleyebileceksin (görev kapsamı, tool izinleri, model/effort seçimi)",
+    "Subagent frontmatter'ında `model` ve `effort` alanlarını maliyet/kalite trade-off'una göre seçebileceksin; `effort`'un session seviyesini override ettiğini ama `CLAUDE_CODE_EFFORT_LEVEL` ortam değişkenini override edemediğini bileceksin",
+    "Advisor'ı (`/advisor`, `advisorModel`, `--advisor`) ana model + danışman model pattern'i olarak konumlandırabilecek; ne zaman değer kattığını ve ne zaman ana modeli doğrudan yükseltmenin daha doğru olduğunu ayırt edebileceksin",
+    "Subagent'ların fresh/isolated context ile başladığını ve parent geçmişini otomatik görmediğini bilerek, her rolün çıktısını açık bir handoff artifact'ı olarak tasarlayabileceksin",
+    "Rol agent'larını SaaS Dashboard projesinde uçtan uca zincirleyebileceksin (PM→Architect→Backend→QA→Technical Writer)",
+    "Rol agent'larını Gün 13'teki plugin yapısıyla bir 'takım kiti' olarak paketleyebileceksin"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 SDLC Rolleri → Agent Eşlemesi ve Handoff Artifact İhtiyacı"
+        },
+        {
+          "t": "p",
+          "text": "Bir yazılım projesinde PM, Architect, Backend/Frontend Developer, QA, Security, DevOps ve Technical Writer farklı sorularla ilgilenir: PM 'ne inşa ediyoruz', Architect 'nasıl inşa ediyoruz', QA 'doğru mu inşa ettik'. Her rolü ayrı bir subagent olarak tanımlamak, Gün 11'de öğrendiğin dar tool izni ve odaklı sistem promptu prensiplerinin doğal bir uzantısıdır: PM agent'ının kod yazma yetkisi olmamalı, DevOps agent'ının PRD yazma sorumluluğu olmamalı."
+        },
+        {
+          "t": "p",
+          "text": "Ama burada kritik bir teknik detay devreye giriyor: subagent'lar **fresh, izole bir context** ile başlar ve parent konuşmanın geçmişini otomatik görmez — Claude bunun yerine bir delegation message oluşturur. Bu yüzden PM agent'ının ürettiği feature spec, Architect agent'ının context'ine otomatik akmaz. Her rolün çıktısı, bir sonraki agent'a açıkça geçirilebilen bir **handoff artifact** (ör. `feature-spec.md`) olarak dosyalanmalı."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Rol",
+            "Ana Soru",
+            "Örnek Handoff Artifact"
+          ],
+          "rows": [
+            [
+              "Product Manager",
+              "Ne inşa ediyoruz?",
+              "feature-spec.md"
+            ],
+            [
+              "Architect",
+              "Nasıl inşa ediyoruz?",
+              "architecture-note.md"
+            ],
+            [
+              "Backend Developer",
+              "API/DB nasıl çalışır?",
+              "api-plan.md"
+            ],
+            [
+              "QA Engineer",
+              "Doğru mu çalışıyor?",
+              "qa-report.md"
+            ],
+            [
+              "Technical Writer",
+              "Kullanıcıya nasıl anlatılır?",
+              "release-notes.md"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Rol agent'ı tasarımının özü 'her role bir dosya' değil, 'her role dar bir yetki + net bir çıktı formatı'dır. Subagent izolasyonu bunu bir kısıt değil, bir tasarım ilkesi haline getirir: agent'lar arası iletişim örtük değil, dosyalanmış artifact'lar üzerinden açık olmalıdır."
+        },
+        {
+          "t": "h",
+          "text": "1.2 Model, Effort, Tools: Rol Bazlı Maliyet/Kalite Kararı"
+        },
+        {
+          "t": "p",
+          "text": "Subagent frontmatter'ı `model`, `effort`, `tools`, `disallowedTools` gibi alanları destekler. Model/effort seçimi lineer bir kalite skalası değildir — effort seviyeleri (`low`, `medium`, `high`, `xhigh`) modelden modele farklı kalibre edilir; bir modelde 'high' dediğin şey başka bir modeldeki 'high' ile aynı davranışı vermeyebilir. Bu yüzden pratik prensip şudur: rutin/mekanik işler (lint kontrolü, dosya arama) için düşük effort + ucuz model yeterli; kritik mimari veya güvenlik kararları için hem daha güçlü model hem daha yüksek effort gerekir."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Rol",
+            "Önerilen model",
+            "Gerekçe"
+          ],
+          "rows": [
+            [
+              "PM Agent",
+              "Sonnet, effort: medium",
+              "Yazılı planlama; yüksek dil kalitesi ama ucuz"
+            ],
+            [
+              "Architect Agent",
+              "Opus, effort: high",
+              "Geri dönüşü zor mimari kararlar"
+            ],
+            [
+              "Backend/Frontend Agent",
+              "Sonnet, effort: medium/high",
+              "Kod üretimi; görev karmaşıklığına göre"
+            ],
+            [
+              "QA Agent",
+              "Sonnet, effort: medium",
+              "Test planı + bug hunt; sistematik ama ucuz"
+            ],
+            [
+              "Security Agent",
+              "Opus, effort: high",
+              "Yanlış negatif maliyeti yüksek"
+            ],
+            [
+              "DevOps Agent",
+              "Sonnet, effort: medium",
+              "CI/CD scriptleri; belirlenmiş pattern'ler"
+            ],
+            [
+              "Technical Writer Agent",
+              "Haiku/Sonnet, effort: low/medium",
+              "Dokümantasyon; hız öncelikli"
+            ]
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Frontmatter'daki `effort`, ilgili subagent aktifken **session effort seviyesini override eder** — ama `CLAUDE_CODE_EFFORT_LEVEL` ortam değişkenini override edemez. Bir agent'ın effort ayarı 'çalışmıyor gibi' görünüyorsa, önce bu ortam değişkeninin set olup olmadığını kontrol et — bu, sahada en sık karşılaşılan debugging tuzağıdır."
+        },
+        {
+          "t": "h",
+          "text": "1.3 Advisor: İkinci Görüş Pattern'i"
+        },
+        {
+          "t": "p",
+          "text": "Advisor tool, ana modelin kritik anlarda (bir yaklaşımı seçmeden önce, tekrarlayan bir hatada takılınca, ya da işi 'bitti' ilan etmeden önce) ikinci, genellikle daha güçlü bir modele danışmasını sağlayan server-side bir mekanizmadır. `/advisor`, `advisorModel` ayarı veya `--advisor` flag'i ile etkinleştirilir; hangi anlarda danışılacağına **model kendisi karar verir** — kullanıcı her adımda zorla tetiklemez."
+        },
+        {
+          "t": "warn",
+          "text": "Advisor deneysel bir özelliktir ve Claude Code v2.1.98+ ile yalnızca Anthropic API üzerinde çalışır (Bedrock, Vertex, Foundry'de yok); Fable 5'i advisor veya ana model olarak kullanmak v2.1.170+ gerektirir. Ayrıca advisor, klasik `tools`/`disallowedTools` ile kısıtlanan bir Claude Code tool'u gibi düşünülmemeli — kendi izin kategorisinde, sunucu tarafında çalışan ayrı bir mekanizmadır. Bu derste hands-on kullanım zorunlu değil; 'kritik karar öncesi ikinci görüş' pattern'i olarak kavramsal düzeyde öğreniliyor."
+        },
+        {
+          "t": "tip",
+          "text": "Advisor her zaman doğru seçim değildir: eğer görevin tamamı kritikse (ör. production migration script'i), ana modeli doğrudan Opus'a yükseltmek, ara sıra danışılan bir advisor'dan daha tutarlı olabilir. Advisor, 'çoğunlukla mekanik ama ara sıra kritik karar noktası olan' görevlerde maliyet avantajı sağlar."
+        },
+        {
+          "t": "h",
+          "text": "1.4 Rol Agent'ı Tasarım Prensipleri"
+        },
+        {
+          "t": "list",
+          "items": [
+            "Net bir `description`: Claude'un ne zaman bu agent'a delegasyon yapacağını belirler (ör. 'Backend API endpoint tasarımı ve implementasyonu için kullan')",
+            "Dar tool izni: PM agent'ının Edit/Write'a ihtiyacı yok, sadece Read/Grep yeterli olabilir",
+            "Odaklı sistem promptu: agent'ın rolünü, çıktı formatını (handoff artifact'ı) ve kapsam dışı bıraktığı işleri açıkça tanımla",
+            "Rol bazlı model/effort: 1.2'deki tabloyu başlangıç noktası olarak kullan, projenin bütçesine göre ayarla"
+          ]
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "2.1 PM Agent: Feature Spec ve Prioritization"
+        },
+        {
+          "t": "p",
+          "text": "PM Agent'ın görevi bir özelliği kullanıcı senaryosu, kabul kriterleri ve önceliklendirme gerekçesiyle birlikte `feature-spec.md` olarak yazmaktır. Kod yazma veya mimari karar verme yetkisi yok — sadece Read ve Grep yeterli."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "`.claude/agents/pm-agent.md` dosyasını oluştur: `name: pm-agent`, `description: Yeni özellik spec'i, user story ve prioritization için kullan`, `tools: Read, Grep`, `model: sonnet`, `effort: medium`",
+            "Sistem promptunda çıktı formatını zorunlu kıl: 'Her zaman `feature-spec.md` üret; bölümler: Kullanıcı Senaryosu, Kabul Kriterleri, Önceliklendirme Gerekçesi, Kapsam Dışı'",
+            "SaaS Dashboard'da PM Agent'a yeni bir özellik (ör. 'proje arşivleme') spec'i yazdır, çıktıyı `feature-spec.md` olarak kaydet"
+          ]
+        },
+        {
+          "t": "h",
+          "text": "2.2 Architect Agent: Mimari Karar ve Teknoloji Seçimi"
+        },
+        {
+          "t": "p",
+          "text": "Architect Agent, PM'in `feature-spec.md`'sini girdi olarak alır ve `architecture-note.md` üretir: veri modeli değişikliği, hangi katmanların etkilendiği, teknoloji/tasarım kararı gerekçesi. Bu rol Gün 14'teki ARCHITECTURE.md disiplininin agent'a taşınmış halidir."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "`.claude/agents/architect-agent.md`: `tools: Read, Grep`, `model: opus`, `effort: high` (geri dönüşü zor kararlar için)",
+            "Sistem promptu: 'feature-spec.md'yi oku, gerekli şema/API değişikliklerini `architecture-note.md` olarak yaz; kod yazma, sadece karar dokümante et'",
+            "PM'in ürettiği `feature-spec.md`'yi Architect Agent'a açıkça geçir (parent context otomatik akmaz) ve `architecture-note.md`'yi üret"
+          ]
+        },
+        {
+          "t": "h",
+          "text": "2.3 Backend Developer Agent: API ve DB"
+        },
+        {
+          "t": "p",
+          "text": "Backend Agent, `architecture-note.md`'ye göre endpoint implementasyonu yapar ve `api-plan.md` (endpoint listesi + curl doğrulama komutları) üretir. Bu agent'ın Edit/Write yetkisi var — kod yazan tek core rol bu ve Frontend'dir."
+        },
+        {
+          "t": "code",
+          "lang": "markdown",
+          "text": "---\nname: backend-agent\ndescription: architecture-note.md'ye göre API endpoint implementasyonu için kullan\ntools: Read, Edit, Bash\nmodel: sonnet\neffort: high\n---\narchitecture-note.md'yi oku. Belirtilen endpoint'leri implemente et.\nHer endpoint için curl ile test komutu üret ve api-plan.md'ye ekle.\nKapsam dışı: frontend kodu, veritabanı migration'ı olmayan schema değişikliği."
+        },
+        {
+          "t": "h",
+          "text": "2.4 QA Engineer Agent: Test Planı ve Bug Hunt"
+        },
+        {
+          "t": "p",
+          "text": "QA Agent, `api-plan.md`'deki endpoint'leri test eder ve `qa-report.md` üretir: test planı, bulunan hatalar, tekrar üretme adımları. Kod düzeltmez — sadece raporlar; düzeltme kararı geliştiriciye kalır (Gün 14'teki review subagent prensibiyle aynı)."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "`.claude/agents/qa-agent.md`: `tools: Read, Bash`, `model: sonnet`, `effort: medium`",
+            "Sistem promptu: 'api-plan.md'deki endpoint'leri curl ile test et, beklenmeyen davranışları qa-report.md'ye yaz; kod değiştirme'",
+            "Backend Agent'ın ürettiği `api-plan.md`'yi QA Agent'a geçir, `qa-report.md`'yi incele"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Core takımın 4 agent'ını (PM→Architect→Backend→QA) test etmeden Bölüm 3'e geçme — bu zincir, günün mini challenge'ının omurgasıdır."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — DERİNLEŞ / UYGULAMA",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 Extended Takım: Frontend, DevOps, Security, Technical Writer"
+        },
+        {
+          "t": "p",
+          "text": "İkinci dörtlü, core zincirin üretimleştirme, kalite ve dokümantasyon katmanını oluşturur. Frontend Agent `api-plan.md`'ye göre UI component üretir; DevOps Agent CI/CD ve Docker konfigürasyonu yazar; Security Agent OWASP taraması ve secret detection yapar; Technical Writer Agent tüm artifact'ları okuyup kullanıcıya dönük `release-notes.md` yazar."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Rol",
+            "Girdi",
+            "Çıktı (handoff artifact)",
+            "Tool izni"
+          ],
+          "rows": [
+            [
+              "Frontend Agent",
+              "api-plan.md",
+              "component listesi + ekran görüntüsü notu",
+              "Read, Edit"
+            ],
+            [
+              "DevOps Agent",
+              "Proje kökü",
+              "ci-config.yml + Dockerfile",
+              "Read, Edit, Bash"
+            ],
+            [
+              "Security Agent",
+              "Tüm kod tabanı",
+              "security-report.md",
+              "Read, Grep, Bash"
+            ],
+            [
+              "Technical Writer Agent",
+              "Tüm artifact'lar",
+              "release-notes.md",
+              "Read"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Security Agent'ın effort'unu düşük tutmak cazip gelebilir (hızlı sonuç için) ama 1.2'deki prensip burada özellikle geçerli: yanlış negatif maliyeti yüksek olduğu için Security Agent'ı Opus + high effort'ta tutmak, maliyetten tasarruf etmekten daha önemlidir."
+        },
+        {
+          "t": "h",
+          "text": "3.2 Rol Agent'larını Plugin Olarak Paketleme"
+        },
+        {
+          "t": "p",
+          "text": "Gün 13'te öğrendiğin plugin yapısı (skill + agent + hook + MCP paketleme katmanı) burada devreye giriyor: 8 rol agent'ını tek bir plugin altında toplayıp `/plugin-adı:agent-adı` namespace'i ile paylaşılabilir bir 'takım kiti' haline getirebilirsin. Bu, standalone `.claude/agents/` kullanımından (hızlı, proje-içi deney) versiyonlanmış, dağıtılabilir bir yapıya geçiştir."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Plugin dizinini oluştur: `.claude-plugin/plugin.json` (manifest) + `agents/` dizini (8 agent markdown dosyası, plugin kökünde — `.claude-plugin/` içine değil)",
+            "`marketplace.json` oluştur, `claude plugin validate` ile doğrula",
+            "`--plugin-dir` ile lokal test et, `/reload-plugins` çalıştır",
+            "8 agent'ın `@-mention` typeahead'de doğru namespace ile göründüğünü doğrula"
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Plugin-shipped agent'lar `name`, `description`, `model`, `effort`, `maxTurns`, `tools`, `disallowedTools`, `skills`, `memory`, `background`, `isolation` alanlarını destekler; ama `hooks`, `mcpServers`, `permissionMode` plugin agent'larında desteklenmez — bu alanları kullanıyorsan standalone subagent olarak bırak."
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "PM Agent'a feature spec yazdırma",
+      "prompt": "@pm-agent Proje arşivleme özelliği için feature-spec.md yaz: kullanıcı senaryosu, kabul kriterleri, önceliklendirme gerekçesi, kapsam dışı.",
+      "note": "PM agent'ının Edit yetkisi olmadığından emin ol."
+    },
+    {
+      "title": "Architect Agent'a mimari karar yaptırma",
+      "prompt": "@architect-agent feature-spec.md'yi oku ve architecture-note.md üret: hangi tablolar/endpoint'ler etkileniyor, hangi tasarım kararı gerekiyor."
+    },
+    {
+      "title": "Backend Agent'a endpoint implementasyonu",
+      "prompt": "@backend-agent architecture-note.md'ye göre endpoint'i implemente et, curl ile test et, api-plan.md'yi güncelle."
+    },
+    {
+      "title": "QA Agent'a bug hunt yaptırma",
+      "prompt": "@qa-agent api-plan.md'deki endpoint'leri test et, beklenmeyen davranışları qa-report.md'ye yaz; kod değiştirme."
+    },
+    {
+      "title": "Zincirleme: PM çıktısını Architect'e devretme",
+      "prompt": "feature-spec.md dosyasının içeriğini @architect-agent'a girdi olarak ver ve architecture-note.md üretmesini iste.",
+      "note": "Subagent parent context'i otomatik görmez — dosya içeriğini açıkça geçir."
+    }
+  ],
+  "challenge": {
+    "title": "Tam Takım Simülasyonu",
+    "task": "PM → Architect → Backend → QA → Technical Writer zincirini SaaS Dashboard üzerinde uçtan uca çalıştır. Her adımın çıktısı, bir sonraki agent'ın girdisi olmalı.",
+    "requirements": [
+      "8 rolden en az 4'ü (core takım) için agent dosyası yazılmış olmalı",
+      "PM Agent'ın ürettiği feature-spec.md, Architect Agent'a açıkça girdi olarak geçirilmeli",
+      "Her rol agent'ı dar bir tool iznine sahip olmalı (PM/QA/Technical Writer Edit/Write almamalı)",
+      "Rol agent'ları en az bir plugin altında paketlenmiş olmalı"
+    ],
+    "success": [
+      "PM → Architect → Backend → QA → Technical Writer zinciri kesintisiz tamamlanıyor",
+      "Her adım, bir sonraki agent'ın kullanabileceği dosyalanmış veya kopyalanabilir net bir artifact üretiyor: feature-spec.md, architecture-note.md, api-plan.md, qa-report.md, release-notes.md",
+      "Hiçbir agent kendi kapsamı dışında bir dosyayı düzenlemiyor (PM kod yazmıyor, QA kod düzeltmiyor)",
+      "Plugin `claude plugin validate` ile hatasız doğrulanıyor"
+    ],
+    "solution": {
+      "intro": "Zinciri sırayla ilerlet ve her adımda önceki artifact'ı açıkça bir sonraki agent'a geçir — subagent'lar fresh context ile başladığı için bu geçiş otomatik olmaz.",
+      "prompts": [
+        {
+          "title": "1. PM",
+          "prompt": "@pm-agent ile feature-spec.md üret, içeriğini onayla."
+        },
+        {
+          "title": "2. Architect",
+          "prompt": "feature-spec.md içeriğini @architect-agent'a ver, architecture-note.md üret."
+        },
+        {
+          "title": "3. Backend",
+          "prompt": "architecture-note.md içeriğini @backend-agent'a ver, endpoint'i implemente ettir, api-plan.md üret."
+        },
+        {
+          "title": "4. QA",
+          "prompt": "api-plan.md içeriğini @qa-agent'a ver, qa-report.md üret."
+        },
+        {
+          "title": "5. Technical Writer",
+          "prompt": "Tüm artifact'ları @technical-writer-agent'a ver, release-notes.md üret."
+        }
+      ],
+      "notes": [
+        "Her artifact'ı bir sonraki adıma geçirmeden önce kısaca gözden geçirmek, hatanın zincirde ilerlemesini (ör. yanlış bir mimari kararın koda kadar yayılmasını) önler.",
+        "Plugin paketleme son adımdır — önce agent'ları standalone `.claude/agents/` içinde test edip çalıştığından emin ol, sonra plugin'e taşı.",
+        "Security Agent'ı zincire dahil etmek istersen Backend'den sonra, QA'dan önce ekle — kod var ama henüz test raporu yok."
+      ],
+      "pitfalls": [
+        "⚠️ Bir agent'ın çıktısını bir sonrakine 'aynı konuşmada zaten gördü' varsayarak geçmemek — subagent fresh context ile başlar, dosya içeriğini açıkça geçirmen gerekir.",
+        "⚠️ PM veya QA agent'ına Edit/Write vermek — rolün 'sadece rapor/spec üret' sınırını bozar, kim neyi değiştirdi belirsizleşir.",
+        "⚠️ Tüm agent'ları aynı model/effort'ta tutmak — Architect ve Security gibi kritik kararlı roller için bu, gereksiz risk ya da gereksiz maliyet demektir.",
+        "⚠️ Advisor'ı her agent için zorunlu hands-on adım gibi öğretmek — advisor deneysel ve isteğe bağlı bir pattern, zincirin çalışması için gerekli değil.",
+        "⚠️ Plugin agent dosyalarına `hooks` veya `mcpServers` eklemeye çalışmak — bu alanlar plugin-shipped agent'larda desteklenmiyor."
+      ]
+    }
+  },
+  "takeaways": [
+    "SDLC rollerini agent'a eşlemek, Gün 11'deki dar tool izni + odaklı sistem promptu prensiplerinin doğal bir uzantısıdır",
+    "Subagent'lar fresh/izole context ile başlar ve parent geçmişini otomatik görmez — bu yüzden her rolün çıktısı açık, dosyalanmış bir handoff artifact'ı olmalıdır",
+    "Model/effort seçimi lineer bir kalite skalası değildir; rutin işler düşük effort+ucuz model, kritik kararlar güçlü model+yüksek effort gerektirir",
+    "Frontmatter `effort`, aktif subagent için session seviyesini override eder ama `CLAUDE_CODE_EFFORT_LEVEL` ortam değişkenini geçemez",
+    "Advisor, ana model + danışman model'i tek bir istekte birleştiren deneysel bir server-side pattern'dir; ne zaman danışılacağına model karar verir, kullanıcı değil",
+    "Core takım (PM, Architect, Backend, QA) challenge zincirinin omurgasını oluşturur; extended takım (Frontend, DevOps, Security, Technical Writer) üretimleştirme katmanıdır",
+    "Rol agent'larını plugin olarak paketlemek, standalone `.claude/agents/`'tan paylaşılabilir, versiyonlanmış bir 'takım kiti'ne geçiştir",
+    "Plugin-shipped agent'lar `hooks`, `mcpServers`, `permissionMode` desteklemez — bu alanlar gerekiyorsa standalone subagent tercih edilmeli"
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Create custom subagents — subagent frontmatter (model, effort, tools, disallowedTools) ve context izolasyonunun resmi referansı",
+        "url": "https://code.claude.com/docs/en/sub-agents"
+      },
+      {
+        "label": "Model configuration — effort seviyelerinin frontmatter/env var/session önceliği ve model bazında kalibrasyonunun resmi açıklaması",
+        "url": "https://code.claude.com/docs/en/model-config"
+      },
+      {
+        "label": "Escalate hard decisions with the advisor tool — advisor'ın etkinleştirme, sürüm gereksinimi (v2.1.98+/v2.1.170+) ve model eşleştirme kuralları",
+        "url": "https://code.claude.com/docs/en/advisor"
+      },
+      {
+        "label": "Plugins reference — plugin-shipped agent'ların desteklenen/desteklenmeyen frontmatter alanlarının tam referansı",
+        "url": "https://code.claude.com/docs/en/plugins-reference"
+      }
+    ],
+    "community": [],
+    "extra": []
+  },
+  "next_preview": "Yarın (Gün 16) birden fazla Claude Code oturumunu aynı anda çalıştırmayı ve tek ekrandan yönetmeyi öğreniyorsun — agent view ve git worktree'ler ile paralel izolasyon. Bugün kurduğun rol agent'ları, yarının paralel oturumlarında farklı worktree'lerde eş zamanlı çalışabilecek.",
+  "checklist": [
+    "8 SDLC rolünü ana soru ve handoff artifact'ıyla eşleştirebiliyorum",
+    "Subagent'ların fresh context ile başladığını ve parent geçmişini otomatik görmediğini biliyorum — bu yüzden artifact'ları açıkça geçirmem gerekiyor",
+    "Frontmatter effort'un session seviyesini override ettiğini ama ortam değişkenini override edemediğini biliyorum",
+    "Advisor'ın deneysel olduğunu, sürüm/sağlayıcı bağımlılığını ve 'model karar verir' prensibini açıklayabiliyorum",
+    "PM, Architect, Backend, QA agent'larını yazdım ve SaaS Dashboard'da test ettim",
+    "Frontend, DevOps, Security, Technical Writer agent'larını en az 4'ünü ekledim",
+    "Core takım zincirini (PM→Architect→Backend→QA) kesintisiz çalıştırdım",
+    "Rol agent'larını bir plugin altında paketleyip `claude plugin validate` ile doğruladım",
+    "Her agent'ın tool iznini rolüne göre dar tuttum (PM/QA Edit almadı)",
+    "Tam zincir challenge'ını (5 rol, 5 artifact) uçtan uca tamamladım"
+  ]
+}

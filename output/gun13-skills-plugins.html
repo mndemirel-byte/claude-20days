@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 13 — Skills &amp; Plugins: Yeniden Kullanılabilir Yetenek Paketleri · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><a href="gun11-subagentlar.html"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></a><a href="gun12-hooks-sandboxing.html"><span class="num">12</span><span>Hooks ve Sandboxing</span></a><span class="cur"><span class="num">13</span><span>Skills &amp; Plugins</span></span><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 3 — İleri · Gün 13 / 20</div><h1>Skills &amp; Plugins: Yeniden Kullanılabilir Yetenek Paketleri</h1><p class="tagline">“Claude&#x27;a modüler yetenekler kazandır — ve onları dağıt”</p><p class="intro">Gün 12&#x27;de Claude&#x27;un davranışını hook&#x27;larla dışarıdan zorunlu kıldın. Bugün farklı bir soruya bakıyorsun: bir işi tekrar tekrar doğru yapmayı Claude&#x27;a nasıl &#x27;öğretirsin&#x27; — ve bu öğretimi başka projelere, hatta başka insanlara nasıl taşırsın? Skill, Claude&#x27;un ihtiyaç anında yükleyeceği bir bilgi + talimat paketidir; Plugin ise bir veya daha fazla skill&#x27;i (isteğe bağlı olarak agent, hook ve MCP server ile birlikte) tek bir dağıtılabilir pakette toplar. Marketplace de bu paketlerin keşfedilip kurulduğu katalogdur. Bugünün sonunda kendi skill&#x27;lerini yazmış, bir plugin&#x27;e paketlemiş, lokal olarak test etmiş ve kendi marketplace&#x27;inden kurmuş olacaksın.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Teorik: Skill Anatomisi</div><div class="du">35 dk</div><div class="de">Skill vs Command vs Agent, SKILL.md frontmatter, $ARGUMENTS ile parametre geçirme</div></div><div class="step"><div class="ph">2 · Pratik: Skill Yazımı</div><div class="du">40 dk</div><div class="de">İki standalone skill: project-setup + api-design, tetiklenme teşhisi</div></div><div class="step"><div class="ph">3 · Plugin &amp; Marketplace</div><div class="du">55 dk</div><div class="de">Skill&#x27;i plugin&#x27;e taşıma, --plugin-dir lokal test, marketplace.json, validate, install</div></div><div class="step"><div class="ph">4 · Mini Challenge</div><div class="du">30 dk</div><div class="de">3 skill&#x27;i tek plugin&#x27;de paketleyip namespace ile test etme</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-12 tamamlanmış: Claude Code kurulu, CLAUDE.md/Auto Memory, MCP, subagent&#x27;lar, hooks; Todo App (Gün 10) çalışır durumda ve lokal repo&#x27;da erişilebilir; Terminalde temel dizin/dosya işlemlerine (<code>mkdir</code>, dosya taşıma) aşinalık</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal + Claude Code çalışır durumda (v2.1.199+ önerilir — skill stacking için); Todo App proje dizini (Gün 10&#x27;dan); Git (marketplace&#x27;i lokal veya git-hosted olarak test etmek için)</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Skill / Command / Agent arasındaki mimari farkı açıklayabileceksin: yeni reusable workflow&#x27;lar için Skill-first yaklaşımı, Command&#x27;ların hâlâ var olduğunu ama Skill&#x27;in önerilen yol olduğunu bileceksin</li><li>SKILL.md frontmatter&#x27;ında yalnızca <code>description</code>&#x27;ın önerildiğini, <code>name</code>/<code>disable-model-invocation</code>/<code>allowed-tools</code> gibi alanların opsiyonel olduğunu bileceksin</li><li><code>$ARGUMENTS</code>, <code>$ARGUMENTS[N]</code>/<code>$N</code> ile skill&#x27;e parametre geçirebileceksin</li><li>Plugin&#x27;in neyi paketlediğini (skill/agent/hook/MCP, ileri seviyede LSP/bin/settings.json) ve <strong>namespace</strong> kuralını (<code>/plugin-adı:skill-adı</code>) açıklayabileceksin</li><li><code>plugin.json</code> ve <code>marketplace.json</code> şemasını, <code>.claude-plugin/</code> dizinine yalnızca manifest&#x27;in girdiğini bileceksin</li><li><code>--plugin-dir</code> ile lokal test → marketplace ile dağıtım akışını uygulayıp <code>claude plugin validate</code> ile doğrulayabileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Skill Nedir?</h3><p>Bir skill, Claude&#x27;un bir görevi tutarlı biçimde tamamlaması için yüklediği bir talimat + kaynak paketidir: en az bir SKILL.md dosyası, isteğe bağlı olarak yardımcı script&#x27;ler, şablonlar veya referans dokümanlar. Skill&#x27;ler &#x27;progressive disclosure&#x27; prensibiyle çalışır — Claude, skill&#x27;in var olduğunu (sadece <code>description</code>&#x27;ı) her zaman görür, ama SKILL.md&#x27;nin tam içeriğini yalnızca skill gerçekten devreye girdiğinde context&#x27;e yükler. Bu, onlarca skill kurulu olsa bile context window&#x27;un boşuna dolmamasını sağlar.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Command&#x27;lar hâlâ var ve çalışıyor; ancak yeni reusable workflow&#x27;lar için Skill-first yaklaşım önerilir. Bir plugin içindeki <code>commands/</code> dizini de aslında düz Markdown dosyaları olarak ele alınır — yeni plugin&#x27;lerde bunun yerine <code>skills/</code> yapısını tercih etmek resmi öneridir.</div><h3 class="sub">1.2 Skill vs Command vs Agent</h3><p>Üçü de &#x27;Claude&#x27;a bir şey yaptır&#x27; amacına hizmet eder ama farklı katmanlarda çalışır: Command kısa, elle tetiklenen bir prompt makrosudur; Skill daha zengin, otomatik ya da elle tetiklenebilen, kaynak dosyalarıyla birlikte gelen bir yetenek paketidir; Agent ise ayrı bir context&#x27;te, kendi tool/model politikasıyla çalışan uzmanlaşmış bir persona/oturumdur.</p><table><thead><tr><th>Kavram</th><th>Tetikleme</th><th>Context</th><th>Ne zaman?</th></tr></thead><tbody><tr><td>Skill</td><td>Otomatik (model description&#x27;a göre karar verir) veya <code>/plugin:skill</code> ile elle</td><td>Ana konuşmada, progressive disclosure ile</td><td>Yeniden kullanılabilir bilgi, workflow, tool-guidance</td></tr><tr><td>Command</td><td>Yalnızca elle, <code>/komut</code> ile</td><td>Ana konuşmada, doğrudan enjekte</td><td>Kısa, basit prompt macro&#x27;su</td></tr><tr><td>Agent</td><td>Doğal dil, @-mention veya <code>--agent</code> ile</td><td>İzole subagent context&#x27;i</td><td>Uzman rol, ayrı model/tool policy, delegasyon</td></tr></tbody></table><h3 class="sub">1.3 SKILL.md Frontmatter</h3><p>SKILL.md&#x27;nin frontmatter&#x27;ında teknik olarak tüm alanlar opsiyoneldir — ama <code>description</code> yazmak güçlü biçimde önerilir, çünkü Claude&#x27;un skill&#x27;i ne zaman tetikleyeceğine karar vermesinin tek dayanağı budur. <code>name</code> verilmezse dosya adından türetilir; <code>disable-model-invocation: true</code> skill&#x27;i yalnızca elle çağrılabilir yapar; <code>allowed-tools</code> skill aktifken hangi tool&#x27;ların onaysız kullanılabileceğini listeler; <code>user-invocable</code> skill&#x27;in <code>/</code> ile elle çağrılabilir olup olmadığını kontrol eder.</p><div class="callout tip"><span class="lbl">💡 İpucu</span><code>allowed-tools</code>, listelenen tool&#x27;lara *izin verir* (onaysız kullanım) — diğer tool&#x27;ları otomatik olarak *kapatmaz*. Belirli tool&#x27;ları kesin biçimde engellemek istiyorsan <code>disallowed-tools</code> veya permission deny rule&#x27;ları kullanmalısın; <code>allowed-tools</code> tek başına bir kısıtlama mekanizması değildir.</div><h3 class="sub">1.4 Parametre Geçirme: $ARGUMENTS</h3><p>Bir skill&#x27;e çalışma zamanında veri geçirmenin temel ve önerilen yolu <code>$ARGUMENTS</code>&#x27;tır — kullanıcının skill&#x27;i çağırırken yazdığı serbest metni SKILL.md içine enjekte eder. Daha yapılandırılmış kullanım için <code>$ARGUMENTS[N]</code> (0-tabanlı) veya kısayolu <code>$N</code> ile tek tek argümanlara erişilebilir.</p><h3 class="sub">1.5 Plugin Nedir?</h3><div class="callout kp"><span class="lbl">🔑 Önemli</span>Plugin, bir veya daha fazla Claude Code genişletmesini (skill, agent, hook, MCP server) tek bir dağıtılabilir pakette birleştiren yapıdır. İleri seviyede bir plugin ayrıca LSP server, arka planda çalışan monitor, çalıştırılabilir <code>bin/</code> dosyaları ve varsayılan bir <code>settings.json</code> da taşıyabilir — bugün odağımız skill+hook birleşimi.</div><p>Bir plugin içindeki skill&#x27;ler ana skill havuzuna karışmaz; <strong>namespace</strong> altında görünürler: <code>plugin.json</code> içindeki <code>name</code> alanı namespace&#x27;i belirler ve skill <code>/plugin-adı:skill-adı</code> şeklinde çağrılır. Aynı isimli iki skill farklı plugin&#x27;lerde çakışmadan bir arada durabilir — namespace bu izolasyonu sağlar.</p><h3 class="sub">1.6 Marketplace: Keşif ve Dağıtım Katmanı</h3><p>Marketplace, plugin&#x27;lerin keşfedilip kurulduğu bir katalogdur — <code>.claude-plugin/marketplace.json</code> dosyasıyla tanımlanır. Her plugin girdisinin bir <code>source</code> alanı vardır ve beş kaynak tipini destekler: relative path (lokal/git-hosted marketplace içinde), <code>github</code>, <code>url</code> (git URL), <code>git-subdir</code> (bir repo içindeki alt dizin) ve <code>npm</code>.</p><table><thead><tr><th>Source Tipi</th><th>Ne için kullanılır</th></tr></thead><tbody><tr><td>relative path</td><td>Marketplace ile aynı repo/dizin içindeki plugin&#x27;ler</td></tr><tr><td>github</td><td><code>owner/repo</code> formatında GitHub deposu</td></tr><tr><td>url</td><td>Herhangi bir git URL&#x27;si (GitHub dışı hostlar dahil)</td></tr><tr><td>git-subdir</td><td>Büyük bir monorepo&#x27;nun içindeki tek bir plugin alt dizini</td></tr><tr><td>npm</td><td>Bir npm paketi olarak dağıtılan plugin</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span><code>ref</code> (branch/tag) ve <code>sha</code> (exact commit) birlikte set edilirse <code>sha</code> geçerli olan pin&#x27;dir — branch sonradan silinse bile kurulum, commit erişilebilir olduğu sürece çalışmaya devam eder.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><strong>Yaygın hata:</strong> <code>.claude-plugin/</code> dizinine yalnızca manifest dosyası (<code>plugin.json</code> ya da <code>marketplace.json</code>) girer. <code>skills/</code>, <code>agents/</code>, <code>hooks/</code>, <code>commands/</code> gibi klasörler plugin&#x27;in <strong>kök dizininde</strong> olmalıdır — yanlışlıkla <code>.claude-plugin/</code> içine konursa plugin doğru yüklenmez.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Relative path source (ör. <code>&quot;./plugins/toolkit-plugin&quot;</code>) yalnızca lokal dizin veya git-hosted marketplace senaryosunda güvenilir çözülür. Marketplace doğrudan bir URL üzerinden (yalnızca <code>marketplace.json</code> indirilerek) eklendiyse, plugin dosyaları hiç indirilmediği için relative path kaynaklar çözülemez.</div><h3 class="sub">1.7 İleri Seviye: Dinamik Context Enjeksiyonu (!command)</h3><p><code>$ARGUMENTS</code> skill&#x27;e veri geçirmenin temel yoludur. Daha ileri bir pattern olarak SKILL.md içinde <code>!command</code> sözdizimi (veya fenced bir ``<code>! bloğu), prompt Claude&#x27;a gönderilmeden <strong>önce</strong> çalıştırılan bir shell komutunun çıktısını doğrudan context&#x27;e enjekte eder — örneğin </code>!git diff HEAD<code> ile güncel değişiklikleri veya </code>!gh pr diff` ile bir PR&#x27;ın içeriğini skill&#x27;in çalıştığı anda otomatik olarak metne dahil edebilirsin.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>!command</code>, prompt oluşmadan <strong>önce</strong> shell komutunu çalıştırır — bu yüzden yalnızca güvendiğin komutlarla kullanılmalı. Özellikle community skill/plugin içindeki <code>!command</code> satırları, <code>allowed-tools</code>, <code>bin/</code> script&#x27;leri, hook ve MCP tanımları; review edilmeden kurulup çalıştırılmamalıdır (Gün 12&#x27;deki sandbox mantığıyla aynı temkinli yaklaşım burada da geçerli).</div><h3 class="sub">1.8 Skill Teşhis ve Community Güvenliği</h3><table><thead><tr><th>Sorun</th><th>Komut / Çözüm</th></tr></thead><tbody><tr><td>Skill listede görünmüyor</td><td><code>/skills</code> ile listele; dosya yolu ve frontmatter söz dizimini kontrol et</td></tr><tr><td>Claude skill&#x27;i otomatik tetiklemiyor</td><td><code>description</code>&#x27;ın kullanıcının doğal dildeki isteğiyle eşleştiğini doğrula</td></tr><tr><td>Skill istemediğim zaman tetikleniyor</td><td><code>description</code>&#x27;ı daralt veya <code>disable-model-invocation: true</code> ekle</td></tr><tr><td>Plugin değişikliği oturuma yansımıyor</td><td><code>/reload-plugins</code> çalıştır</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Plugin&#x27;ler makinende aynı yetkiyle çalışan yerel MCP server ve script&#x27;ler içerebilir. Yalnızca güvendiğin marketplace&#x27;lerden ve incelediğin plugin&#x27;lerden kurulum yap.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 İlk Standalone Skill: project-setup</h3><p>Önce plugin katmanına hiç girmeden, düz bir skill yazıp çalıştığını gör. Bu, plugin&#x27;e taşırken neyin değiştiğini (namespace, dizin yapısı) net görmeni sağlar.</p><ol><li><code>.claude/skills/project-setup/SKILL.md</code> dosyasını oluştur; frontmatter&#x27;da yalnızca <code>description</code> yaz</li><li>Gövdeye proje başlatma adımlarını (klasör yapısı, CLAUDE.md şablonu, ilk commit) yaz</li><li><code>$ARGUMENTS</code> ile proje adını parametre olarak al</li><li><code>/skills</code> ile skill&#x27;in listede göründüğünü doğrula</li><li>Claude&#x27;a doğal dille bir istek yönelt (&#x27;yeni bir proje başlat: ...&#x27;) ve skill&#x27;in otomatik tetiklendiğini gözlemle</li></ol><pre><code>---
+description: Yeni bir proje dizini başlatır; klasör yapısı, CLAUDE.md şablonu ve ilk commit oluşturur. Kullanıcı &#x27;yeni proje başlat&#x27; veya &#x27;proje kur&#x27; dediğinde tetikle.
+---
+
+# Project Setup
+
+Proje adı: $ARGUMENTS
+
+1. $ARGUMENTS adında bir dizin oluştur
+2. Standart alt klasörleri kur: src/, tests/, docs/
+3. CLAUDE.md şablonunu proje köküne yaz
+4. git init + ilk commit yap</code></pre><h3 class="sub">2.2 İkinci Skill: api-design</h3><p>İkinci skill&#x27;i, <code>allowed-tools</code> ile kapsamını daraltarak yaz — bu skill yalnızca dosya okuma/yazma yapmalı, komut çalıştırmamalı.</p><ol><li><code>.claude/skills/api-design/SKILL.md</code> oluştur</li><li>frontmatter&#x27;a <code>allowed-tools: Read, Write, Edit</code> ekle</li><li>Gövdeye REST tasarım kurallarını (endpoint isimlendirme, status kod convention&#x27;ı, versiyonlama) yaz</li><li>Skill tetiklenmezse: description&#x27;ı gözden geçir, gerekirse örnek tetikleyici cümle ekle</li></ol><h3 class="sub">2.3 Skill&#x27;i Plugin&#x27;e Taşıma</h3><p>Şimdi <code>project-setup</code> skill&#x27;ini bir plugin&#x27;in parçası haline getiriyorsun. Dikkat: <code>.claude-plugin/</code> dizinine yalnızca <code>plugin.json</code> girer; skill&#x27;in kendisi plugin <strong>kökündeki</strong> <code>skills/</code> altına gider.</p><pre><code>mkdir -p toolkit-plugin/.claude-plugin
+mkdir -p toolkit-plugin/skills/project-setup
+cp .claude/skills/project-setup/SKILL.md toolkit-plugin/skills/project-setup/</code></pre><pre><code>{
+  &quot;name&quot;: &quot;toolkit-plugin&quot;,
+  &quot;description&quot;: &quot;Proje başlatma ve API tasarım skill&#x27;lerini içeren takım kiti&quot;,
+  &quot;version&quot;: &quot;0.1.0&quot;
+}</code></pre><h3 class="sub">2.4 Lokal Test: --plugin-dir</h3><p>Plugin&#x27;i marketplace&#x27;e koymadan önce lokal olarak test et — bu, resmi quickstart&#x27;ın önerdiği sıradır: önce authoring + lokal test, sonra dağıtım.</p><ol><li><code>claude --plugin-dir ./toolkit-plugin</code> ile Claude Code&#x27;u bu plugin yüklü şekilde başlat</li><li><code>/toolkit-plugin:project-setup</code> ile skill&#x27;i namespace&#x27;i üzerinden elle çağır</li><li>SKILL.md&#x27;de bir değişiklik yap, <code>/reload-plugins</code> ile yeniden yükle (oturumu kapatmadan)</li><li><code>claude plugin validate ./toolkit-plugin</code> ile şema hatalarını kontrol et</li></ol><h3 class="sub">2.5 Marketplace Oluşturma ve Kurulum</h3><ol><li><code>mkdir -p my-marketplace/.claude-plugin</code> ile marketplace dizinini kur</li><li><code>marketplace.json</code> içine <code>toolkit-plugin</code>&#x27;i relative path source ile ekle</li><li><code>claude plugin validate ./my-marketplace</code> ile marketplace şemasını doğrula</li><li><code>/plugin marketplace add ./my-marketplace</code> ile lokal marketplace&#x27;i ekle</li><li><code>/plugin install toolkit-plugin@my-marketplace</code> ile kur</li><li><code>/plugin list</code> ile kurulumun ve namespace&#x27;in doğru göründüğünü teyit et</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>marketplace.json</code>&#x27;daki plugin <code>name</code> alanı kebab-case olmalı (küçük harf, rakam, tire) — büyük harf, boşluk veya özel karakter içeriyorsa claude.ai marketplace sync&#x27;i reddeder, yerel kurulum yine de çalışabilir.</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ</h2><h3 class="sub">3.1 Üçüncü Skill: deployment</h3><p>Toolkit&#x27;i tamamlamak için üçüncü bir skill ekle: <code>deployment</code> — Render/Vercel&#x27;e deploy adımlarını ve Gün 5/10&#x27;daki free-tier uyarılarını (ephemeral filesystem, 15 dakika spin-down) içeren bir rehber.</p><h3 class="sub">3.2 Üç Skill&#x27;i Tek Plugin&#x27;de Birleştirme</h3><ol><li><code>toolkit-plugin/skills/</code> altına <code>testing/</code> ve <code>deployment/</code> klasörlerini ekle</li><li>Her birine kendi SKILL.md&#x27;sini yaz (setup zaten hazır)</li><li><code>claude --plugin-dir ./toolkit-plugin</code> ile üçünü birden lokalde test et</li><li>Her birini namespace&#x27;i ile ayrı ayrı çağır: <code>/toolkit-plugin:project-setup</code>, <code>/toolkit-plugin:testing</code>, <code>/toolkit-plugin:deployment</code></li></ol><h3 class="sub">3.3 Skill&#x27;i Başka Bir Projeye Taşıma</h3><p>Plugin&#x27;lerin en büyük avantajı taşınabilirlik. <code>toolkit-plugin</code> dizinini farklı bir projeye kopyala (veya marketplace üzerinden kur) ve aynı namespace&#x27;lerle çalıştığını doğrula — hiçbir yeniden yazım gerekmemeli.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Bir skill projeye özelse <code>.claude/skills/</code> altında kalsın; birden fazla projede veya takım arkadaşlarınla paylaşmak istiyorsan plugin&#x27;e taşı. Bu ayrım, skill&#x27;i ne zaman &#x27;paketleme zahmetine değer&#x27; hale geldiğine karar verirken iyi bir sezgi verir.</div><h3 class="sub">3.4 Sıradaki: SaaS Dashboard</h3><p>Yarın başlayacağın SaaS Dashboard projesinde bugün öğrendiğin plugin yapısını, rol bazlı agent&#x27;ları (Gün 15) paketlemek için tekrar kullanacaksın — &#x27;takım kiti&#x27; fikri oradan devam ediyor.</p><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">project-setup Skill Taslağı</div><pre><code>`.claude/skills/project-setup/SKILL.md` yaz. Frontmatter&#x27;da yalnızca description olsun. $ARGUMENTS ile proje adını al; klasör yapısı, CLAUDE.md şablonu ve ilk commit adımlarını içersin.</code></pre><div class="note">İlk skill — description&#x27;ın tetiklenme için ne kadar kritik olduğunu deneyimlemek için birkaç farklı ifadeyle test et.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">api-design Skill Taslağı</div><pre><code>`.claude/skills/api-design/SKILL.md` yaz. allowed-tools: Read, Write, Edit olsun (komut çalıştırmasın). REST endpoint isimlendirme, status kod convention&#x27;ı ve versiyonlama kurallarını içersin.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Plugin İskeleti Oluşturma</div><pre><code>toolkit-plugin/.claude-plugin/plugin.json ve toolkit-plugin/skills/project-setup/ yapısını oluştur. project-setup skill&#x27;imi bu yapıya taşı. Sonra &#x27;claude --plugin-dir ./toolkit-plugin&#x27; ile nasıl test edeceğimi göster.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Marketplace + Validate</div><pre><code>my-marketplace/.claude-plugin/marketplace.json oluştur, toolkit-plugin&#x27;i relative path source ile ekle. Sonra hem plugin hem marketplace için &#x27;claude plugin validate&#x27; komutlarını çalıştır ve çıktıyı yorumla.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Skill Neden Tetiklenmiyor?</div><pre><code>api-design skill&#x27;im doğal dil isteğimde tetiklenmiyor. /skills çıktısını incele, description&#x27;ımı değerlendir ve neden tetiklenmediğini teşhis et; gerekirse description&#x27;ı yeniden yaz.</code></pre><div class="note">Teşhis promptu — Gün 6&#x27;daki skill troubleshooting mantığının plugin bağlamındaki devamı.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>Toolkit Plugin: 3 Skill + Marketplace</h3><p>setup, testing, deployment skill&#x27;lerini içeren bir &#x27;toolkit-plugin&#x27; oluştur, kendi lokal marketplace&#x27;inde yayınla, kurup namespace ile test et.</p><p><strong>Gereksinimler:</strong></p><ul><li>toolkit-plugin/skills/ altında 3 skill klasörü olmalı: project-setup, testing, deployment</li><li>.claude-plugin/ dizininde yalnızca plugin.json bulunmalı — skills/ plugin kökünde olmalı</li><li>En az bir skill $ARGUMENTS kullanarak parametre almalı</li><li>Plugin önce --plugin-dir ile lokal test edilmeli, sonra marketplace&#x27;e eklenmeli</li><li>marketplace.json&#x27;da toolkit-plugin relative path source ile tanımlı olmalı</li><li>claude plugin validate hem plugin hem marketplace için hatasız geçmeli</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>3 skill de /toolkit-plugin:project-setup, /toolkit-plugin:testing, /toolkit-plugin:deployment namespace&#x27;i ile doğru çağrılıyor</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>plugin.json ve marketplace.json claude plugin validate&#x27;i geçiyor</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>--plugin-dir ile lokal test edildikten sonra marketplace&#x27;ten kurulum (/plugin install) çalışıyor</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>En az bir skill $ARGUMENTS ile parametre alıyor ve doğru işliyor</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>.claude-plugin/ dizininde yalnızca manifest dosyası var, skills/ plugin kökünde</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ı authoring → packaging → local test → distribution sırasıyla ilerlet: önce her skill&#x27;i tek tek yaz ve test et, sonra plugin&#x27;e taşı, --plugin-dir ile doğrula, en son marketplace&#x27;e koy.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1. Üç skill</div><pre><code>project-setup, testing, deployment skill&#x27;lerini .claude/skills/ altında ayrı ayrı yaz ve her birini standalone test et.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2. Plugin&#x27;e taşı</div><pre><code>toolkit-plugin/.claude-plugin/plugin.json oluştur, üç skill&#x27;i de skills/ altına taşı.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3. Lokal test</div><pre><code>claude --plugin-dir ./toolkit-plugin ile başlat, üç skill&#x27;i namespace&#x27;i ile çağır, /reload-plugins ile değişiklikleri yükle.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4. Marketplace + validate</div><pre><code>my-marketplace/.claude-plugin/marketplace.json oluştur, claude plugin validate ile hem plugin hem marketplace&#x27;i doğrula, /plugin marketplace add ve /plugin install ile kur.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Her skill&#x27;i plugin&#x27;e taşımadan önce standalone test etmek, plugin katmanında bir sorun çıkarsa &#x27;skill mi bozuk, paketleme mi bozuk&#x27; ayrımını kolaylaştırır.</li><li>--plugin-dir ile lokal test adımını atlayıp doğrudan marketplace&#x27;e geçmek, hata ayıklamayı zorlaştırır — resmi quickstart&#x27;ın önerdiği sıra budur.</li><li>Namespace&#x27;i doğru yazmayı unutma: plugin.json&#x27;daki name alanı = namespace önekidir, skill klasör adı değil.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ ⚠️ skills/, agents/, hooks/ klasörlerini yanlışlıkla .claude-plugin/ içine koymak — bu yaygın bir hata ve plugin&#x27;in yüklenmesini engeller.</li><li>⚠️ ⚠️ marketplace.json&#x27;da plugin name&#x27;i kebab-case yazmamak (büyük harf/boşluk) — claude.ai marketplace sync&#x27;i reddeder.</li><li>⚠️ ⚠️ Relative path source&#x27;u doğrudan bir URL üzerinden eklenen marketplace&#x27;te kullanmaya çalışmak — plugin dosyaları indirilmediği için kaynak çözülemez.</li><li>⚠️ ⚠️ allowed-tools&#x27;un otomatik olarak diğer tool&#x27;ları kapattığını sanmak — yalnızca listelenenlere onaysız izin verir, kısıtlama değildir.</li><li>⚠️ ⚠️ Plugin&#x27;de değişiklik yapıp /reload-plugins çalıştırmayı unutmak, sonra &#x27;değişiklik yansımadı&#x27; diye şaşırmak.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Skill, progressive disclosure ile çalışır: description her zaman görünür, tam içerik yalnızca tetiklendiğinde context&#x27;e yüklenir</li><li>Yeni reusable workflow&#x27;lar için Skill-first yaklaşımı önerilir; Command hâlâ var ama daha basit/elle tetiklenen kullanımlar için</li><li>SKILL.md frontmatter&#x27;ında tüm alanlar opsiyoneldir ama description tetiklenme kararının tek dayanağıdır</li><li>$ARGUMENTS temel parametre geçirme yoludur; !command daha ileri bir pattern olup prompt oluşmadan önce shell çıktısını enjekte eder — güvenilir kaynaklarla kullanılmalı</li><li>Plugin skill&#x27;leri namespace altında çalışır (/plugin-adı:skill-adı) — bu, aynı isimli skill&#x27;lerin farklı plugin&#x27;lerde çakışmadan bir arada durmasını sağlar</li><li>.claude-plugin/ dizinine yalnızca manifest (plugin.json/marketplace.json) girer; skills/agents/hooks plugin kökünde olmalı</li><li>Doğru sıra authoring → --plugin-dir ile lokal test → marketplace ile dağıtımdır; marketplace&#x27;i en başta devreye sokmak hata ayıklamayı zorlaştırır</li><li>Marketplace source tipleri relative path/github/url/git-subdir/npm&#x27;dir; relative path yalnızca lokal/git-hosted marketplace&#x27;te güvenilir çözülür</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noopener">Extend Claude with skills — SKILL.md şeması, frontmatter alanları, $ARGUMENTS ve dinamik context enjeksiyonunun resmi referansı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/plugins" target="_blank" rel="noopener">Create plugins — plugin.json şeması, dizin yapısı, namespace kuralı ve --plugin-dir ile lokal test akışının resmi rehberi</a></li><li>⭐ <a href="https://code.claude.com/docs/en/plugin-marketplaces" target="_blank" rel="noopener">Create and distribute a plugin marketplace — marketplace.json şeması, 5 source tipi ve ref/sha pinlemenin resmi referansı</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://github.com/anthropics/skills" target="_blank" rel="noopener">anthropics/skills (GitHub) — Anthropic&#x27;in resmi örnek skill koleksiyonu ve marketplace olarak kurulum örneği</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 14)</span>Yarın (Gün 14) SaaS Dashboard projesine başlıyorsun — Proje Kademe 3&#x27;ün ilk günü. Bugün öğrendiğin skill/plugin yapısını, Gün 15&#x27;te rol bazlı agent&#x27;ları bir &#x27;takım kiti&#x27; olarak paketlerken tekrar kullanacaksın.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Skill&#x27;in progressive disclosure ile nasıl çalıştığını (description her zaman görünür, içerik tetiklenince yüklenir) açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>Skill / Command / Agent farkını ve neden Skill-first önerildiğini kendi cümlelerimle anlatabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>SKILL.md frontmatter&#x27;ında hangi alanların opsiyonel olduğunu, description&#x27;ın neden kritik olduğunu biliyorum</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>$ARGUMENTS ile skill&#x27;e parametre geçirdim</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>allowed-tools&#x27;un izin verdiğini ama tek başına kısıtlama yapmadığını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>Plugin&#x27;in neyi paketlediğini ve namespace kuralını (/plugin-adı:skill-adı) açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>.claude-plugin/ dizinine yalnızca manifest&#x27;in girdiğini, skills/agents/hooks&#x27;un plugin kökünde olması gerektiğini biliyorum</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>--plugin-dir ile bir plugin&#x27;i lokal test ettim ve /reload-plugins kullandım</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>marketplace.json oluşturup claude plugin validate ile doğruladım</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>3 skill&#x27;i tek plugin&#x27;de paketleyip marketplace üzerinden kurdum</span></label></li></ul><div class="pager"><a href="gun12-hooks-sandboxing.html"><div class="dir">← Önceki</div><div class="tt">Gün 12</div><div>Hooks ve Sandboxing</div></a><a class="next" href="gun14-saas-dashboard.html"><div class="dir">Sonraki →</div><div class="tt">Gün 14</div><div>İleri Seviye Proje: SaaS Dashboard</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 13/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=13;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>

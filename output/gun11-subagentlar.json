@@ -1,0 +1,537 @@
+{
+  "day": 11,
+  "total_days": 20,
+  "week": 3,
+  "slug": "subagentlar",
+  "title": "Subagent'lar: Uzmanlaşmış AI Takım Arkadaşları",
+  "tagline": "Tek Claude yerine, uzman bir takım kur",
+  "tier": null,
+  "date_label": "Temmuz 2026",
+  "intro": "Hafta 3'e hoş geldin. Şimdiye kadar tek bir Claude Code oturumuyla çalıştın — her şey aynı context window'da biriktı. Bugün bunu değiştiriyorsun: subagent'lar, kendi context penceresi, kendi system prompt'u ve kendi tool/izin setiyle çalışan uzmanlaşmış asistanlardır. Ana konuşmanı log/dosya/arama çıktısıyla kirletmeden bir işi devretmeyi, ne zaman devredeceğine karar vermeyi ve güvenli (least-privilege) bir agent tasarlamayı öğreneceksin.",
+  "flow": [
+    {
+      "phase": "1 · Kavram + Mimari",
+      "dur": "35 dk",
+      "desc": "Subagent nedir, context izolasyonu, built-in agent'lar, kapsam/öncelik sırası"
+    },
+    {
+      "phase": "2 · İlk Agent'ı Yazma",
+      "dur": "50 dk",
+      "desc": ".claude/agents/ yapısı, frontmatter, code-reviewer agent'ının yazılması ve çağrılması"
+    },
+    {
+      "phase": "3 · Çağırma + Kontrol",
+      "dur": "45 dk",
+      "desc": "Doğal dil / @-mention / --agent farkı, model çözümleme sırası, tools vs permissionMode"
+    },
+    {
+      "phase": "4 · Derinleşme: Çoklu Agent + Nested",
+      "dur": "40 dk",
+      "desc": "test-writer agent'ı, zincirleme delegasyon, nested subagent, background/foreground"
+    }
+  ],
+  "prerequisites": [
+    "Gün 1-10 tamamlanmış: Claude Code kurulu, CLAUDE.md hazır, git workflow, custom command'lar, MCP temelleri",
+    "Todo App (Gün 10) çalışır durumda ve lokal repo'da erişilebilir"
+  ],
+  "tools_needed": [
+    "Terminal + Claude Code çalışır durumda",
+    "Todo App proje dizini (Gün 10'dan)",
+    "Bir metin editörü (agent dosyalarını incelemek için)"
+  ],
+  "objectives": [
+    "Subagent kavramını ve context izolasyonunun neden önemli olduğunu açıklayabileceksin",
+    "`.claude/agents/` (proje) ve `~/.claude/agents/` (kullanıcı) kapsam farkını ve 5 seviyeli öncelik sırasını bileceksin",
+    "Frontmatter alanlarını (`name`, `description`, `tools`, `model`, `permissionMode` vb.) doğru kullanarak bir agent dosyası yazabileceksin",
+    "Doğal dil, @-mention ve `--agent` kullanımını delegasyon kesinliği ve oturum kapsamı açısından ayırt edebileceksin",
+    "Model çözümleme sırasını `CLAUDE_CODE_SUBAGENT_MODEL → invocation model → frontmatter model → ana oturum modeli` olarak açıklayabileceksin",
+    "Nested subagent kavramını, `Agent` tool bağımlılığını ve derinlik limitini bileceksin",
+    "`tools`, `disallowedTools` ve `permissionMode` farkını güvenli (least-privilege) agent tasarımı açısından açıklayabileceksin"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 Subagent Nedir?"
+        },
+        {
+          "t": "p",
+          "text": "Bir subagent, ana konuşmandan bağımsız kendi context window'unda çalışan, kendi system prompt'u ve kendi tool/izin setiyle donatılmış özel bir asistandır. Ana Claude, bir alt görevin (onlarca dosya okuma, kapsamlı arama, log analizi gibi) ana konuşmayı gereksiz detayla dolduracağını fark ettiğinde işi bir subagent'a devredebilir — subagent kendi context'inde çalışır, ana konuşmaya yalnızca özet sonucu döner."
+        },
+        {
+          "t": "keypoint",
+          "text": "Subagent kullanmanın asıl gerekçesi context izolasyonudur: 20 dosya okuyup sonuç çıkaran bir araştırma, subagent olmadan yapılırsa o 20 dosyanın tamamı ana context'te kalıcı olarak birikir. Subagent ile ana konuşma sadece özeti görür."
+        },
+        {
+          "t": "h",
+          "text": "1.2 Built-in Subagent'lar"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code, kendi agent dosyanı yazmadan önce kullanabileceğin hazır subagent'larla gelir. Bunlardan Explore ve Plan, hız için CLAUDE.md ve git status yüklemeyi atlar — bu onları hafif keşif görevleri için uygun, ama proje-özel kurallara ihtiyaç duyan görevler için eksik kılar."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Agent",
+            "Amaç",
+            "Not"
+          ],
+          "rows": [
+            [
+              "Explore",
+              "Kod tabanını hızlıca tarama, dosya/desen bulma",
+              "CLAUDE.md ve git status yüklemez — hız için"
+            ],
+            [
+              "Plan",
+              "Değişiklik öncesi plan çıkarma, tasarım keşfi",
+              "CLAUDE.md ve git status yüklemez — hız için"
+            ],
+            [
+              "general-purpose",
+              "Genel amaçlı, geniş tool erişimli görevler",
+              "Model, ana oturumun modeliyle sınırlıdır (üst sınır: Opus)"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.3 Kapsam ve Öncelik Sırası"
+        },
+        {
+          "t": "p",
+          "text": "Aynı isimli birden fazla agent tanımı varsa, Claude Code aşağıdaki sırayla en yüksek önceliklisini kullanır. Ayrıca proje kapsamındaki `.claude/agents/` klasörü sadece repo kökünde değil, çalışma dizininden yukarı doğru taranır; aynı isim birden fazla iç içe `.claude/agents/` klasöründe tanımlıysa, çalışma dizinine en yakın olan kazanır (\"closest wins\")."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Öncelik",
+            "Kaynak",
+            "Kapsam"
+          ],
+          "rows": [
+            [
+              "1 (en yüksek)",
+              "Managed settings",
+              "Organizasyon tarafından zorunlu kılınan agent'lar"
+            ],
+            [
+              "2",
+              "`--agents` CLI flag'i",
+              "Oturum başlatılırken elle belirtilen agent'lar"
+            ],
+            [
+              "3",
+              "`.claude/agents/` (proje)",
+              "Repo/çalışma dizini kapsamlı, takımla paylaşılır"
+            ],
+            [
+              "4",
+              "`~/.claude/agents/` (kullanıcı)",
+              "Tüm projelerde kişisel olarak kullanılır"
+            ],
+            [
+              "5 (en düşük)",
+              "Plugin agent'ları",
+              "Bir plugin/marketplace ile birlikte gelir"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.4 Frontmatter Anatomisi"
+        },
+        {
+          "t": "p",
+          "text": "Bir agent dosyası, YAML frontmatter + markdown gövdeden oluşur. Gövde, subagent'ın system prompt'u olur. Frontmatter'da yalnızca `name` ve `description` zorunludur; geri kalan her şey opsiyoneldir ve verilmezse mantıklı bir varsayılana düşer."
+        },
+        {
+          "t": "code",
+          "lang": "yaml",
+          "text": "---\nname: code-reviewer\ndescription: Kod değişikliklerini güvenlik ve kalite açısından inceler. Değişiklik yapıldıktan sonra proaktif olarak kullan.\ntools: Read, Grep, Glob\nmodel: sonnet\npermissionMode: default\n---\nSen kıdemli bir kod inceleme uzmanısın. İncelediğin her değişiklikte:\n1. Güvenlik açıklarını (injection, secret sızıntısı) kontrol et\n2. Hata yönetimi eksiklerini işaretle\n3. Bulgularını önem sırasına göre listele, kod değiştirme"
+        },
+        {
+          "t": "keypoint",
+          "text": "`tools` alanı verilmezse subagent, parent (ana) oturumun erişebildiği tüm tool setini devralır — bu \"her şeyi yapabilir\" anlamına gelmez, parent'ın zaten erişebildiği tool setiyle sınırlıdır. Yine de bir subagent'ı belirli bir işe kilitlemek istiyorsan `tools` alanını açıkça yaz."
+        },
+        {
+          "t": "h",
+          "text": "1.5 tools vs permissionMode — İkisi Aynı Şey Değil"
+        },
+        {
+          "t": "p",
+          "text": "`tools` (ve `disallowedTools`), subagent'ın hangi araçlara **erişebileceğini** belirleyen bir yetenek listesidir (allowlist/denylist). `permissionMode` ise bu araçları kullanırken **onay isteme davranışını** belirler. Bir subagent'ın `tools` listesinde `Bash` olması, `permissionMode` ayarına göre her komut için onay isteyebilir ya da hiç sormadan çalışabilir — ikisi farklı katmanlardır."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Alan",
+            "Ne belirler",
+            "Örnek"
+          ],
+          "rows": [
+            [
+              "tools / disallowedTools",
+              "Hangi araçlara erişim var (yetenek kapsamı)",
+              "tools: Read, Grep, Glob"
+            ],
+            [
+              "permissionMode",
+              "Araç kullanılırken onay davranışı",
+              "default, acceptEdits, auto, dontAsk, bypassPermissions, plan"
+            ]
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "`permissionMode` güncel değerleri: `default` (standart onay akışı), `acceptEdits` (dosya düzenlemelerini otomatik kabul et), `auto`, `dontAsk`, `bypassPermissions` (tüm onayları atla — dikkatli kullan) ve `plan` (sadece planla, uygulama). `manual`, v2.1.200+ sürümlerde `default` için bir alias olarak eklendi."
+        },
+        {
+          "t": "h",
+          "text": "1.6 Model Çözümleme Sırası"
+        },
+        {
+          "t": "p",
+          "text": "Bir subagent hangi modelle çalışacağına şu sırayla karar verir: önce `CLAUDE_CODE_SUBAGENT_MODEL` ortam değişkeni kontrol edilir, sonra çağrı anında verilen bir model parametresi, sonra agent dosyasının frontmatter'ındaki `model` alanı, ve hiçbiri yoksa ana oturumun kullandığı model kullanılır."
+        },
+        {
+          "t": "keypoint",
+          "text": "Model çözümleme sırası: `CLAUDE_CODE_SUBAGENT_MODEL` → invocation model → frontmatter `model` → ana oturum modeli. Bu sırayı bilmek, 'neden bu agent beklediğimden farklı bir modelle çalıştı' sorusunun cevabıdır."
+        },
+        {
+          "t": "h",
+          "text": "1.7 Ne Zaman Subagent, Ne Zaman Ana Konuşma?"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Durum",
+            "Tercih"
+          ],
+          "rows": [
+            [
+              "İş, çok fazla ara çıktı üretecek (log, arama sonucu, dosya taraması)",
+              "Subagent"
+            ],
+            [
+              "Aynı tür işi tekrar tekrar aynı talimatlarla yaptırıyorsun",
+              "Subagent (özelleştirilmiş)"
+            ],
+            [
+              "Sonucun ana konuşmadaki bağlamla sıkı etkileşmesi gerekiyor",
+              "Ana konuşma"
+            ],
+            [
+              "Kısa, tek seferlik ve düşük riskli bir işlem",
+              "Ana konuşma"
+            ]
+          ]
+        },
+        {
+          "t": "h",
+          "text": "1.8 Subagent mı, Agent Teams mı?"
+        },
+        {
+          "t": "p",
+          "text": "Subagent'lar tek bir oturum içinde çalışır ve sonucu doğrudan ana konuşmaya (parent'a) raporlar. Agent Teams (Gün 17'de işlenecek) ise birbirinden bağımsız birden fazla Claude Code oturumunu, paylaşılan bir görev listesi ve doğrudan ajanlar-arası mesajlaşma ile koordine eder — farklı bir mimari katmandır."
+        },
+        {
+          "t": "table",
+          "headers": [
+            "İhtiyaç",
+            "Kullan"
+          ],
+          "rows": [
+            [
+              "Ana konuşmayı kirletmeden araştırma/review yaptırmak",
+              "Subagent"
+            ],
+            [
+              "Tek oturum içinde uzman görev delegasyonu",
+              "Subagent"
+            ],
+            [
+              "Birden fazla bağımsız Claude Code oturumunu koordine etmek",
+              "Agent Teams"
+            ],
+            [
+              "Agent'ların birbiriyle mesajlaşması / paylaşılan görev listesi",
+              "Agent Teams"
+            ]
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "`/agents` komutu artık interaktif bir sihirbaz açmıyor (v2.1.198+). Yeni bir agent oluşturmak için ya Claude'a doğal dille yazdırırsın (\"bana X yapan bir subagent oluştur\") ya da `.claude/agents/` altına dosyayı elle eklersin."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "2.1 İlk Agent: code-reviewer"
+        },
+        {
+          "t": "p",
+          "text": "İlk agent'ın salt-okunur olmalı — bu, agent tasarımında least-privilege (en az yetki) prensibinin en basit uygulamasıdır: bir kod inceleme agent'ının dosya değiştirmesine gerek yoktur, o yüzden ona bu yetkiyi hiç vermeyiz."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Todo App proje dizinine geç ve Claude Code'u başlat: claude",
+            "Agent oluşturma promptunu ver (Prompt Kütüphanesi'ndeki 1. prompt)",
+            "Oluşan .claude/agents/code-reviewer.md dosyasını aç, frontmatter'ı incele",
+            "tools alanının sadece Read, Grep, Glob içerdiğini doğrula — Write/Edit/Bash yok"
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "`.claude/agents/` klasörü oturum başladıktan **sonra** ilk kez oluşturuluyorsa (daha önce hiç yoktuysa) çalışan oturum bunu algılamaz — Claude Code'u yeniden başlatman gerekir. Klasör zaten varsa, içine eklenen/değiştirilen dosyalar birkaç saniye içinde algılanır, restart gerekmez."
+        },
+        {
+          "t": "h",
+          "text": "2.2 Agent'ı Çağırma"
+        },
+        {
+          "t": "p",
+          "text": "Bir subagent'ı kullanmanın üç farklı kesinlik seviyesi vardır: doğal dilde önerme, @-mention ile garanti etme, ve `--agent` ile tüm oturumu o agent kimliğiyle başlatma. Bugün ilk ikisini kullanacaksın."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Doğal dille dene: \"code-reviewer agent'ını kullanarak son değişiklikleri incele\"",
+            "Claude'un bunu bir subagent çağrısı olarak tanıdığını gözlemle",
+            "Aynı işi @-mention ile garanti ederek tekrar dene: @code-reviewer son değişiklikleri incele",
+            "İki çağırma yönteminin sonucunu karşılaştır"
+          ]
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Yöntem",
+            "Kesinlik",
+            "Kapsam"
+          ],
+          "rows": [
+            [
+              "Doğal dil",
+              "Claude uygun görürse delegasyon yapar (garanti değil)",
+              "Tek görev, öneri niteliğinde"
+            ],
+            [
+              "@-mention",
+              "Belirtilen subagent'ın bu görev için çalışması garanti edilir",
+              "Tek görev, kesin"
+            ],
+            [
+              "`claude --agent <name>`",
+              "Tüm oturum o agent'ın system prompt/tool/model ayarıyla başlar",
+              "Oturum genelinde (session-wide)"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "`--agent`, tek görevlik bir çağrı değildir — ana oturumun kendisini o agent'ın kimliğiyle (system prompt, tool kısıtlaması, model) başlatır. Bunu, 'bu oturum boyunca ben artık code-reviewer'ım' demek gibi düşün."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — DERİNLEŞ",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 İkinci Agent: test-writer"
+        },
+        {
+          "t": "p",
+          "text": "code-reviewer'ın tersine, test-writer dosya yazması ve testleri çalıştırması gereken bir agent'tır — ama ona sınırsız `Bash` vermek yerine, sadece gerekli komutlara izin veren kısıtlı bir tool kuralı yazacaksın. Bu, `tools` alanının sadece açık/kapalı değil, komut-özel kısıtlama da destekleyebildiğini gösterir."
+        },
+        {
+          "t": "code",
+          "lang": "yaml",
+          "text": "---\nname: test-writer\ndescription: Eksik test kapsamını bulur ve test yazar. Yeni bir endpoint/fonksiyon eklendiğinde proaktif olarak kullan.\ntools: Read, Grep, Glob, Edit, Bash(pytest *), Bash(npm test *)\npermissionMode: default\n---\nSen bir test yazma uzmanısın. Görevin:\n1. Test kapsamı eksik olan fonksiyon/endpoint'leri bul\n2. Edge case'leri (boş girdi, olmayan id, geçersiz payload) kapsayan testler yaz\n3. Yazdığın testleri çalıştırıp geçtiğini doğrula"
+        },
+        {
+          "t": "tip",
+          "text": "`Bash(pytest *)` gibi komut-özel kurallar, agent'a genel `Bash` erişimi vermek yerine sadece belirli komutlara izin verir — sınırsız `Bash` verilen bir test-writer teorik olarak `rm -rf` da çalıştırabilir, kısıtlı kural bunu engeller."
+        },
+        {
+          "t": "h",
+          "text": "3.2 Zincirleme: reviewer → tester"
+        },
+        {
+          "t": "p",
+          "text": "İki agent'ı art arda çağırarak zincirleme delegasyon deneyeceksin: önce code-reviewer sorunları bulsun, sonra test-writer o sorunları kapsayan testler yazsın. Her iki subagent da kendi izole context'inde çalışır; ana konuşma sadece özet sonuçları görür."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "\"code-reviewer ile son değişiklikleri incele\" de, bulguları oku",
+            "Bulunan sorunlardan en az birini kapsayan bir test istekle: \"test-writer ile bu sorunu kapsayan bir test yaz\"",
+            "Testin gerçekten çalıştığını doğrula"
+          ]
+        },
+        {
+          "t": "h",
+          "text": "3.3 Nested Subagent'lar ve Derinlik Limiti"
+        },
+        {
+          "t": "p",
+          "text": "Bir subagent, kendi içinden başka bir subagent çağırabilir — buna nested (iç içe) subagent denir. Ama bunun gerçekleşmesi için o subagent'ın `tools` listesinde `Agent` tool'unun bulunması gerekir. Bir subagent'ın başka subagent doğurmasını engellemek istiyorsan `Agent`'ı `tools` listesine hiç koyma ya da `disallowedTools` içine ekle."
+        },
+        {
+          "t": "warn",
+          "text": "Nested subagent zincirinin bir derinlik limiti vardır: beşinci seviyedeki bir subagent artık `Agent` tool'unu almaz ve daha fazla subagent doğuramaz — bu, sonsuz/kontrolsüz agent zincirlerini önleyen bir güvenlik sınırıdır."
+        },
+        {
+          "t": "h",
+          "text": "3.4 Foreground / Background Davranışı"
+        },
+        {
+          "t": "p",
+          "text": "v2.1.198 ve sonrasında subagent'lar varsayılan olarak arka planda (background) çalışır — ana konuşma subagent'ın bitmesini beklemeden devam edebilir. Claude, subagent'ın sonucuna hemen ihtiyaç duyduğunda o subagent'ı ön planda (foreground) çalıştırmayı kendisi seçer; bu senin elle ayarlaman gereken bir şey değildir."
+        },
+        {
+          "t": "keypoint",
+          "text": "Background varsayılan davranıştır ama garanti değildir — Claude, sonucu bir sonraki adımda kullanması gerektiğini fark ederse subagent'ı foreground'a alır. Bunu bir agent'ın 'yavaş' çalıştığını düşünmeden önce hatırla."
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "1) code-reviewer Agent'ı Oluşturma",
+      "prompt": "Bana .claude/agents/code-reviewer.md adında bir subagent oluştur. Görevi: kod değişikliklerini güvenlik ve kalite açısından incelemek. Sadece Read, Grep ve Glob tool'larına erişimi olsun — dosya değiştirme yetkisi olmasın. description alanını, değişiklik yapıldıktan sonra otomatik delegasyona uygun, spesifik bir cümleyle yaz.",
+      "note": "İlk agent'ı bilinçli olarak salt-okunur tasarlıyoruz — least-privilege prensibinin en basit uygulaması."
+    },
+    {
+      "title": "2) Doğal Dil ile Delegasyon",
+      "prompt": "code-reviewer agent'ını kullanarak son commit'teki değişiklikleri incele ve bulgularını önem sırasına göre listele.",
+      "note": "Bu bir öneri niteliğindedir — Claude uygun görürse delege eder, garanti değildir."
+    },
+    {
+      "title": "3) @-mention ile Kesin Çağırma",
+      "prompt": "@code-reviewer son commit'teki değişiklikleri incele ve bulgularını önem sırasına göre listele.",
+      "note": "@-mention, belirtilen subagent'ın bu görev için kesinlikle çalışmasını garanti eder."
+    },
+    {
+      "title": "4) test-writer Agent'ı Oluşturma",
+      "prompt": "Bana .claude/agents/test-writer.md adında bir subagent oluştur. Görevi: eksik test kapsamını bulup edge case'leri kapsayan testler yazmak. tools alanına Read, Grep, Glob, Edit ve sadece test çalıştırma komutlarına izin veren kısıtlı bir Bash kuralı ekle — genel Bash erişimi verme.",
+      "note": "Bu agent dosya değiştirebilmeli ama komut çalıştırma yetkisi kısıtlı kalmalı."
+    },
+    {
+      "title": "5) Zincirleme Delegasyon",
+      "prompt": "code-reviewer ile bulunan sorunlardan en az birini seç, sonra test-writer ile bu sorunu ortaya çıkaran/kapsayan bir test yazdır. Testin gerçekten çalıştığını doğrula.",
+      "note": "İki agent'ı ardışık çağırarak reviewer bulgularını tester'ın girdisi haline getiriyorsun."
+    }
+  ],
+  "challenge": {
+    "title": "Todo App İçin 3 Uzman Agent Kur",
+    "task": "Todo App (Gün 10) için üç agent tanımla — reviewer, tester, documenter — her birini least-privilege prensibiyle tasarla ve projeyi her biriyle analiz ettir.",
+    "requirements": [
+      "3 agent dosyası .claude/agents/ altında tanımlanmış olmalı",
+      "reviewer salt-okunur (Read/Grep/Glob) kalmalı",
+      "tester yalnızca test yazma/çalıştırma için gerekli minimum tool setine sahip olmalı (genel Bash yok)",
+      "documenter dosya okuma ve dokümantasyon yazma izinleriyle sınırlı olmalı",
+      "Her agent'ın description alanı otomatik delegasyona uygun ve spesifik yazılmış olmalı",
+      "En az bir agent gerçek bir bulgu/çıktı üretmiş olmalı"
+    ],
+    "success": [
+      "3 agent dosyası .claude/agents/ altında mevcut",
+      "reviewer'ın tools listesi sadece Read, Grep, Glob içeriyor",
+      "tester'ın tools listesi Edit + kısıtlı Bash kuralı içeriyor, genel Bash yok",
+      "documenter'ın tools listesi dosya okuma + yazma ile sınırlı",
+      "Her agent'ın description alanı ne zaman devreye gireceğini net anlatıyor",
+      "En az bir agent (örn. reviewer) gerçek bir bulgu üretti",
+      "İlk çıktıdan sonra en az bir agent'ın prompt'u/description'ı iyileştirildi"
+    ],
+    "solution": {
+      "intro": "Bu challenge'ı Prompt Kütüphanesi'ndeki desenleri izleyerek üç kez tekrarla: önce agent'ı oluştur, sonra description'ının otomatik delegasyonu tetikleyip tetiklemediğini test et, gerekirse description'ı netleştir.",
+      "prompts": [
+        {
+          "title": "1. reviewer",
+          "prompt": "code-reviewer promptu ile salt-okunur bir inceleme agent'ı oluştur, çağır ve bulguları oku."
+        },
+        {
+          "title": "2. tester",
+          "prompt": "test-writer promptu ile kısıtlı Bash kurallı bir test agent'ı oluştur, reviewer bulgularından birini test ettir."
+        },
+        {
+          "title": "3. documenter",
+          "prompt": "Sadece dosya okuma ve markdown yazma iznine sahip bir documenter agent'ı oluştur; projenin güncel README'sini bu agent'a güncelletir."
+        }
+      ],
+      "notes": [
+        "Her agent'ı oluşturduktan sonra description'ı test et: doğal dilde belirsiz bir istek verip Claude'un doğru agent'ı seçip seçmediğine bak.",
+        "tools alanını boş bırakmak 'her şeyi yapabilir' değil, parent'ın tool setini devralmak anlamına gelir — yine de bilinçli olarak kısıtlama yaz.",
+        "documenter'a Bash verme; sadece Read + Edit/Write yeterlidir, komut çalıştırma riski gereksiz."
+      ],
+      "pitfalls": [
+        "⚠️ description'ı çok genel yazmak (\"kod ile ilgilenir\") — otomatik delegasyon güvenilir çalışmaz, Claude hangi agent'ı seçeceğini kestiremez.",
+        "⚠️ tester'a sınırsız Bash vermek — kısıtlı Bash(pytest *) gibi kurallar yerine genel erişim, least-privilege'i bozar.",
+        "⚠️ `--agent` ile tek görevlik delegasyonu karıştırmak — `--agent` tüm oturumu değiştirir, tek seferlik çağrı için doğal dil veya @-mention kullanılır.",
+        "⚠️ Yeni oluşturulan .claude/agents/ klasörünün aynı oturumda hemen algılanacağını varsaymak — klasör oturumdan önce yoktuysa restart gerekir."
+      ]
+    }
+  },
+  "takeaways": [
+    "Subagent'ın asıl değeri context izolasyonudur: ara çıktıların (log, arama, dosya) ana konuşmayı doldurmasını engeller",
+    "Frontmatter'da sadece name ve description zorunludur; tools verilmezse parent'ın tool setini devralır",
+    "tools/disallowedTools \"neye erişebilir\", permissionMode \"nasıl onay ister\" sorularını ayrı ayrı cevaplar",
+    "Doğal dil öneri, @-mention garanti, --agent ise tüm oturumu o agent kimliğiyle başlatan session-wide bir moddur",
+    "Model çözümleme sırası: CLAUDE_CODE_SUBAGENT_MODEL → invocation model → frontmatter model → ana oturum modeli",
+    "Nested subagent için Agent tool'unun tools listesinde olması gerekir; derinlik limiti 5'tir",
+    "v2.1.198+ subagent'lar varsayılan background çalışır, Claude sonuca ihtiyaç duyunca foreground'a alır",
+    "Subagent tek oturum içi delegasyon içindir; birden fazla bağımsız oturumu koordine etmek Agent Teams'in (Gün 17) işidir"
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Create custom subagents — subagent oluşturma, frontmatter alanları, kapsam/öncelik sırası ve built-in agent'ların resmi referansı",
+        "url": "https://code.claude.com/docs/en/sub-agents"
+      },
+      {
+        "label": "Tools reference — tool isimleri, komut-özel kısıtlama sözdizimi (ToolName(specifier)) ve izin kuralları",
+        "url": "https://code.claude.com/docs/en/tools-reference"
+      },
+      {
+        "label": "Agent Teams — subagent'lardan farkı: bağımsız oturumlar, paylaşılan görev listesi, ajanlar-arası mesajlaşma",
+        "url": "https://code.claude.com/docs/en/agent-teams"
+      }
+    ],
+    "community": [
+      {
+        "label": "Steering Claude Code: skills, hooks, subagents and more — subagent'ın diğer altı yönlendirme yöntemiyle (CLAUDE.md, rules, skills, hooks, output styles) karşılaştırması",
+        "url": "https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more"
+      }
+    ],
+    "extra": [
+      {
+        "label": "Subagents in the SDK — subagent kavramının Agent SDK tarafındaki programatik karşılığı",
+        "url": "https://platform.claude.com/docs/en/agent-sdk/subagents"
+      }
+    ]
+  },
+  "next_preview": "Yarın (Gün 12) hooks ve sandboxing'e geçiyorsun: Claude Code'un belirli olaylarda otomatik aksiyon almasını sağlayan hook'lar ve otonom yürütmeyi izole ortamlarda güvenli hale getiren sandbox kavramları.",
+  "checklist": [
+    "name ve description alanlarının frontmatter'da zorunlu olduğunu, geri kalanının opsiyonel olduğunu biliyorum",
+    "Proje (.claude/agents/) ve kullanıcı (~/.claude/agents/) kapsam farkını ve 5 seviyeli öncelik sırasını biliyorum",
+    "tools alanı boş bırakılırsa parent'ın tool setinin devralındığını biliyorum",
+    "tools/disallowedTools ile permissionMode'un farklı katmanlar olduğunu açıklayabiliyorum",
+    "Doğal dil, @-mention ve --agent arasındaki kesinlik ve kapsam farkını biliyorum",
+    "Model çözümleme sırasını (env var → invocation → frontmatter → ana oturum) sıralayabiliyorum",
+    "Nested subagent için Agent tool'unun gerekliliğini ve derinlik limitini (5) biliyorum",
+    "code-reviewer ve test-writer agent'larını oluşturup zincirleme çağırdım",
+    "3 agent'ı (reviewer/tester/documenter) least-privilege prensibiyle tanımlayıp test ettim",
+    "Subagent ile Agent Teams arasındaki temel farkı (tek oturum vs bağımsız oturumlar) açıklayabiliyorum"
+  ]
+}

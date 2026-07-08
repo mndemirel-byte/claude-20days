@@ -1,0 +1,487 @@
+# content/gun13.py
+# Tek kaynak: LESSON sözlüğü. generators/render_html.py ve generators/render_json.py
+# bu sözlükten HTML + JSON üretir.
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from generators.schema import h, p, keypoint, tip, warn, bullets, steps, code, table
+
+
+LESSON = {
+    "day": 13,
+    "total_days": 20,
+    "week": 3,
+    "slug": "skills-plugins",
+    "title": "Skills & Plugins: Yeniden Kullanılabilir Yetenek Paketleri",
+    "tagline": "Claude'a modüler yetenekler kazandır — ve onları dağıt",
+    "tier": None,
+    "date_label": "Temmuz 2026",
+
+    "intro": (
+        "Gün 12'de Claude'un davranışını hook'larla dışarıdan zorunlu kıldın. Bugün farklı bir "
+        "soruya bakıyorsun: bir işi tekrar tekrar doğru yapmayı Claude'a nasıl 'öğretirsin' — ve "
+        "bu öğretimi başka projelere, hatta başka insanlara nasıl taşırsın? Skill, Claude'un "
+        "ihtiyaç anında yükleyeceği bir bilgi + talimat paketidir; Plugin ise bir veya daha fazla "
+        "skill'i (isteğe bağlı olarak agent, hook ve MCP server ile birlikte) tek bir dağıtılabilir "
+        "pakette toplar. Marketplace de bu paketlerin keşfedilip kurulduğu katalogdur. Bugünün "
+        "sonunda kendi skill'lerini yazmış, bir plugin'e paketlemiş, lokal olarak test etmiş ve "
+        "kendi marketplace'inden kurmuş olacaksın."
+    ),
+
+    "flow": [
+        {"phase": "1 · Teorik: Skill Anatomisi", "dur": "35 dk",
+         "desc": "Skill vs Command vs Agent, SKILL.md frontmatter, $ARGUMENTS ile parametre geçirme"},
+        {"phase": "2 · Pratik: Skill Yazımı", "dur": "40 dk",
+         "desc": "İki standalone skill: project-setup + api-design, tetiklenme teşhisi"},
+        {"phase": "3 · Plugin & Marketplace", "dur": "55 dk",
+         "desc": "Skill'i plugin'e taşıma, --plugin-dir lokal test, marketplace.json, validate, install"},
+        {"phase": "4 · Mini Challenge", "dur": "30 dk",
+         "desc": "3 skill'i tek plugin'de paketleyip namespace ile test etme"},
+    ],
+
+    "prerequisites": [
+        "Gün 1-12 tamamlanmış: Claude Code kurulu, CLAUDE.md/Auto Memory, MCP, subagent'lar, hooks",
+        "Todo App (Gün 10) çalışır durumda ve lokal repo'da erişilebilir",
+        "Terminalde temel dizin/dosya işlemlerine (`mkdir`, dosya taşıma) aşinalık",
+    ],
+    "tools_needed": [
+        "Terminal + Claude Code çalışır durumda (v2.1.199+ önerilir — skill stacking için)",
+        "Todo App proje dizini (Gün 10'dan)",
+        "Git (marketplace'i lokal veya git-hosted olarak test etmek için)",
+    ],
+
+    "objectives": [
+        "Skill / Command / Agent arasındaki mimari farkı açıklayabileceksin: yeni reusable workflow'lar için Skill-first yaklaşımı, Command'ların hâlâ var olduğunu ama Skill'in önerilen yol olduğunu bileceksin",
+        "SKILL.md frontmatter'ında yalnızca `description`'ın önerildiğini, `name`/`disable-model-invocation`/`allowed-tools` gibi alanların opsiyonel olduğunu bileceksin",
+        "`$ARGUMENTS`, `$ARGUMENTS[N]`/`$N` ile skill'e parametre geçirebileceksin",
+        "Plugin'in neyi paketlediğini (skill/agent/hook/MCP, ileri seviyede LSP/bin/settings.json) ve **namespace** kuralını (`/plugin-adı:skill-adı`) açıklayabileceksin",
+        "`plugin.json` ve `marketplace.json` şemasını, `.claude-plugin/` dizinine yalnızca manifest'in girdiğini bileceksin",
+        "`--plugin-dir` ile lokal test → marketplace ile dağıtım akışını uygulayıp `claude plugin validate` ile doğrulayabileceksin",
+    ],
+
+    "sections": [
+        {
+            "num": "BÖLÜM 1",
+            "title": "TEORİK TEMEL",
+            "blocks": [
+                h("1.1 Skill Nedir?"),
+                p(
+                    "Bir skill, Claude'un bir görevi tutarlı biçimde tamamlaması için yüklediği "
+                    "bir talimat + kaynak paketidir: en az bir SKILL.md dosyası, isteğe bağlı "
+                    "olarak yardımcı script'ler, şablonlar veya referans dokümanlar. Skill'ler "
+                    "'progressive disclosure' prensibiyle çalışır — Claude, skill'in var olduğunu "
+                    "(sadece `description`'ı) her zaman görür, ama SKILL.md'nin tam içeriğini "
+                    "yalnızca skill gerçekten devreye girdiğinde context'e yükler. Bu, onlarca "
+                    "skill kurulu olsa bile context window'un boşuna dolmamasını sağlar."
+                ),
+                keypoint(
+                    "Command'lar hâlâ var ve çalışıyor; ancak yeni reusable workflow'lar için "
+                    "Skill-first yaklaşım önerilir. Bir plugin içindeki `commands/` dizini de "
+                    "aslında düz Markdown dosyaları olarak ele alınır — yeni plugin'lerde bunun "
+                    "yerine `skills/` yapısını tercih etmek resmi öneridir."
+                ),
+                h("1.2 Skill vs Command vs Agent"),
+                p(
+                    "Üçü de 'Claude'a bir şey yaptır' amacına hizmet eder ama farklı katmanlarda "
+                    "çalışır: Command kısa, elle tetiklenen bir prompt makrosudur; Skill daha "
+                    "zengin, otomatik ya da elle tetiklenebilen, kaynak dosyalarıyla birlikte gelen "
+                    "bir yetenek paketidir; Agent ise ayrı bir context'te, kendi tool/model "
+                    "politikasıyla çalışan uzmanlaşmış bir persona/oturumdur."
+                ),
+                table(
+                    ["Kavram", "Tetikleme", "Context", "Ne zaman?"],
+                    [
+                        ["Skill", "Otomatik (model description'a göre karar verir) veya `/plugin:skill` ile elle", "Ana konuşmada, progressive disclosure ile", "Yeniden kullanılabilir bilgi, workflow, tool-guidance"],
+                        ["Command", "Yalnızca elle, `/komut` ile", "Ana konuşmada, doğrudan enjekte", "Kısa, basit prompt macro'su"],
+                        ["Agent", "Doğal dil, @-mention veya `--agent` ile", "İzole subagent context'i", "Uzman rol, ayrı model/tool policy, delegasyon"],
+                    ],
+                ),
+                h("1.3 SKILL.md Frontmatter"),
+                p(
+                    "SKILL.md'nin frontmatter'ında teknik olarak tüm alanlar opsiyoneldir — ama "
+                    "`description` yazmak güçlü biçimde önerilir, çünkü Claude'un skill'i ne zaman "
+                    "tetikleyeceğine karar vermesinin tek dayanağı budur. `name` verilmezse dosya "
+                    "adından türetilir; `disable-model-invocation: true` skill'i yalnızca elle "
+                    "çağrılabilir yapar; `allowed-tools` skill aktifken hangi tool'ların onaysız "
+                    "kullanılabileceğini listeler; `user-invocable` skill'in `/` ile elle "
+                    "çağrılabilir olup olmadığını kontrol eder."
+                ),
+                tip(
+                    "`allowed-tools`, listelenen tool'lara *izin verir* (onaysız kullanım) — "
+                    "diğer tool'ları otomatik olarak *kapatmaz*. Belirli tool'ları kesin biçimde "
+                    "engellemek istiyorsan `disallowed-tools` veya permission deny rule'ları "
+                    "kullanmalısın; `allowed-tools` tek başına bir kısıtlama mekanizması değildir."
+                ),
+                h("1.4 Parametre Geçirme: $ARGUMENTS"),
+                p(
+                    "Bir skill'e çalışma zamanında veri geçirmenin temel ve önerilen yolu "
+                    "`$ARGUMENTS`'tır — kullanıcının skill'i çağırırken yazdığı serbest metni "
+                    "SKILL.md içine enjekte eder. Daha yapılandırılmış kullanım için "
+                    "`$ARGUMENTS[N]` (0-tabanlı) veya kısayolu `$N` ile tek tek argümanlara "
+                    "erişilebilir."
+                ),
+                h("1.5 Plugin Nedir?"),
+                keypoint(
+                    "Plugin, bir veya daha fazla Claude Code genişletmesini (skill, agent, hook, "
+                    "MCP server) tek bir dağıtılabilir pakette birleştiren yapıdır. İleri "
+                    "seviyede bir plugin ayrıca LSP server, arka planda çalışan monitor, "
+                    "çalıştırılabilir `bin/` dosyaları ve varsayılan bir `settings.json` da "
+                    "taşıyabilir — bugün odağımız skill+hook birleşimi."
+                ),
+                p(
+                    "Bir plugin içindeki skill'ler ana skill havuzuna karışmaz; **namespace** "
+                    "altında görünürler: `plugin.json` içindeki `name` alanı namespace'i belirler "
+                    "ve skill `/plugin-adı:skill-adı` şeklinde çağrılır. Aynı isimli iki skill "
+                    "farklı plugin'lerde çakışmadan bir arada durabilir — namespace bu izolasyonu "
+                    "sağlar."
+                ),
+                h("1.6 Marketplace: Keşif ve Dağıtım Katmanı"),
+                p(
+                    "Marketplace, plugin'lerin keşfedilip kurulduğu bir katalogdur — "
+                    "`.claude-plugin/marketplace.json` dosyasıyla tanımlanır. Her plugin girdisinin "
+                    "bir `source` alanı vardır ve beş kaynak tipini destekler: relative path "
+                    "(lokal/git-hosted marketplace içinde), `github`, `url` (git URL), "
+                    "`git-subdir` (bir repo içindeki alt dizin) ve `npm`."
+                ),
+                table(
+                    ["Source Tipi", "Ne için kullanılır"],
+                    [
+                        ["relative path", "Marketplace ile aynı repo/dizin içindeki plugin'ler"],
+                        ["github", "`owner/repo` formatında GitHub deposu"],
+                        ["url", "Herhangi bir git URL'si (GitHub dışı hostlar dahil)"],
+                        ["git-subdir", "Büyük bir monorepo'nun içindeki tek bir plugin alt dizini"],
+                        ["npm", "Bir npm paketi olarak dağıtılan plugin"],
+                    ],
+                ),
+                tip(
+                    "`ref` (branch/tag) ve `sha` (exact commit) birlikte set edilirse `sha` "
+                    "geçerli olan pin'dir — branch sonradan silinse bile kurulum, commit "
+                    "erişilebilir olduğu sürece çalışmaya devam eder."
+                ),
+                warn(
+                    "**Yaygın hata:** `.claude-plugin/` dizinine yalnızca manifest dosyası "
+                    "(`plugin.json` ya da `marketplace.json`) girer. `skills/`, `agents/`, "
+                    "`hooks/`, `commands/` gibi klasörler plugin'in **kök dizininde** olmalıdır — "
+                    "yanlışlıkla `.claude-plugin/` içine konursa plugin doğru yüklenmez."
+                ),
+                warn(
+                    "Relative path source (ör. `\"./plugins/toolkit-plugin\"`) yalnızca lokal "
+                    "dizin veya git-hosted marketplace senaryosunda güvenilir çözülür. Marketplace "
+                    "doğrudan bir URL üzerinden (yalnızca `marketplace.json` indirilerek) "
+                    "eklendiyse, plugin dosyaları hiç indirilmediği için relative path kaynaklar "
+                    "çözülemez."
+                ),
+                h("1.7 İleri Seviye: Dinamik Context Enjeksiyonu (!command)"),
+                p(
+                    "`$ARGUMENTS` skill'e veri geçirmenin temel yoludur. Daha ileri bir pattern "
+                    "olarak SKILL.md içinde `!command` sözdizimi (veya fenced bir ```! bloğu), "
+                    "prompt Claude'a gönderilmeden **önce** çalıştırılan bir shell komutunun "
+                    "çıktısını doğrudan context'e enjekte eder — örneğin `!git diff HEAD` ile "
+                    "güncel değişiklikleri veya `!gh pr diff` ile bir PR'ın içeriğini skill'in "
+                    "çalıştığı anda otomatik olarak metne dahil edebilirsin."
+                ),
+                warn(
+                    "`!command`, prompt oluşmadan **önce** shell komutunu çalıştırır — bu yüzden "
+                    "yalnızca güvendiğin komutlarla kullanılmalı. Özellikle community skill/plugin "
+                    "içindeki `!command` satırları, `allowed-tools`, `bin/` script'leri, hook ve "
+                    "MCP tanımları; review edilmeden kurulup çalıştırılmamalıdır (Gün 12'deki "
+                    "sandbox mantığıyla aynı temkinli yaklaşım burada da geçerli)."
+                ),
+                h("1.8 Skill Teşhis ve Community Güvenliği"),
+                table(
+                    ["Sorun", "Komut / Çözüm"],
+                    [
+                        ["Skill listede görünmüyor", "`/skills` ile listele; dosya yolu ve frontmatter söz dizimini kontrol et"],
+                        ["Claude skill'i otomatik tetiklemiyor", "`description`'ın kullanıcının doğal dildeki isteğiyle eşleştiğini doğrula"],
+                        ["Skill istemediğim zaman tetikleniyor", "`description`'ı daralt veya `disable-model-invocation: true` ekle"],
+                        ["Plugin değişikliği oturuma yansımıyor", "`/reload-plugins` çalıştır"],
+                    ],
+                ),
+                warn(
+                    "Plugin'ler makinende aynı yetkiyle çalışan yerel MCP server ve script'ler "
+                    "içerebilir. Yalnızca güvendiğin marketplace'lerden ve incelediğin plugin'lerden "
+                    "kurulum yap."
+                ),
+            ],
+        },
+        {
+            "num": "BÖLÜM 2",
+            "title": "PRATİK — ADIM ADIM",
+            "blocks": [
+                h("2.1 İlk Standalone Skill: project-setup"),
+                p(
+                    "Önce plugin katmanına hiç girmeden, düz bir skill yazıp çalıştığını gör. "
+                    "Bu, plugin'e taşırken neyin değiştiğini (namespace, dizin yapısı) net "
+                    "görmeni sağlar."
+                ),
+                steps([
+                    "`.claude/skills/project-setup/SKILL.md` dosyasını oluştur; frontmatter'da yalnızca `description` yaz",
+                    "Gövdeye proje başlatma adımlarını (klasör yapısı, CLAUDE.md şablonu, ilk commit) yaz",
+                    "`$ARGUMENTS` ile proje adını parametre olarak al",
+                    "`/skills` ile skill'in listede göründüğünü doğrula",
+                    "Claude'a doğal dille bir istek yönelt ('yeni bir proje başlat: ...') ve skill'in otomatik tetiklendiğini gözlemle",
+                ]),
+                code(
+                    "---\n"
+                    "description: Yeni bir proje dizini başlatır; klasör yapısı, CLAUDE.md şablonu "
+                    "ve ilk commit oluşturur. Kullanıcı 'yeni proje başlat' veya 'proje kur' dediğinde tetikle.\n"
+                    "---\n\n"
+                    "# Project Setup\n\n"
+                    "Proje adı: $ARGUMENTS\n\n"
+                    "1. $ARGUMENTS adında bir dizin oluştur\n"
+                    "2. Standart alt klasörleri kur: src/, tests/, docs/\n"
+                    "3. CLAUDE.md şablonunu proje köküne yaz\n"
+                    "4. git init + ilk commit yap",
+                    "markdown",
+                ),
+                h("2.2 İkinci Skill: api-design"),
+                p(
+                    "İkinci skill'i, `allowed-tools` ile kapsamını daraltarak yaz — bu skill "
+                    "yalnızca dosya okuma/yazma yapmalı, komut çalıştırmamalı."
+                ),
+                steps([
+                    "`.claude/skills/api-design/SKILL.md` oluştur",
+                    "frontmatter'a `allowed-tools: Read, Write, Edit` ekle",
+                    "Gövdeye REST tasarım kurallarını (endpoint isimlendirme, status kod convention'ı, versiyonlama) yaz",
+                    "Skill tetiklenmezse: description'ı gözden geçir, gerekirse örnek tetikleyici cümle ekle",
+                ]),
+                h("2.3 Skill'i Plugin'e Taşıma"),
+                p(
+                    "Şimdi `project-setup` skill'ini bir plugin'in parçası haline getiriyorsun. "
+                    "Dikkat: `.claude-plugin/` dizinine yalnızca `plugin.json` girer; skill'in "
+                    "kendisi plugin **kökündeki** `skills/` altına gider."
+                ),
+                code(
+                    "mkdir -p toolkit-plugin/.claude-plugin\n"
+                    "mkdir -p toolkit-plugin/skills/project-setup\n"
+                    "cp .claude/skills/project-setup/SKILL.md toolkit-plugin/skills/project-setup/",
+                    "bash",
+                ),
+                code(
+                    "{\n"
+                    '  "name": "toolkit-plugin",\n'
+                    '  "description": "Proje başlatma ve API tasarım skill\'lerini içeren takım kiti",\n'
+                    '  "version": "0.1.0"\n'
+                    "}",
+                    "json",
+                ),
+                h("2.4 Lokal Test: --plugin-dir"),
+                p(
+                    "Plugin'i marketplace'e koymadan önce lokal olarak test et — bu, resmi "
+                    "quickstart'ın önerdiği sıradır: önce authoring + lokal test, sonra dağıtım."
+                ),
+                steps([
+                    "`claude --plugin-dir ./toolkit-plugin` ile Claude Code'u bu plugin yüklü şekilde başlat",
+                    "`/toolkit-plugin:project-setup` ile skill'i namespace'i üzerinden elle çağır",
+                    "SKILL.md'de bir değişiklik yap, `/reload-plugins` ile yeniden yükle (oturumu kapatmadan)",
+                    "`claude plugin validate ./toolkit-plugin` ile şema hatalarını kontrol et",
+                ]),
+                h("2.5 Marketplace Oluşturma ve Kurulum"),
+                steps([
+                    "`mkdir -p my-marketplace/.claude-plugin` ile marketplace dizinini kur",
+                    "`marketplace.json` içine `toolkit-plugin`'i relative path source ile ekle",
+                    "`claude plugin validate ./my-marketplace` ile marketplace şemasını doğrula",
+                    "`/plugin marketplace add ./my-marketplace` ile lokal marketplace'i ekle",
+                    "`/plugin install toolkit-plugin@my-marketplace` ile kur",
+                    "`/plugin list` ile kurulumun ve namespace'in doğru göründüğünü teyit et",
+                ]),
+                warn(
+                    "`marketplace.json`'daki plugin `name` alanı kebab-case olmalı (küçük harf, "
+                    "rakam, tire) — büyük harf, boşluk veya özel karakter içeriyorsa claude.ai "
+                    "marketplace sync'i reddeder, yerel kurulum yine de çalışabilir."
+                ),
+            ],
+        },
+        {
+            "num": "BÖLÜM 3",
+            "title": "PRATİK — DERİNLEŞ",
+            "blocks": [
+                h("3.1 Üçüncü Skill: deployment"),
+                p(
+                    "Toolkit'i tamamlamak için üçüncü bir skill ekle: `deployment` — Render/"
+                    "Vercel'e deploy adımlarını ve Gün 5/10'daki free-tier uyarılarını (ephemeral "
+                    "filesystem, 15 dakika spin-down) içeren bir rehber."
+                ),
+                h("3.2 Üç Skill'i Tek Plugin'de Birleştirme"),
+                steps([
+                    "`toolkit-plugin/skills/` altına `testing/` ve `deployment/` klasörlerini ekle",
+                    "Her birine kendi SKILL.md'sini yaz (setup zaten hazır)",
+                    "`claude --plugin-dir ./toolkit-plugin` ile üçünü birden lokalde test et",
+                    "Her birini namespace'i ile ayrı ayrı çağır: `/toolkit-plugin:project-setup`, `/toolkit-plugin:testing`, `/toolkit-plugin:deployment`",
+                ]),
+                h("3.3 Skill'i Başka Bir Projeye Taşıma"),
+                p(
+                    "Plugin'lerin en büyük avantajı taşınabilirlik. `toolkit-plugin` dizinini "
+                    "farklı bir projeye kopyala (veya marketplace üzerinden kur) ve aynı "
+                    "namespace'lerle çalıştığını doğrula — hiçbir yeniden yazım gerekmemeli."
+                ),
+                keypoint(
+                    "Bir skill projeye özelse `.claude/skills/` altında kalsın; birden fazla "
+                    "projede veya takım arkadaşlarınla paylaşmak istiyorsan plugin'e taşı. Bu "
+                    "ayrım, skill'i ne zaman 'paketleme zahmetine değer' hale geldiğine karar "
+                    "verirken iyi bir sezgi verir."
+                ),
+                h("3.4 Sıradaki: SaaS Dashboard"),
+                p(
+                    "Yarın başlayacağın SaaS Dashboard projesinde bugün öğrendiğin plugin "
+                    "yapısını, rol bazlı agent'ları (Gün 15) paketlemek için tekrar "
+                    "kullanacaksın — 'takım kiti' fikri oradan devam ediyor."
+                ),
+            ],
+        },
+    ],
+
+    "prompts": [
+        {
+            "title": "project-setup Skill Taslağı",
+            "prompt": (
+                "`.claude/skills/project-setup/SKILL.md` yaz. Frontmatter'da yalnızca description "
+                "olsun. $ARGUMENTS ile proje adını al; klasör yapısı, CLAUDE.md şablonu ve ilk "
+                "commit adımlarını içersin."
+            ),
+            "note": "İlk skill — description'ın tetiklenme için ne kadar kritik olduğunu deneyimlemek için birkaç farklı ifadeyle test et.",
+        },
+        {
+            "title": "api-design Skill Taslağı",
+            "prompt": (
+                "`.claude/skills/api-design/SKILL.md` yaz. allowed-tools: Read, Write, Edit olsun "
+                "(komut çalıştırmasın). REST endpoint isimlendirme, status kod convention'ı ve "
+                "versiyonlama kurallarını içersin."
+            ),
+        },
+        {
+            "title": "Plugin İskeleti Oluşturma",
+            "prompt": (
+                "toolkit-plugin/.claude-plugin/plugin.json ve toolkit-plugin/skills/project-setup/ "
+                "yapısını oluştur. project-setup skill'imi bu yapıya taşı. Sonra "
+                "'claude --plugin-dir ./toolkit-plugin' ile nasıl test edeceğimi göster."
+            ),
+        },
+        {
+            "title": "Marketplace + Validate",
+            "prompt": (
+                "my-marketplace/.claude-plugin/marketplace.json oluştur, toolkit-plugin'i relative "
+                "path source ile ekle. Sonra hem plugin hem marketplace için 'claude plugin "
+                "validate' komutlarını çalıştır ve çıktıyı yorumla."
+            ),
+        },
+        {
+            "title": "Skill Neden Tetiklenmiyor?",
+            "prompt": (
+                "api-design skill'im doğal dil isteğimde tetiklenmiyor. /skills çıktısını incele, "
+                "description'ımı değerlendir ve neden tetiklenmediğini teşhis et; gerekirse "
+                "description'ı yeniden yaz."
+            ),
+            "note": "Teşhis promptu — Gün 6'daki skill troubleshooting mantığının plugin bağlamındaki devamı.",
+        },
+    ],
+
+    "challenge": {
+        "title": "Toolkit Plugin: 3 Skill + Marketplace",
+        "task": (
+            "setup, testing, deployment skill'lerini içeren bir 'toolkit-plugin' oluştur, kendi "
+            "lokal marketplace'inde yayınla, kurup namespace ile test et."
+        ),
+        "requirements": [
+            "toolkit-plugin/skills/ altında 3 skill klasörü olmalı: project-setup, testing, deployment",
+            ".claude-plugin/ dizininde yalnızca plugin.json bulunmalı — skills/ plugin kökünde olmalı",
+            "En az bir skill $ARGUMENTS kullanarak parametre almalı",
+            "Plugin önce --plugin-dir ile lokal test edilmeli, sonra marketplace'e eklenmeli",
+            "marketplace.json'da toolkit-plugin relative path source ile tanımlı olmalı",
+            "claude plugin validate hem plugin hem marketplace için hatasız geçmeli",
+        ],
+        "success": [
+            "3 skill de /toolkit-plugin:project-setup, /toolkit-plugin:testing, /toolkit-plugin:deployment namespace'i ile doğru çağrılıyor",
+            "plugin.json ve marketplace.json claude plugin validate'i geçiyor",
+            "--plugin-dir ile lokal test edildikten sonra marketplace'ten kurulum (/plugin install) çalışıyor",
+            "En az bir skill $ARGUMENTS ile parametre alıyor ve doğru işliyor",
+            ".claude-plugin/ dizininde yalnızca manifest dosyası var, skills/ plugin kökünde",
+        ],
+        "solution": {
+            "intro": (
+                "Bu challenge'ı authoring → packaging → local test → distribution sırasıyla "
+                "ilerlet: önce her skill'i tek tek yaz ve test et, sonra plugin'e taşı, "
+                "--plugin-dir ile doğrula, en son marketplace'e koy."
+            ),
+            "prompts": [
+                {"title": "1. Üç skill", "prompt": "project-setup, testing, deployment skill'lerini .claude/skills/ altında ayrı ayrı yaz ve her birini standalone test et."},
+                {"title": "2. Plugin'e taşı", "prompt": "toolkit-plugin/.claude-plugin/plugin.json oluştur, üç skill'i de skills/ altına taşı."},
+                {"title": "3. Lokal test", "prompt": "claude --plugin-dir ./toolkit-plugin ile başlat, üç skill'i namespace'i ile çağır, /reload-plugins ile değişiklikleri yükle."},
+                {"title": "4. Marketplace + validate", "prompt": "my-marketplace/.claude-plugin/marketplace.json oluştur, claude plugin validate ile hem plugin hem marketplace'i doğrula, /plugin marketplace add ve /plugin install ile kur."},
+            ],
+            "notes": [
+                "Her skill'i plugin'e taşımadan önce standalone test etmek, plugin katmanında bir sorun çıkarsa 'skill mi bozuk, paketleme mi bozuk' ayrımını kolaylaştırır.",
+                "--plugin-dir ile lokal test adımını atlayıp doğrudan marketplace'e geçmek, hata ayıklamayı zorlaştırır — resmi quickstart'ın önerdiği sıra budur.",
+                "Namespace'i doğru yazmayı unutma: plugin.json'daki name alanı = namespace önekidir, skill klasör adı değil.",
+            ],
+            "pitfalls": [
+                "⚠️ skills/, agents/, hooks/ klasörlerini yanlışlıkla .claude-plugin/ içine koymak — bu yaygın bir hata ve plugin'in yüklenmesini engeller.",
+                "⚠️ marketplace.json'da plugin name'i kebab-case yazmamak (büyük harf/boşluk) — claude.ai marketplace sync'i reddeder.",
+                "⚠️ Relative path source'u doğrudan bir URL üzerinden eklenen marketplace'te kullanmaya çalışmak — plugin dosyaları indirilmediği için kaynak çözülemez.",
+                "⚠️ allowed-tools'un otomatik olarak diğer tool'ları kapattığını sanmak — yalnızca listelenenlere onaysız izin verir, kısıtlama değildir.",
+                "⚠️ Plugin'de değişiklik yapıp /reload-plugins çalıştırmayı unutmak, sonra 'değişiklik yansımadı' diye şaşırmak.",
+            ],
+        },
+    },
+
+    "takeaways": [
+        "Skill, progressive disclosure ile çalışır: description her zaman görünür, tam içerik yalnızca tetiklendiğinde context'e yüklenir",
+        "Yeni reusable workflow'lar için Skill-first yaklaşımı önerilir; Command hâlâ var ama daha basit/elle tetiklenen kullanımlar için",
+        "SKILL.md frontmatter'ında tüm alanlar opsiyoneldir ama description tetiklenme kararının tek dayanağıdır",
+        "$ARGUMENTS temel parametre geçirme yoludur; !command daha ileri bir pattern olup prompt oluşmadan önce shell çıktısını enjekte eder — güvenilir kaynaklarla kullanılmalı",
+        "Plugin skill'leri namespace altında çalışır (/plugin-adı:skill-adı) — bu, aynı isimli skill'lerin farklı plugin'lerde çakışmadan bir arada durmasını sağlar",
+        ".claude-plugin/ dizinine yalnızca manifest (plugin.json/marketplace.json) girer; skills/agents/hooks plugin kökünde olmalı",
+        "Doğru sıra authoring → --plugin-dir ile lokal test → marketplace ile dağıtımdır; marketplace'i en başta devreye sokmak hata ayıklamayı zorlaştırır",
+        "Marketplace source tipleri relative path/github/url/git-subdir/npm'dir; relative path yalnızca lokal/git-hosted marketplace'te güvenilir çözülür",
+    ],
+
+    "reading": {
+        "official": [
+            {"label": "Extend Claude with skills — SKILL.md şeması, frontmatter alanları, $ARGUMENTS ve dinamik context enjeksiyonunun resmi referansı",
+             "url": "https://code.claude.com/docs/en/skills"},
+            {"label": "Create plugins — plugin.json şeması, dizin yapısı, namespace kuralı ve --plugin-dir ile lokal test akışının resmi rehberi",
+             "url": "https://code.claude.com/docs/en/plugins"},
+            {"label": "Create and distribute a plugin marketplace — marketplace.json şeması, 5 source tipi ve ref/sha pinlemenin resmi referansı",
+             "url": "https://code.claude.com/docs/en/plugin-marketplaces"},
+        ],
+        "community": [],
+        "extra": [
+            {"label": "anthropics/skills (GitHub) — Anthropic'in resmi örnek skill koleksiyonu ve marketplace olarak kurulum örneği",
+             "url": "https://github.com/anthropics/skills"},
+        ],
+    },
+
+    "next_preview": (
+        "Yarın (Gün 14) SaaS Dashboard projesine başlıyorsun — Proje Kademe 3'ün ilk günü. "
+        "Bugün öğrendiğin skill/plugin yapısını, Gün 15'te rol bazlı agent'ları bir 'takım kiti' "
+        "olarak paketlerken tekrar kullanacaksın."
+    ),
+
+    "checklist": [
+        "Skill'in progressive disclosure ile nasıl çalıştığını (description her zaman görünür, içerik tetiklenince yüklenir) açıklayabiliyorum",
+        "Skill / Command / Agent farkını ve neden Skill-first önerildiğini kendi cümlelerimle anlatabiliyorum",
+        "SKILL.md frontmatter'ında hangi alanların opsiyonel olduğunu, description'ın neden kritik olduğunu biliyorum",
+        "$ARGUMENTS ile skill'e parametre geçirdim",
+        "allowed-tools'un izin verdiğini ama tek başına kısıtlama yapmadığını biliyorum",
+        "Plugin'in neyi paketlediğini ve namespace kuralını (/plugin-adı:skill-adı) açıklayabiliyorum",
+        ".claude-plugin/ dizinine yalnızca manifest'in girdiğini, skills/agents/hooks'un plugin kökünde olması gerektiğini biliyorum",
+        "--plugin-dir ile bir plugin'i lokal test ettim ve /reload-plugins kullandım",
+        "marketplace.json oluşturup claude plugin validate ile doğruladım",
+        "3 skill'i tek plugin'de paketleyip marketplace üzerinden kurdum",
+    ],
+}
+
+
+if __name__ == "__main__":
+    # Hızlı yapısal doğrulama (schema uyumu ve minimum sayılar)
+    assert LESSON["day"] == 13
+    assert len(LESSON["flow"]) == 4
+    assert 5 <= len(LESSON["objectives"]) <= 7
+    assert len(LESSON["sections"]) == 3
+    assert [s["num"] for s in LESSON["sections"]] == ["BÖLÜM 1", "BÖLÜM 2", "BÖLÜM 3"]
+    assert len(LESSON["prompts"]) >= 4
+    assert 6 <= len(LESSON["takeaways"]) <= 8
+    assert len(LESSON["reading"]["official"]) >= 3
+    assert len(LESSON["checklist"]) >= 8
+    sol = LESSON["challenge"]["solution"]
+    assert all(k in sol for k in ("intro", "prompts", "notes", "pitfalls"))
+    print("✓ gun13.py sanity check passed")

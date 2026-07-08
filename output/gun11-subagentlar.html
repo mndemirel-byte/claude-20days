@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 11 — Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><span class="cur"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></span><a href="gun12-hooks-sandboxing.html"><span class="num">12</span><span>Hooks ve Sandboxing</span></a><a href="gun13-skills-plugins.html"><span class="num">13</span><span>Skills &amp; Plugins</span></a><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="locked" title="yakında"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><span class="locked" title="yakında"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 3 — İleri · Gün 11 / 20</div><h1>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</h1><p class="tagline">“Tek Claude yerine, uzman bir takım kur”</p><p class="intro">Hafta 3&#x27;e hoş geldin. Şimdiye kadar tek bir Claude Code oturumuyla çalıştın — her şey aynı context window&#x27;da biriktı. Bugün bunu değiştiriyorsun: subagent&#x27;lar, kendi context penceresi, kendi system prompt&#x27;u ve kendi tool/izin setiyle çalışan uzmanlaşmış asistanlardır. Ana konuşmanı log/dosya/arama çıktısıyla kirletmeden bir işi devretmeyi, ne zaman devredeceğine karar vermeyi ve güvenli (least-privilege) bir agent tasarlamayı öğreneceksin.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Kavram + Mimari</div><div class="du">35 dk</div><div class="de">Subagent nedir, context izolasyonu, built-in agent&#x27;lar, kapsam/öncelik sırası</div></div><div class="step"><div class="ph">2 · İlk Agent&#x27;ı Yazma</div><div class="du">50 dk</div><div class="de">.claude/agents/ yapısı, frontmatter, code-reviewer agent&#x27;ının yazılması ve çağrılması</div></div><div class="step"><div class="ph">3 · Çağırma + Kontrol</div><div class="du">45 dk</div><div class="de">Doğal dil / @-mention / --agent farkı, model çözümleme sırası, tools vs permissionMode</div></div><div class="step"><div class="ph">4 · Derinleşme: Çoklu Agent + Nested</div><div class="du">40 dk</div><div class="de">test-writer agent&#x27;ı, zincirleme delegasyon, nested subagent, background/foreground</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-10 tamamlanmış: Claude Code kurulu, CLAUDE.md hazır, git workflow, custom command&#x27;lar, MCP temelleri; Todo App (Gün 10) çalışır durumda ve lokal repo&#x27;da erişilebilir</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal + Claude Code çalışır durumda; Todo App proje dizini (Gün 10&#x27;dan); Bir metin editörü (agent dosyalarını incelemek için)</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Subagent kavramını ve context izolasyonunun neden önemli olduğunu açıklayabileceksin</li><li><code>.claude/agents/</code> (proje) ve <code>~/.claude/agents/</code> (kullanıcı) kapsam farkını ve 5 seviyeli öncelik sırasını bileceksin</li><li>Frontmatter alanlarını (<code>name</code>, <code>description</code>, <code>tools</code>, <code>model</code>, <code>permissionMode</code> vb.) doğru kullanarak bir agent dosyası yazabileceksin</li><li>Doğal dil, @-mention ve <code>--agent</code> kullanımını delegasyon kesinliği ve oturum kapsamı açısından ayırt edebileceksin</li><li>Model çözümleme sırasını <code>CLAUDE_CODE_SUBAGENT_MODEL → invocation model → frontmatter model → ana oturum modeli</code> olarak açıklayabileceksin</li><li>Nested subagent kavramını, <code>Agent</code> tool bağımlılığını ve derinlik limitini bileceksin</li><li><code>tools</code>, <code>disallowedTools</code> ve <code>permissionMode</code> farkını güvenli (least-privilege) agent tasarımı açısından açıklayabileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Subagent Nedir?</h3><p>Bir subagent, ana konuşmandan bağımsız kendi context window&#x27;unda çalışan, kendi system prompt&#x27;u ve kendi tool/izin setiyle donatılmış özel bir asistandır. Ana Claude, bir alt görevin (onlarca dosya okuma, kapsamlı arama, log analizi gibi) ana konuşmayı gereksiz detayla dolduracağını fark ettiğinde işi bir subagent&#x27;a devredebilir — subagent kendi context&#x27;inde çalışır, ana konuşmaya yalnızca özet sonucu döner.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Subagent kullanmanın asıl gerekçesi context izolasyonudur: 20 dosya okuyup sonuç çıkaran bir araştırma, subagent olmadan yapılırsa o 20 dosyanın tamamı ana context&#x27;te kalıcı olarak birikir. Subagent ile ana konuşma sadece özeti görür.</div><h3 class="sub">1.2 Built-in Subagent&#x27;lar</h3><p>Claude Code, kendi agent dosyanı yazmadan önce kullanabileceğin hazır subagent&#x27;larla gelir. Bunlardan Explore ve Plan, hız için CLAUDE.md ve git status yüklemeyi atlar — bu onları hafif keşif görevleri için uygun, ama proje-özel kurallara ihtiyaç duyan görevler için eksik kılar.</p><table><thead><tr><th>Agent</th><th>Amaç</th><th>Not</th></tr></thead><tbody><tr><td>Explore</td><td>Kod tabanını hızlıca tarama, dosya/desen bulma</td><td>CLAUDE.md ve git status yüklemez — hız için</td></tr><tr><td>Plan</td><td>Değişiklik öncesi plan çıkarma, tasarım keşfi</td><td>CLAUDE.md ve git status yüklemez — hız için</td></tr><tr><td>general-purpose</td><td>Genel amaçlı, geniş tool erişimli görevler</td><td>Model, ana oturumun modeliyle sınırlıdır (üst sınır: Opus)</td></tr></tbody></table><h3 class="sub">1.3 Kapsam ve Öncelik Sırası</h3><p>Aynı isimli birden fazla agent tanımı varsa, Claude Code aşağıdaki sırayla en yüksek önceliklisini kullanır. Ayrıca proje kapsamındaki <code>.claude/agents/</code> klasörü sadece repo kökünde değil, çalışma dizininden yukarı doğru taranır; aynı isim birden fazla iç içe <code>.claude/agents/</code> klasöründe tanımlıysa, çalışma dizinine en yakın olan kazanır (&quot;closest wins&quot;).</p><table><thead><tr><th>Öncelik</th><th>Kaynak</th><th>Kapsam</th></tr></thead><tbody><tr><td>1 (en yüksek)</td><td>Managed settings</td><td>Organizasyon tarafından zorunlu kılınan agent&#x27;lar</td></tr><tr><td>2</td><td><code>--agents</code> CLI flag&#x27;i</td><td>Oturum başlatılırken elle belirtilen agent&#x27;lar</td></tr><tr><td>3</td><td><code>.claude/agents/</code> (proje)</td><td>Repo/çalışma dizini kapsamlı, takımla paylaşılır</td></tr><tr><td>4</td><td><code>~/.claude/agents/</code> (kullanıcı)</td><td>Tüm projelerde kişisel olarak kullanılır</td></tr><tr><td>5 (en düşük)</td><td>Plugin agent&#x27;ları</td><td>Bir plugin/marketplace ile birlikte gelir</td></tr></tbody></table><h3 class="sub">1.4 Frontmatter Anatomisi</h3><p>Bir agent dosyası, YAML frontmatter + markdown gövdeden oluşur. Gövde, subagent&#x27;ın system prompt&#x27;u olur. Frontmatter&#x27;da yalnızca <code>name</code> ve <code>description</code> zorunludur; geri kalan her şey opsiyoneldir ve verilmezse mantıklı bir varsayılana düşer.</p><pre><code>---
+name: code-reviewer
+description: Kod değişikliklerini güvenlik ve kalite açısından inceler. Değişiklik yapıldıktan sonra proaktif olarak kullan.
+tools: Read, Grep, Glob
+model: sonnet
+permissionMode: default
+---
+Sen kıdemli bir kod inceleme uzmanısın. İncelediğin her değişiklikte:
+1. Güvenlik açıklarını (injection, secret sızıntısı) kontrol et
+2. Hata yönetimi eksiklerini işaretle
+3. Bulgularını önem sırasına göre listele, kod değiştirme</code></pre><div class="callout kp"><span class="lbl">🔑 Önemli</span><code>tools</code> alanı verilmezse subagent, parent (ana) oturumun erişebildiği tüm tool setini devralır — bu &quot;her şeyi yapabilir&quot; anlamına gelmez, parent&#x27;ın zaten erişebildiği tool setiyle sınırlıdır. Yine de bir subagent&#x27;ı belirli bir işe kilitlemek istiyorsan <code>tools</code> alanını açıkça yaz.</div><h3 class="sub">1.5 tools vs permissionMode — İkisi Aynı Şey Değil</h3><p><code>tools</code> (ve <code>disallowedTools</code>), subagent&#x27;ın hangi araçlara <strong>erişebileceğini</strong> belirleyen bir yetenek listesidir (allowlist/denylist). <code>permissionMode</code> ise bu araçları kullanırken <strong>onay isteme davranışını</strong> belirler. Bir subagent&#x27;ın <code>tools</code> listesinde <code>Bash</code> olması, <code>permissionMode</code> ayarına göre her komut için onay isteyebilir ya da hiç sormadan çalışabilir — ikisi farklı katmanlardır.</p><table><thead><tr><th>Alan</th><th>Ne belirler</th><th>Örnek</th></tr></thead><tbody><tr><td>tools / disallowedTools</td><td>Hangi araçlara erişim var (yetenek kapsamı)</td><td>tools: Read, Grep, Glob</td></tr><tr><td>permissionMode</td><td>Araç kullanılırken onay davranışı</td><td>default, acceptEdits, auto, dontAsk, bypassPermissions, plan</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span><code>permissionMode</code> güncel değerleri: <code>default</code> (standart onay akışı), <code>acceptEdits</code> (dosya düzenlemelerini otomatik kabul et), <code>auto</code>, <code>dontAsk</code>, <code>bypassPermissions</code> (tüm onayları atla — dikkatli kullan) ve <code>plan</code> (sadece planla, uygulama). <code>manual</code>, v2.1.200+ sürümlerde <code>default</code> için bir alias olarak eklendi.</div><h3 class="sub">1.6 Model Çözümleme Sırası</h3><p>Bir subagent hangi modelle çalışacağına şu sırayla karar verir: önce <code>CLAUDE_CODE_SUBAGENT_MODEL</code> ortam değişkeni kontrol edilir, sonra çağrı anında verilen bir model parametresi, sonra agent dosyasının frontmatter&#x27;ındaki <code>model</code> alanı, ve hiçbiri yoksa ana oturumun kullandığı model kullanılır.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Model çözümleme sırası: <code>CLAUDE_CODE_SUBAGENT_MODEL</code> → invocation model → frontmatter <code>model</code> → ana oturum modeli. Bu sırayı bilmek, &#x27;neden bu agent beklediğimden farklı bir modelle çalıştı&#x27; sorusunun cevabıdır.</div><h3 class="sub">1.7 Ne Zaman Subagent, Ne Zaman Ana Konuşma?</h3><table><thead><tr><th>Durum</th><th>Tercih</th></tr></thead><tbody><tr><td>İş, çok fazla ara çıktı üretecek (log, arama sonucu, dosya taraması)</td><td>Subagent</td></tr><tr><td>Aynı tür işi tekrar tekrar aynı talimatlarla yaptırıyorsun</td><td>Subagent (özelleştirilmiş)</td></tr><tr><td>Sonucun ana konuşmadaki bağlamla sıkı etkileşmesi gerekiyor</td><td>Ana konuşma</td></tr><tr><td>Kısa, tek seferlik ve düşük riskli bir işlem</td><td>Ana konuşma</td></tr></tbody></table><h3 class="sub">1.8 Subagent mı, Agent Teams mı?</h3><p>Subagent&#x27;lar tek bir oturum içinde çalışır ve sonucu doğrudan ana konuşmaya (parent&#x27;a) raporlar. Agent Teams (Gün 17&#x27;de işlenecek) ise birbirinden bağımsız birden fazla Claude Code oturumunu, paylaşılan bir görev listesi ve doğrudan ajanlar-arası mesajlaşma ile koordine eder — farklı bir mimari katmandır.</p><table><thead><tr><th>İhtiyaç</th><th>Kullan</th></tr></thead><tbody><tr><td>Ana konuşmayı kirletmeden araştırma/review yaptırmak</td><td>Subagent</td></tr><tr><td>Tek oturum içinde uzman görev delegasyonu</td><td>Subagent</td></tr><tr><td>Birden fazla bağımsız Claude Code oturumunu koordine etmek</td><td>Agent Teams</td></tr><tr><td>Agent&#x27;ların birbiriyle mesajlaşması / paylaşılan görev listesi</td><td>Agent Teams</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>/agents</code> komutu artık interaktif bir sihirbaz açmıyor (v2.1.198+). Yeni bir agent oluşturmak için ya Claude&#x27;a doğal dille yazdırırsın (&quot;bana X yapan bir subagent oluştur&quot;) ya da <code>.claude/agents/</code> altına dosyayı elle eklersin.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 İlk Agent: code-reviewer</h3><p>İlk agent&#x27;ın salt-okunur olmalı — bu, agent tasarımında least-privilege (en az yetki) prensibinin en basit uygulamasıdır: bir kod inceleme agent&#x27;ının dosya değiştirmesine gerek yoktur, o yüzden ona bu yetkiyi hiç vermeyiz.</p><ol><li>Todo App proje dizinine geç ve Claude Code&#x27;u başlat: claude</li><li>Agent oluşturma promptunu ver (Prompt Kütüphanesi&#x27;ndeki 1. prompt)</li><li>Oluşan .claude/agents/code-reviewer.md dosyasını aç, frontmatter&#x27;ı incele</li><li>tools alanının sadece Read, Grep, Glob içerdiğini doğrula — Write/Edit/Bash yok</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>.claude/agents/</code> klasörü oturum başladıktan <strong>sonra</strong> ilk kez oluşturuluyorsa (daha önce hiç yoktuysa) çalışan oturum bunu algılamaz — Claude Code&#x27;u yeniden başlatman gerekir. Klasör zaten varsa, içine eklenen/değiştirilen dosyalar birkaç saniye içinde algılanır, restart gerekmez.</div><h3 class="sub">2.2 Agent&#x27;ı Çağırma</h3><p>Bir subagent&#x27;ı kullanmanın üç farklı kesinlik seviyesi vardır: doğal dilde önerme, @-mention ile garanti etme, ve <code>--agent</code> ile tüm oturumu o agent kimliğiyle başlatma. Bugün ilk ikisini kullanacaksın.</p><ol><li>Doğal dille dene: &quot;code-reviewer agent&#x27;ını kullanarak son değişiklikleri incele&quot;</li><li>Claude&#x27;un bunu bir subagent çağrısı olarak tanıdığını gözlemle</li><li>Aynı işi @-mention ile garanti ederek tekrar dene: @code-reviewer son değişiklikleri incele</li><li>İki çağırma yönteminin sonucunu karşılaştır</li></ol><table><thead><tr><th>Yöntem</th><th>Kesinlik</th><th>Kapsam</th></tr></thead><tbody><tr><td>Doğal dil</td><td>Claude uygun görürse delegasyon yapar (garanti değil)</td><td>Tek görev, öneri niteliğinde</td></tr><tr><td>@-mention</td><td>Belirtilen subagent&#x27;ın bu görev için çalışması garanti edilir</td><td>Tek görev, kesin</td></tr><tr><td><code>claude --agent &lt;name&gt;</code></td><td>Tüm oturum o agent&#x27;ın system prompt/tool/model ayarıyla başlar</td><td>Oturum genelinde (session-wide)</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span><code>--agent</code>, tek görevlik bir çağrı değildir — ana oturumun kendisini o agent&#x27;ın kimliğiyle (system prompt, tool kısıtlaması, model) başlatır. Bunu, &#x27;bu oturum boyunca ben artık code-reviewer&#x27;ım&#x27; demek gibi düşün.</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ</h2><h3 class="sub">3.1 İkinci Agent: test-writer</h3><p>code-reviewer&#x27;ın tersine, test-writer dosya yazması ve testleri çalıştırması gereken bir agent&#x27;tır — ama ona sınırsız <code>Bash</code> vermek yerine, sadece gerekli komutlara izin veren kısıtlı bir tool kuralı yazacaksın. Bu, <code>tools</code> alanının sadece açık/kapalı değil, komut-özel kısıtlama da destekleyebildiğini gösterir.</p><pre><code>---
+name: test-writer
+description: Eksik test kapsamını bulur ve test yazar. Yeni bir endpoint/fonksiyon eklendiğinde proaktif olarak kullan.
+tools: Read, Grep, Glob, Edit, Bash(pytest *), Bash(npm test *)
+permissionMode: default
+---
+Sen bir test yazma uzmanısın. Görevin:
+1. Test kapsamı eksik olan fonksiyon/endpoint&#x27;leri bul
+2. Edge case&#x27;leri (boş girdi, olmayan id, geçersiz payload) kapsayan testler yaz
+3. Yazdığın testleri çalıştırıp geçtiğini doğrula</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span><code>Bash(pytest *)</code> gibi komut-özel kurallar, agent&#x27;a genel <code>Bash</code> erişimi vermek yerine sadece belirli komutlara izin verir — sınırsız <code>Bash</code> verilen bir test-writer teorik olarak <code>rm -rf</code> da çalıştırabilir, kısıtlı kural bunu engeller.</div><h3 class="sub">3.2 Zincirleme: reviewer → tester</h3><p>İki agent&#x27;ı art arda çağırarak zincirleme delegasyon deneyeceksin: önce code-reviewer sorunları bulsun, sonra test-writer o sorunları kapsayan testler yazsın. Her iki subagent da kendi izole context&#x27;inde çalışır; ana konuşma sadece özet sonuçları görür.</p><ol><li>&quot;code-reviewer ile son değişiklikleri incele&quot; de, bulguları oku</li><li>Bulunan sorunlardan en az birini kapsayan bir test istekle: &quot;test-writer ile bu sorunu kapsayan bir test yaz&quot;</li><li>Testin gerçekten çalıştığını doğrula</li></ol><h3 class="sub">3.3 Nested Subagent&#x27;lar ve Derinlik Limiti</h3><p>Bir subagent, kendi içinden başka bir subagent çağırabilir — buna nested (iç içe) subagent denir. Ama bunun gerçekleşmesi için o subagent&#x27;ın <code>tools</code> listesinde <code>Agent</code> tool&#x27;unun bulunması gerekir. Bir subagent&#x27;ın başka subagent doğurmasını engellemek istiyorsan <code>Agent</code>&#x27;ı <code>tools</code> listesine hiç koyma ya da <code>disallowedTools</code> içine ekle.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Nested subagent zincirinin bir derinlik limiti vardır: beşinci seviyedeki bir subagent artık <code>Agent</code> tool&#x27;unu almaz ve daha fazla subagent doğuramaz — bu, sonsuz/kontrolsüz agent zincirlerini önleyen bir güvenlik sınırıdır.</div><h3 class="sub">3.4 Foreground / Background Davranışı</h3><p>v2.1.198 ve sonrasında subagent&#x27;lar varsayılan olarak arka planda (background) çalışır — ana konuşma subagent&#x27;ın bitmesini beklemeden devam edebilir. Claude, subagent&#x27;ın sonucuna hemen ihtiyaç duyduğunda o subagent&#x27;ı ön planda (foreground) çalıştırmayı kendisi seçer; bu senin elle ayarlaman gereken bir şey değildir.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Background varsayılan davranıştır ama garanti değildir — Claude, sonucu bir sonraki adımda kullanması gerektiğini fark ederse subagent&#x27;ı foreground&#x27;a alır. Bunu bir agent&#x27;ın &#x27;yavaş&#x27; çalıştığını düşünmeden önce hatırla.</div><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) code-reviewer Agent&#x27;ı Oluşturma</div><pre><code>Bana .claude/agents/code-reviewer.md adında bir subagent oluştur. Görevi: kod değişikliklerini güvenlik ve kalite açısından incelemek. Sadece Read, Grep ve Glob tool&#x27;larına erişimi olsun — dosya değiştirme yetkisi olmasın. description alanını, değişiklik yapıldıktan sonra otomatik delegasyona uygun, spesifik bir cümleyle yaz.</code></pre><div class="note">İlk agent&#x27;ı bilinçli olarak salt-okunur tasarlıyoruz — least-privilege prensibinin en basit uygulaması.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) Doğal Dil ile Delegasyon</div><pre><code>code-reviewer agent&#x27;ını kullanarak son commit&#x27;teki değişiklikleri incele ve bulgularını önem sırasına göre listele.</code></pre><div class="note">Bu bir öneri niteliğindedir — Claude uygun görürse delege eder, garanti değildir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) @-mention ile Kesin Çağırma</div><pre><code>@code-reviewer son commit&#x27;teki değişiklikleri incele ve bulgularını önem sırasına göre listele.</code></pre><div class="note">@-mention, belirtilen subagent&#x27;ın bu görev için kesinlikle çalışmasını garanti eder.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4) test-writer Agent&#x27;ı Oluşturma</div><pre><code>Bana .claude/agents/test-writer.md adında bir subagent oluştur. Görevi: eksik test kapsamını bulup edge case&#x27;leri kapsayan testler yazmak. tools alanına Read, Grep, Glob, Edit ve sadece test çalıştırma komutlarına izin veren kısıtlı bir Bash kuralı ekle — genel Bash erişimi verme.</code></pre><div class="note">Bu agent dosya değiştirebilmeli ama komut çalıştırma yetkisi kısıtlı kalmalı.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">5) Zincirleme Delegasyon</div><pre><code>code-reviewer ile bulunan sorunlardan en az birini seç, sonra test-writer ile bu sorunu ortaya çıkaran/kapsayan bir test yazdır. Testin gerçekten çalıştığını doğrula.</code></pre><div class="note">İki agent&#x27;ı ardışık çağırarak reviewer bulgularını tester&#x27;ın girdisi haline getiriyorsun.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>Todo App İçin 3 Uzman Agent Kur</h3><p>Todo App (Gün 10) için üç agent tanımla — reviewer, tester, documenter — her birini least-privilege prensibiyle tasarla ve projeyi her biriyle analiz ettir.</p><p><strong>Gereksinimler:</strong></p><ul><li>3 agent dosyası .claude/agents/ altında tanımlanmış olmalı</li><li>reviewer salt-okunur (Read/Grep/Glob) kalmalı</li><li>tester yalnızca test yazma/çalıştırma için gerekli minimum tool setine sahip olmalı (genel Bash yok)</li><li>documenter dosya okuma ve dokümantasyon yazma izinleriyle sınırlı olmalı</li><li>Her agent&#x27;ın description alanı otomatik delegasyona uygun ve spesifik yazılmış olmalı</li><li>En az bir agent gerçek bir bulgu/çıktı üretmiş olmalı</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>3 agent dosyası .claude/agents/ altında mevcut</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>reviewer&#x27;ın tools listesi sadece Read, Grep, Glob içeriyor</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>tester&#x27;ın tools listesi Edit + kısıtlı Bash kuralı içeriyor, genel Bash yok</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>documenter&#x27;ın tools listesi dosya okuma + yazma ile sınırlı</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>Her agent&#x27;ın description alanı ne zaman devreye gireceğini net anlatıyor</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>En az bir agent (örn. reviewer) gerçek bir bulgu üretti</span></label></li><li><label><input type="checkbox" data-k="succ6"><span>İlk çıktıdan sonra en az bir agent&#x27;ın prompt&#x27;u/description&#x27;ı iyileştirildi</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ı Prompt Kütüphanesi&#x27;ndeki desenleri izleyerek üç kez tekrarla: önce agent&#x27;ı oluştur, sonra description&#x27;ının otomatik delegasyonu tetikleyip tetiklemediğini test et, gerekirse description&#x27;ı netleştir.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1. reviewer</div><pre><code>code-reviewer promptu ile salt-okunur bir inceleme agent&#x27;ı oluştur, çağır ve bulguları oku.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2. tester</div><pre><code>test-writer promptu ile kısıtlı Bash kurallı bir test agent&#x27;ı oluştur, reviewer bulgularından birini test ettir.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3. documenter</div><pre><code>Sadece dosya okuma ve markdown yazma iznine sahip bir documenter agent&#x27;ı oluştur; projenin güncel README&#x27;sini bu agent&#x27;a güncelletir.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Her agent&#x27;ı oluşturduktan sonra description&#x27;ı test et: doğal dilde belirsiz bir istek verip Claude&#x27;un doğru agent&#x27;ı seçip seçmediğine bak.</li><li>tools alanını boş bırakmak &#x27;her şeyi yapabilir&#x27; değil, parent&#x27;ın tool setini devralmak anlamına gelir — yine de bilinçli olarak kısıtlama yaz.</li><li>documenter&#x27;a Bash verme; sadece Read + Edit/Write yeterlidir, komut çalıştırma riski gereksiz.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ ⚠️ description&#x27;ı çok genel yazmak (&quot;kod ile ilgilenir&quot;) — otomatik delegasyon güvenilir çalışmaz, Claude hangi agent&#x27;ı seçeceğini kestiremez.</li><li>⚠️ ⚠️ tester&#x27;a sınırsız Bash vermek — kısıtlı Bash(pytest *) gibi kurallar yerine genel erişim, least-privilege&#x27;i bozar.</li><li>⚠️ ⚠️ <code>--agent</code> ile tek görevlik delegasyonu karıştırmak — <code>--agent</code> tüm oturumu değiştirir, tek seferlik çağrı için doğal dil veya @-mention kullanılır.</li><li>⚠️ ⚠️ Yeni oluşturulan .claude/agents/ klasörünün aynı oturumda hemen algılanacağını varsaymak — klasör oturumdan önce yoktuysa restart gerekir.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Subagent&#x27;ın asıl değeri context izolasyonudur: ara çıktıların (log, arama, dosya) ana konuşmayı doldurmasını engeller</li><li>Frontmatter&#x27;da sadece name ve description zorunludur; tools verilmezse parent&#x27;ın tool setini devralır</li><li>tools/disallowedTools &quot;neye erişebilir&quot;, permissionMode &quot;nasıl onay ister&quot; sorularını ayrı ayrı cevaplar</li><li>Doğal dil öneri, @-mention garanti, --agent ise tüm oturumu o agent kimliğiyle başlatan session-wide bir moddur</li><li>Model çözümleme sırası: CLAUDE_CODE_SUBAGENT_MODEL → invocation model → frontmatter model → ana oturum modeli</li><li>Nested subagent için Agent tool&#x27;unun tools listesinde olması gerekir; derinlik limiti 5&#x27;tir</li><li>v2.1.198+ subagent&#x27;lar varsayılan background çalışır, Claude sonuca ihtiyaç duyunca foreground&#x27;a alır</li><li>Subagent tek oturum içi delegasyon içindir; birden fazla bağımsız oturumu koordine etmek Agent Teams&#x27;in (Gün 17) işidir</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">Create custom subagents — subagent oluşturma, frontmatter alanları, kapsam/öncelik sırası ve built-in agent&#x27;ların resmi referansı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/tools-reference" target="_blank" rel="noopener">Tools reference — tool isimleri, komut-özel kısıtlama sözdizimi (ToolName(specifier)) ve izin kuralları</a></li><li>⭐ <a href="https://code.claude.com/docs/en/agent-teams" target="_blank" rel="noopener">Agent Teams — subagent&#x27;lardan farkı: bağımsız oturumlar, paylaşılan görev listesi, ajanlar-arası mesajlaşma</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more" target="_blank" rel="noopener">Steering Claude Code: skills, hooks, subagents and more — subagent&#x27;ın diğer altı yönlendirme yöntemiyle (CLAUDE.md, rules, skills, hooks, output styles) karşılaştırması</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://platform.claude.com/docs/en/agent-sdk/subagents" target="_blank" rel="noopener">Subagents in the SDK — subagent kavramının Agent SDK tarafındaki programatik karşılığı</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 12)</span>Yarın (Gün 12) hooks ve sandboxing&#x27;e geçiyorsun: Claude Code&#x27;un belirli olaylarda otomatik aksiyon almasını sağlayan hook&#x27;lar ve otonom yürütmeyi izole ortamlarda güvenli hale getiren sandbox kavramları.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>name ve description alanlarının frontmatter&#x27;da zorunlu olduğunu, geri kalanının opsiyonel olduğunu biliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>Proje (.claude/agents/) ve kullanıcı (~/.claude/agents/) kapsam farkını ve 5 seviyeli öncelik sırasını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>tools alanı boş bırakılırsa parent&#x27;ın tool setinin devralındığını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>tools/disallowedTools ile permissionMode&#x27;un farklı katmanlar olduğunu açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>Doğal dil, @-mention ve --agent arasındaki kesinlik ve kapsam farkını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>Model çözümleme sırasını (env var → invocation → frontmatter → ana oturum) sıralayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>Nested subagent için Agent tool&#x27;unun gerekliliğini ve derinlik limitini (5) biliyorum</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>code-reviewer ve test-writer agent&#x27;larını oluşturup zincirleme çağırdım</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>3 agent&#x27;ı (reviewer/tester/documenter) least-privilege prensibiyle tanımlayıp test ettim</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Subagent ile Agent Teams arasındaki temel farkı (tek oturum vs bağımsız oturumlar) açıklayabiliyorum</span></label></li></ul><div class="pager"><a href="gun10-todo-app-fullstack-deploy.html"><div class="dir">← Önceki</div><div class="tt">Gün 10</div><div>Todo App Full-stack + Deploy</div></a><a class="next" href="gun12-hooks-sandboxing.html"><div class="dir">Sonraki →</div><div class="tt">Gün 12</div><div>Hooks ve Sandboxing</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 11/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=11;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>
