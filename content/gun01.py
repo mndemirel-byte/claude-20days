@@ -83,7 +83,7 @@ LESSON = {
             table(["Yüzey", "Açıklama", "Kimin için"], [
                 ["Terminal CLI", "Komut satırında tam kontrol", "Bu eğitimin ana ortamı"],
                 ["VS Code / JetBrains", "IDE içinde entegre deneyim, inline diff", "Görsel diff isteyenler"],
-                ["Desktop App", "Bağımsız masaüstü uygulaması, görsel diff, paralel oturum", "Birden fazla oturum yönetenler"],
+                ["Desktop App", "Terminal gerektirmeyen masaüstü uygulaması; görsel diff, paralel oturum", "Terminalsiz GUI isteyenler, çoklu oturum yönetenler"],
                 ["Web (claude.ai/code)", "Tarayıcıda, lokal kurulum gerektirmez", "Hızlı denemeler, uzaktan çalışma"],
             ]),
             tip("Ek entegrasyonlar: **Slack** (mention ile görev delege etme) ve **Chrome (beta)** "
@@ -96,25 +96,41 @@ LESSON = {
                 ["sonnet", "Claude Sonnet 5", "Günlük kodlama (native 1M context)"],
                 ["haiku", "Claude Haiku 4.5", "Basit, hızlı görevler"],
                 ["fable", "Claude Fable 5", "En yetenekli; uzun/otonom görevler (varsayılan değil)"],
+                ["best", "Fable 5 veya en güncel Opus", "Organizasyonun Fable erişimi varsa Fable'ı, yoksa Opus'u kullanır"],
                 ["opusplan", "Opus + Sonnet", "Planlamada opus, uygulamada sonnet"],
             ]),
-            p("**Effort (çaba) seviyeleri:** `low`, `medium`, `high` (varsayılan), `xhigh`, `max`. Daha "
-              "yüksek effort = daha derin düşünme, daha çok token. Prompt içinde `ultrathink` yazarak tek "
-              "seferlik derin düşünme tetikleyebilirsin. **Fast mode** ise Opus'ta daha hızlı yanıt verir."),
-            keypoint("Context window artık 200K değil: Sonnet 5 **native 1M (1 milyon) token** ile çalışır; "
-                     "Opus üst planlarda 1M'e otomatik yükselir. Bu, büyük kod tabanlarıyla çalışmayı kolaylaştırır."),
+            tip("Fable 5'in bilinmesi gereken bir davranışı var: güvenlik sınıflandırıcılarının işaretlediği "
+                "istekler (çoğunlukla cybersecurity ve biyoloji konuları) otomatik olarak varsayılan Opus "
+                "modeline yönlendirilir. Şaşırma; bu beklenen davranıştır."),
+            p("**Effort (çaba) seviyeleri:** `low`, `medium`, `high`, `xhigh`, `max`. Sonnet 5, Opus 4.8 ve "
+              "Fable 5'te varsayılan `high`'dır (Opus 4.7'de `xhigh`). Daha yüksek effort = daha derin "
+              "düşünme, daha çok token. Prompt içinde `ultrathink` yazarak tek seferlik derin düşünme "
+              "tetikleyebilirsin. **Fast mode** ise Opus'ta daha hızlı yanıt verir. (Effort menüsünde "
+              "göreceğin `ultracode` seçeneğini ileri günlerde ele alacağız.)"),
+            keypoint("Context window artık 200K değil: Sonnet 5 her planda **native 1M (1 milyon) token** ile "
+                     "çalışır. Opus'un 1M'e otomatik yükselmesi ise Max/Team/Enterprise planlarında geçerlidir; "
+                     "Pro planda Opus 1M için usage credits gerekir. Pro kullanıcısıysan büyük kod tabanları "
+                     "için doğal seçim Sonnet 5'tir."),
 
             h("1.6 Diğer AI Kodlama Araçlarıyla Karşılaştırma"),
-            table(["Özellik", "Claude Code", "GitHub Copilot", "Cursor", "ChatGPT"], [
-                ["Çalışma yeri", "Terminal + IDE + Web", "IDE içinde", "Özel IDE", "Tarayıcı"],
-                ["Dosya erişimi", "Tüm proje", "Açık dosya", "Tüm proje", "Yok"],
-                ["Komut çalıştırma", "Evet (Bash)", "Hayır", "Sınırlı", "Hayır"],
-                ["Git entegrasyonu", "Tam", "Sınırlı", "Sınırlı", "Yok"],
-                ["Agentic (otonom)", "Evet", "Hayır", "Kısmi", "Hayır"],
-                ["Context window", "200K–1M", "Değişken", "Değişken", "Değişken"],
+            p("Claude Code'un en doğrudan rakibi OpenAI'ın terminal-tabanlı ajanı **Codex**'tir; "
+              "Copilot ve Cursor ise IDE-merkezli yaklaşımı temsil eder:"),
+            table(["Özellik", "Claude Code", "OpenAI Codex", "GitHub Copilot", "Cursor"], [
+                ["Ana çalışma yeri", "Terminal + IDE + Desktop + Web", "Terminal + IDE + Desktop + Cloud", "IDE içinde", "Özel IDE (VS Code fork)"],
+                ["Dosya erişimi", "Tüm proje", "Tüm proje", "Açık dosyalar + agent mode'da proje", "Tüm proje"],
+                ["Komut çalıştırma", "Evet (Bash, birincil yetenek)", "Evet (OS-level sandbox içinde)", "Agent mode'da var", "Var"],
+                ["Git entegrasyonu", "Tam (commit, PR, worktree)", "Tam (commit, PR, cloud task)", "Kısmi", "Kısmi"],
+                ["Proje hafızası", "CLAUDE.md", "AGENTS.md", "Sınırlı", ".cursorrules"],
+                ["Model", "Claude ailesi (Opus/Sonnet/Fable)", "GPT-5.x ailesi", "Çoklu model", "Çoklu model"],
+                ["Context window", "200K–1M", "~400K", "Değişken", "Değişken"],
+                ["Kaynak", "Kapalı", "Open source (Apache 2.0)", "Kapalı", "Kapalı"],
             ]),
-            keypoint("Claude Code'un en büyük farkı **agentic** olmasıdır: görev ver, planlama yapar, "
-                     "birden fazla dosyada çalışır, komut çalıştırır, sonucu doğrular."),
+            keypoint("Claude Code ve Codex kavramsal olarak birbirine çok benzer (terminal-öncelikli, agentic, "
+                     "proje hafızası dosyası, sandbox). Pratik fark model kalitesi ve ekosistemde ortaya çıkar: "
+                     "kör kod kalitesi karşılaştırmalarında Claude modelleri sıklıkla tercih edilir ve Claude "
+                     "Code subagent/hook/skill ekosistemiyle derin özelleştirme sunar. Bu eğitimde öğreneceğin "
+                     "kavramların çoğunun (CLAUDE.md ↔ AGENTS.md gibi) Codex'te birebir karşılığı vardır — "
+                     "yani agentic çalışma pratiği araçtan bağımsız, taşınabilir bir yetkinliktir."),
 
             h("1.7 Abonelik Modelleri ve Maliyet"),
             table(["Plan", "Aylık", "Claude Code", "Not"], [
@@ -130,7 +146,7 @@ LESSON = {
         {"num": "BÖLÜM 2", "title": "PRATİK — ADIM ADIM KURULUM", "blocks": [
             h("2.1 Ön Gereksinim Kontrolü"),
             table(["Gereksinim", "Nasıl kontrol edersin", "Minimum"], [
-                ["İşletim sistemi", "Sürüm bilgisi", "macOS 13+ / Windows 10 1809+ / Ubuntu 20.04+"],
+                ["İşletim sistemi", "Sürüm bilgisi", "macOS 13+ / Windows 10 1809+ / Ubuntu 20.04+ (Debian 10+, Alpine 3.19+ da desteklenir)"],
                 ["İnternet", "Tarayıcıda bir siteyi aç", "Aktif bağlantı"],
                 ["Anthropic hesabı", "claude.ai'da oturum aç", "Pro veya üstü plan"],
                 ["RAM", "Sistem bilgisi", "4GB (8GB önerilir)"],
@@ -138,6 +154,9 @@ LESSON = {
             warn("Node.js artık **zorunlu değil**. Native kurulum bir binary indirir ve çalışmak için "
                  "Node'a ihtiyaç duymaz. Node'u yalnızca (a) npm ile kurmayı seçersen veya (b) bu programda "
                  "React/FastAPI projeleri geliştireceğin için kuracağız — Claude Code'un kendisi için değil."),
+            tip("**Native Windows kullanıyorsan Git for Windows kur** (git-scm.com). Claude Code, Bash "
+                "tool'unu Git Bash üzerinden sağlar; Git for Windows yoksa shell olarak PowerShell'e düşer. "
+                "WSL kullananların ek bir şey yapmasına gerek yok."),
 
             h("2.2 Claude Code Kurulumu"),
             p("**Yöntem 1: Native Installer (önerilen)** — ek bağımlılık gerektirmez, otomatik güncellenir."),
@@ -145,10 +164,15 @@ LESSON = {
             code("# Windows (PowerShell)\nirm https://claude.ai/install.ps1 | iex", "powershell"),
             code("# Homebrew (macOS)\nbrew install --cask claude-code\n\n"
                  "# WinGet (Windows)\nwinget install Anthropic.ClaudeCode", "bash"),
-            warn("Homebrew/WinGet kurulumlarında otomatik güncelleme yoktur; manuel `brew upgrade` / "
-                 "`winget upgrade` gerekir. Native installer ise arka planda otomatik güncellenir."),
-            p("**Yöntem 2: npm ile kurulum** — yalnızca Node.js 18+ mevcutsa tercih et."),
-            code("node --version   # v18.0.0+ olmalı\nnpm install -g @anthropic-ai/claude-code", "bash"),
+            warn("Homebrew/WinGet kurulumları varsayılan olarak otomatik güncellenmez; manuel `brew upgrade` / "
+                 "`winget upgrade` gerekir (istersen `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=1` ile arka plan "
+                 "güncellemeye opt-in yapabilirsin). Homebrew'da iki cask vardır: `claude-code` (stable kanal, "
+                 "~1 hafta geride) ve `claude-code@latest`. Native installer ise arka planda otomatik güncellenir. "
+                 "Kurumsal Linux için imzalı apt/dnf/apk repo'ları da mevcuttur (bkz. setup docs)."),
+            p("**Yöntem 2: npm ile kurulum** — yalnızca Node.js 22+ zaten kuruluysa ve npm iş akışın "
+              "gerektiriyorsa tercih et. Not: npm paketi de artık native installer ile aynı binary'yi "
+              "kurar; kurulan `claude` çalışma zamanında Node kullanmaz."),
+            code("node --version   # v22.0.0+ olmalı\nnpm install -g @anthropic-ai/claude-code", "bash"),
             warn("Asla `sudo npm install -g` kullanma! İzin ve güvenlik sorunlarına yol açar. İzin hatası alırsan nvm kullan."),
 
             h("2.3 Kurulumu Doğrulama"),
@@ -195,9 +219,12 @@ LESSON = {
             ]),
 
             h("3.2 İzin Modları (kısa tanışma)"),
-            p("Claude Code'da `Shift+Tab` ile izin modları arasında geçersin: normal (her aksiyona onay), "
-              "**acceptEdits** (düzenlemeleri otomatik kabul), **plan** (önce plan yap), **auto** (auto mode). "
-              "Bugün normal modda kal; bu modları ve auto mode'u Gün 2'de detaylı işleyeceğiz."),
+            p("Claude Code'da `Shift+Tab` ile izin modları arasında geçersin. Varsayılan döngü: "
+              "**default** (her kritik aksiyona onay) → **acceptEdits** (dosya düzenlemelerini otomatik kabul) "
+              "→ **plan** (önce plan yap, dosya değiştirme). **auto** mode ise hesabın gereksinimleri "
+              "karşılıyorsa döngüye eklenir ve ilk geçişte senden onay (opt-in) ister. Bunların dışında "
+              "`dontAsk` ve `bypassPermissions` gibi ileri modlar da var. Bugün default modda kal; tüm "
+              "modları ve auto mode'u Gün 2'de detaylı işleyeceğiz."),
 
             h("3.3 İlk Kodunu Yazdır"),
             p("Terminal'de Claude Code açıkken sırayla dene ve her adımda ne yaptığını gözlemle:"),
@@ -223,7 +250,7 @@ LESSON = {
         {"title": "Model karşılaştırma denemesi",
          "prompt": "Aynı görevi iki farklı effort ile dene: '/effort high' ve '/effort xhigh'. "
                    "Bir bubble sort implementasyonu yazdır ve çıktı farkını gözlemle.",
-         "note": "Effort komutu ortama göre `/effort` veya model seçici altında olabilir; `/help` ile doğrula."},
+         "note": "`/effort` argümansız çalıştırılırsa seviye seçici açar; `/effort xhigh` gibi doğrudan da ayarlayabilirsin. Aynı ayar `/model` menüsünde ok tuşlarıyla ve CLI'da `--effort` flag'iyle de yapılabilir."},
     ],
 
     "challenge": {

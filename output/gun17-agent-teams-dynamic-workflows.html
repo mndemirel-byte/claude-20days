@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 17 — Agent Teams &amp; Dynamic Workflows · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><a href="gun11-subagentlar.html"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></a><a href="gun12-hooks-sandboxing.html"><span class="num">12</span><span>Hooks ve Sandboxing</span></a><a href="gun13-skills-plugins.html"><span class="num">13</span><span>Skills &amp; Plugins</span></a><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><a href="gun16-paralel-agent-view-worktrees.html"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></a><span class="cur"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></span><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 4 — Master · Gün 17 / 20</div><h1>Agent Teams &amp; Dynamic Workflows</h1><p class="tagline">“Claude&#x27;ların takımını kur, team lead&#x27;i de Claude olsun”</p><p class="intro">Gün 16&#x27;da paralelliğin koordinasyonunu sen yapıyordun: worktree açtın, agent view&#x27;dan dispatch/peek/attach ettin. Bugün koordinasyonu Claude&#x27;a devrediyorsun. İki farklı yaklaşımı derinlemesine göreceksin: Agent Teams&#x27;te bir &#x27;team lead&#x27; Claude, birbiriyle konuşan teammate&#x27;lere görev dağıtır; Dynamic Workflows&#x27;ta ise Claude&#x27;un yazdığı bir script, onlarca-yüzlerce subagent&#x27;ı arka planda orkestre eder. İkisinin de cevapladığı soru aynı değil: &#x27;planı kim tutuyor?&#x27; Bugünün sonunda SaaS Dashboard&#x27;da bir takıma review yaptırmış, bir workflow ile codebase denetimi çalıştırmış ve hangi görevi hangi katmana vereceğine bilinçli karar verebilir olacaksın.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Teorik: İki Orkestrasyon Katmanı</div><div class="du">30 dk</div><div class="de">Agent Teams mimarisi, Dynamic Workflows mimarisi, ultracode&#x27;un iki mekanizması, 5 katmanlı karar tablosu</div></div><div class="step"><div class="ph">2 · Pratik: Agent Teams</div><div class="du">40 dk</div><div class="de">Takımı etkinleştir, dosya sahipliğiyle 3 teammate spawn et, task list + mailbox&#x27;ı gözlemle, shutdown akışı</div></div><div class="step"><div class="ph">3 · Pratik: Dynamic Workflows</div><div class="du">45 dk</div><div class="de">ultracode ile bir audit workflow&#x27;u tetikle, /workflows ile izle, script&#x27;i incele, komut olarak kaydet</div></div><div class="step"><div class="ph">4 · Mini Challenge</div><div class="du">35 dk</div><div class="de">SaaS Dashboard&#x27;a 3 bağımsız feature: biri worktree+subagent, biri Agent Teams, biri Dynamic Workflow ile</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-16 tamamlanmış: worktrees ve agent view (Gün 16), subagent&#x27;lar (Gün 11), rol agent&#x27;ları (Gün 15), SaaS Dashboard projesi git repository&#x27;si olarak init edilmiş; Claude Code güncel sürümde (Agent Teams için v2.1.178+, Dynamic Workflows için v2.1.154+ önerilir — <code>claude --version</code> ile kontrol et); Pro, Max, Team veya Enterprise plan / Console hesabı — Dynamic Workflows&#x27;un kullanılabilirliği plana göre değişir, <code>/config</code>&#x27;ten kontrol edilmeli</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); tmux veya iTerm2 (opsiyonel — Agent Teams&#x27;te split-pane görünüm için); Git (worktree ve branch tabanlı koordinasyon için); VS Code veya tercih edilen editör</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Agent Teams mimarisini (team lead + teammate, shared task list, mailbox) ve deneysel durumunu (<code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS</code>, varsayılan kapalı) açıklayabileceksin</li><li>Doğal dille bir takım isteyip, dosya sahipliği net ayrılmış teammate&#x27;ler spawn edebilecek; task list ve doğrudan mesajlaşmayı takip edebileceksin</li><li>Dynamic Workflow&#x27;un &#x27;planı script&#x27;in tuttuğu&#x27; bir orkestrasyon katmanı olduğunu, Claude&#x27;un yazdığı script&#x27;teki <code>agent()</code>/<code>pipeline()</code> çağrılarını okuyup yorumlayabileceksin</li><li><code>ultracode</code> anahtar kelimesi (tek görev) ile <code>/effort ultracode</code> (oturum geneli) arasındaki farkı ayırt edip doğru olanı seçebileceksin</li><li><code>/workflows</code> ile bir run&#x27;ı izleyip &#x27;Large workflow&#x27; uyarısını (25 agent / 1.5M token eşiği) yorumlayabileceksin</li><li>Skill / Subagent / Agent View+Worktree / Agent Teams / Dynamic Workflow katmanları arasında &#x27;planı kim tutuyor, işçiler birbirine konuşuyor mu&#x27; eksenlerinde doğru katmanı seçebileceksin</li><li>SaaS Dashboard&#x27;da bir review görevini Agent Teams&#x27;e, bir denetim görevini Dynamic Workflow&#x27;a verip sonuçları değerlendirebileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Agent Teams: Team Lead + Teammate Mimarisi</h3><p>Agent Teams, birden fazla Claude Code oturumunun bir arada, birbirleriyle konuşarak çalışmasını sağlar. İlk teammate spawn edildiğinde bir takım oluşur; o anki oturum otomatik olarak &#x27;team lead&#x27; rolünü üstlenir. Lead işi parçalara böler, görev atar ve sonuçları senteze dönüştürür. Teammate&#x27;ler ise bağımsız çalışır: her biri kendi context window&#x27;una sahiptir ve doğrudan birbirleriyle mesajlaşabilir.</p><p>Her teammate, tam ve bağımsız bir Claude Code session&#x27;ıdır. Spawn edildiğinde proje context&#x27;ini (CLAUDE.md, MCP server&#x27;lar, skill&#x27;ler) otomatik yükler — ama lead&#x27;in konuşma geçmişini <strong>almaz</strong>. Sadece spawn prompt&#x27;uyla işe başlar. Bu yüzden teammate&#x27;e verdiğin görev talimatı kendi başına yeterli olmalı: dosya yolları, teknoloji yığını, ne aranacağı, beklenen çıktı formatı.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Teammate spawn iki şekilde olur: sen açıkça istersin (&#x27;3 teammate ile şunu incele&#x27;) veya Claude görevin paralel çalışmadan fayda göreceğini düşünüp önerir. Her iki durumda da senin onayınla gerçekleşir.</div><h3 class="sub">1.2 Etkinleştirme ve Deneysel Durum</h3><p>Agent Teams Temmuz 2026 itibarıyla hâlâ <strong>deneysel</strong> bir özellik ve varsayılan olarak <strong>kapalıdır</strong>. <code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS</code> değişkeni set edilmeden hiçbir takım kurulmaz, takım dizini yazılmaz, Claude teammate spawn etmez veya önermez. İki yerden açabilirsin:</p><table><thead><tr><th>Yöntem</th><th>Nasıl</th><th>Ne zaman tercih edilir</th></tr></thead><tbody><tr><td>Shell environment</td><td><code>export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code></td><td>Tek oturumluk / geçici deneme</td></tr><tr><td>settings.json</td><td><code>{&quot;env&quot;: {&quot;CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS&quot;: &quot;1&quot;}}</code></td><td>Proje genelinde kalıcı, takım arkadaşlarıyla paylaşılabilir</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Resmi dokümanda spesifik bir model şartı belirtilmiyor — ama Agent Teams deneysel bir özellik olduğu için bilinen sınırlamaları var: in-process teammate&#x27;ler <code>/resume</code> veya <code>/rewind</code> ile geri gelmez; task status bazen gecikir (tamamlanan görev &#x27;completed&#x27; işaretlenmeyebilir); shutdown yavaş olabilir; bir session&#x27;da tek takım kurulabilir; teammate&#x27;ler kendi teammate&#x27;lerini doğuramaz (nested team yok).</div><h3 class="sub">1.3 Task List, Mailbox ve Plan Onayı</h3><p>Takımın koordinasyonu iki mekanizmaya dayanır: paylaşılan <strong>task list</strong> (bağımlılıklı görevler, her teammate kendi görevini claim eder) ve <strong>mailbox</strong> (doğrudan mesaj veya tüm takıma broadcast). Broadcast&#x27;i tutumlu kullan — maliyet takım büyüklüğüyle orantılı artar.</p><p>Bir teammate &#x27;plan&#x27; modunda spawn edilirse salt-okunur çalışır: kod tabanını inceler, bir yaklaşım tasarlar ama hiçbir değişiklik yapmadan planını lead&#x27;e onaya sunar. Lead planı onaylar veya gerekçeli reddeder; reddedilirse teammate planı revize edip yeniden sunar. Onaydan sonra teammate implementasyona geçer.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Lead&#x27;in onay kararını yönlendirmek istiyorsan prompt&#x27;una kriter ekle: &#x27;sadece test kapsamı içeren planları onayla&#x27; veya &#x27;veritabanı şemasını değiştiren planları reddet&#x27; gibi.</div><h3 class="sub">1.4 Subagent&#x27;lardan Farkı</h3><p>Gün 11&#x27;deki subagent&#x27;lar ile Agent Teams&#x27;i karıştırmamak önemli. İkisi de paralelliği sağlar ama koordinasyon şekli tamamen farklıdır:</p><table><thead><tr><th>Özellik</th><th>Subagent</th><th>Agent Teams</th></tr></thead><tbody><tr><td>Çalıştığı yer</td><td>Ana konuşmanın içinde, izole context</td><td>Bağımsız, tam Claude Code session&#x27;ları</td></tr><tr><td>Birbirleriyle konuşurlar mı?</td><td>Hayır — sadece ana agent&#x27;a rapor eder</td><td>Evet — doğrudan mesajlaşır, task claim eder</td></tr><tr><td>Ne zaman tercih edilir</td><td>Hızlı, odaklı, rapor eden işçi yeterliyse</td><td>Bulgular paylaşılmalı, birbirini sorgulamalıysa</td></tr><tr><td>Maliyet</td><td>Görece düşük</td><td>Her teammate tam context window — yüksek</td></tr></tbody></table><h3 class="sub">1.5 Dynamic Workflows: Planı Script Tutar</h3><p>Subagent, Agent View ve Agent Teams&#x27;te koordinasyonu hep Claude (veya sen) turn-by-turn yapar: her adımda ne spawn edileceğine karar verilir ve her sonuç bir context window&#x27;a düşer. Dynamic Workflow bu modeli tersine çevirir: Claude, görev için bir <strong>JavaScript script</strong> yazar; bu script planı, döngüyü, dallanmayı ve ara sonuçları kendi içinde tutar. Senin context&#x27;ine sadece final rapor düşer.</p><p>Script içinde iki temel çağrı kullanılır: <code>agent()</code> tek bir subagent çalıştırır, <code>pipeline()</code> bir listedeki her öğe için bir agent çalıştırıp sonuçları toplar. Bu bölümde script&#x27;i <strong>sen yazmayacaksın</strong> — Claude yazar, sen okuyup hangi dosya kümesine hangi agent&#x27;ın gittiğini izleyecek, beğendiğin bir run&#x27;ı komut olarak kaydedeceksin.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Planı koda taşımanın faydası sadece daha fazla agent çalıştırmak değil: bir workflow, bağımsız agent&#x27;ları birbirinin bulgusunu çapraz kontrol ettirebilir (adversarial review) veya aynı planı birkaç farklı açıdan taslaklatıp karşılaştırabilir — tek context window&#x27;da elde edilmesi zor bir güvenilirlik.</div><h3 class="sub">1.6 İki <code>ultracode</code> Mekanizması</h3><p><code>ultracode</code> kelimesi iki farklı, birbirinden bağımsız şeyi tetikler — ayrımı netleştirmek maliyet kontrolü için kritik:</p><table><thead><tr><th>Mekanizma</th><th>Nasıl tetiklenir</th><th>Kapsam</th></tr></thead><tbody><tr><td>Prompt keyword</td><td>Prompt&#x27;un içine <code>ultracode</code> kelimesini yazmak (veya &#x27;bir workflow kullan&#x27; demek)</td><td>Sadece o tek görevi workflow&#x27;a çevirir</td></tr><tr><td><code>/effort ultracode</code></td><td>Oturum ayarını değiştirmek</td><td>Oturumdaki <strong>her</strong> önemli görev için Claude otomatik workflow planlar (xhigh reasoning + otomatik orkestrasyon); session-only</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>/effort ultracode</code>&#x27;u açık unutmak, rutin küçük görevlerin bile workflow&#x27;a dönüşmesine yol açar — bu token maliyetini gereksiz yere şişirir. Rutin işe dönünce <code>/effort high</code>&#x27;a geri dön.</div><h3 class="sub">1.7 Kullanılabilirlik ve Limitler</h3><p>Dynamic Workflows artık dokümante edilmiş, ana orkestrasyon katmanlarından biri — ama kullanılabilirliği plan ve sürüme bağlı: Claude Code v2.1.154+ gerekiyor, tüm paid plan&#x27;larda ve Anthropic API/Bedrock/Vertex/Foundry üzerinde destekleniyor. Kendi ortamında açık olup olmadığını <code>/config</code>&#x27;ten kontrol et — bazı planlarda ayarı sen açman gerekebilir.</p><p>Somut limitler:</p><ul><li>Bir run&#x27;da en fazla <strong>16 eşzamanlı agent</strong> (makine kapasitesine göre daha az olabilir).</li><li>Run başına toplam <strong>1000 agent</strong> üst sınırı.</li><li>Bir workflow <strong>25 agent</strong>&#x27;ı aşarsa veya öngörülen token toplamı <strong>1.5 milyonu</strong> geçerse, task panelindeki ilerleme satırında &#x27;Large workflow&#x27; uyarısı çıkar (v2.1.203+). Bu uyarı bilgilendirmedir — run&#x27;ı durdurmaz; seni <code>/workflows</code>&#x27;a yönlendirir.</li><li><code>/config</code>&#x27;te bir size guideline (small/medium/large/unrestricted) belirlersen, o kılavuzun agent sayısı 25&#x27;lik eşiğin yerine geçer.</li></ul><div class="callout tip"><span class="lbl">💡 İpucu</span><code>/workflows</code> her zaman çalışan ve tamamlanmış run&#x27;ları listeler; birini seçip faz, agent sayısı ve token toplamını görebilir, gerekirse run&#x27;ı oradan durdurabilirsin.</div><h3 class="sub">1.8 Beş Katmanlı Karar Tablosu</h3><p>Gün 16&#x27;da worktree ve agent view&#x27;ı gördün. Bugün ekledğin iki katmanla birlikte, Claude Code&#x27;daki tüm paralellik/orkestrasyon yüzeyi şöyle özetlenir:</p><table><thead><tr><th>Katman</th><th>Ne işe yarar?</th><th>Planı kim tutar?</th><th>Worker iletişimi</th></tr></thead><tbody><tr><td>Skill</td><td>Bir davranışı/uzmanlığı paketler — agent çalıştırma katmanı değildir</td><td>Ana Claude</td><td>Yok</td></tr><tr><td>Subagent (Gün 11)</td><td>Tek oturum içinden uzman worker çağırır</td><td>Ana Claude</td><td>Parent&#x27;a rapor eder, birbirine konuşmaz</td></tr><tr><td>Agent View + Worktree (Gün 16)</td><td>Kullanıcı bağımsız session&#x27;ları yönetir</td><td>Kullanıcı (dispatch/peek/attach)</td><td>Ayrı session&#x27;lar, birbirinden habersiz</td></tr><tr><td>Agent Teams</td><td>Lead Claude görev dağıtır, teammate&#x27;ler koordine olur</td><td>Lead Claude + shared task list</td><td>Teammate&#x27;ler doğrudan mesajlaşır</td></tr><tr><td>Dynamic Workflow</td><td>Script çok sayıda subagent&#x27;ı orkestre eder</td><td>Workflow script</td><td>Script üzerinden sonuç toplama/çapraz kontrol</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Skill&#x27;i bu tabloya &#x27;agent çalıştıran&#x27; bir katman gibi değil, &#x27;davranış paketleyen&#x27; bir katman gibi oku — Gün 13&#x27;teki skill/subagent ayrımıyla çelişmez, sadece spektrumun neresinde durduğunu netleştirir.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 Agent Teams&#x27;i Etkinleştir</h3><ol><li>SaaS Dashboard proje dizinine gir.</li><li>Kalıcı olması için <code>.claude/settings.json</code> içine <code>{&quot;env&quot;: {&quot;CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS&quot;: &quot;1&quot;}}</code> ekle (veya geçici denemek için shell&#x27;de <code>export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code>).</li><li>Oturumu yeniden başlat — takım araçları sadece başlangıçta yüklenir: <code>claude</code>.</li><li>Etkinleştirmeyi doğrula: teammate spawn isteyip Claude&#x27;un kabul ettiğini gözlemle (reddederse env değişkeni okunmamış demektir).</li></ol><h3 class="sub">2.2 Dosya Sahipliğiyle İlk Takımı Spawn Et</h3><p>Rastgele &#x27;birkaç agent aç&#x27; demek yerine, her teammate&#x27;in hangi dosyalara dokunacağını baştan belirt. Bu, Gün 16&#x27;daki task partitioning kurallarının Agent Teams&#x27;e uyarlanmış hâlidir.</p><ol><li>SaaS Dashboard&#x27;da doğal dille bir takım iste: &#x27;Auth modülünü 3 açıdan incele — bir teammate güvenlik (src/auth/), bir teammate performans (API/query katmanı), bir teammate test kapsamı (tests/) — sadece kendi alanına dokunsun, bulguları birbirine bildirsin.&#x27;</li><li>Claude&#x27;un üç teammate spawn ettiğini agent panelinden gözlemle.</li><li>Lead&#x27;den beklenen çıktıyı netleştir: bulgu matrisi + risk sırası + merge önerisi.</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Performans teammate&#x27;inin test-coverage teammate&#x27;ine &#x27;şu endpoint&#x27;i yük testine al&#x27; diye doğrudan mesaj göndermesi — Agent Teams&#x27;in subagent&#x27;tan farkını en net gösteren andır: bulgu ana konuşmaya dönmeden teammate&#x27;ler arasında akar.</div><h3 class="sub">2.3 Task List ve Mesajlaşmayı Takip Et</h3><ol><li>Agent panelinde yukarı/aşağı ok tuşlarıyla bir teammate seç, Enter ile session&#x27;ını görüntüle.</li><li><code>Ctrl+T</code> ile task list&#x27;i aç; hangi görevlerin kimde, hangi durumda (pending/in-progress/completed) olduğunu incele.</li><li>Bir teammate&#x27;e doğrudan mesaj gönder — örn. bulgusunu netleştirmesini iste.</li><li>Delegate mode&#x27;u (Shift+Tab) aç: lead&#x27;in kendi kodu yazmaya başlamasını değil, sadece koordinasyona odaklanmasını sağlar.</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Task status bazen gecikir — bir teammate işini bitirdiği hâlde görev &#x27;completed&#x27; işaretlenmeyebilir, bu da ona bağımlı görevleri bloklar. Görev takılı görünüyorsa işin gerçekten bitip bitmediğini kontrol et ve gerekirse lead&#x27;den teammate&#x27;i dürtmesini iste.</div><h3 class="sub">2.4 Takımı Kapat</h3><p>Agent Teams&#x27;te ayrı bir &#x27;temizlik&#x27; komutu yoktur. Lead teammate&#x27;lere bir shutdown isteği gönderir; teammate mevcut işini bitirip onaylar (ya da gerekçeyle reddeder). Session sona erdiğinde takımın paylaşılan dizinleri <strong>otomatik</strong> temizlenir — ayrı bir cleanup adımı gerekmez.</p><ol><li>Lead&#x27;den takımı kapatmasını iste: &#x27;İşiniz bittiyse teammate&#x27;leri kapat.&#x27;</li><li>Shutdown&#x27;ın hemen değil, her teammate mevcut tool call&#x27;unu bitirdikten sonra gerçekleştiğini gözlemle (yavaş olabilir, sabırlı ol).</li><li>Oturumu normal şekilde <code>/exit</code> ile kapat — paylaşılan dizinler otomatik silinir.</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Terminal çöker veya bağlantı koparsa arkada bir tmux session&#x27;ı kalabilir. <code>tmux ls</code> ile listele, <code>tmux kill-session -t &lt;isim&gt;</code> ile temizle — bu, normal shutdown akışının dışında kalan tek troubleshooting adımıdır.</div><h3 class="sub">2.5 İlk Dynamic Workflow&#x27;u Tetikle</h3><p>İlk workflow denemesini bilinçli olarak güvenli bir görevle başlat: dosya değiştirmeyen, sadece <strong>denetim yapan (audit)</strong> bir görev. Migration gibi yazma-ağırlıklı görevleri daha sonraya bırak.</p><ol><li>SaaS Dashboard&#x27;da şu prompt&#x27;u çalıştır: &#x27;ultracode: SaaS Dashboard&#x27;daki tüm route&#x27;larda auth kontrolünün tutarlı uygulandığını denetle — hangi endpoint&#x27;lerde middleware eksik, hangilerinde farklı bir pattern kullanılmış, listele.&#x27;</li><li>Claude&#x27;un görevi bir workflow&#x27;a çevirdiğini onay kartından (Desktop) veya session mesajından gözlemle.</li><li><code>/workflows</code> komutunu çalıştır, run&#x27;ı seç ve ilerleme görünümünü aç.</li></ol><h3 class="sub">2.6 Run&#x27;ı İzle ve Script&#x27;i Oku</h3><ol><li>İlerleme görünümünde her fazın agent sayısını, token toplamını ve geçen süreyi incele.</li><li>Bir faza gir (drill down) ve o fazdaki agent&#x27;lardan birinin ne bulduğunu oku.</li><li>Claude&#x27;un yazdığı script dosyasını aç; <code>agent()</code> ve <code>pipeline()</code> çağrılarının hangi dosya kümesine hangi görevi verdiğini takip et — script&#x27;i <strong>değiştirmeyeceksin</strong>, sadece orkestrasyonun mantığını anlayacaksın.</li><li>Run tamamlandığında session&#x27;a düşen final raporu oku: her bulgu hangi kaynaktan geldi, hangi iddialar çapraz kontrolü geçemedi.</li></ol><h3 class="sub">2.7 Sonucu Küçük Bir Patch&#x27;e Dönüştür ve Kaydet</h3><ol><li>Raporda öncelikli bulunan 1-2 endpoint için Claude&#x27;dan düzeltme patch&#x27;i iste (bu artık workflow değil, normal bir oturum adımıdır).</li><li>Patch&#x27;i test et, commit et.</li><li>Beğendiğin workflow&#x27;u tekrar kullanmak için kaydet: <code>/workflows</code> → çalışan/biten run&#x27;ı seç → <code>s</code> tuşu → <code>.claude/workflows/</code> (proje geneli, takımla paylaşılır) veya <code>~/.claude/workflows/</code> (kişisel).</li><li>Kaydedilen workflow artık <code>/</code> otomatik tamamlamasında bir komut olarak görünür — bir dahaki denetimde yeniden yazmana gerek kalmaz.</li></ol><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK DERİNLEŞ</h2><h3 class="sub">3.1 Üç Katmanı Yan Yana Kullanmak</h3><p>Şimdiye kadar üç farklı paralellik katmanını gördün: worktree+subagent (Gün 16), Agent Teams ve Dynamic Workflows. Bu bölümde SaaS Dashboard&#x27;a 3 bağımsız feature ekleyerek üçünü aynı projede, bilinçli bir seçimle kullanacaksın — challenge&#x27;ın kendisi budur.</p><table><thead><tr><th>Görev tipi</th><th>Önerilen katman</th><th>Neden</th></tr></thead><tbody><tr><td>Tek, net sınırlı bir dosya değişikliği</td><td>Worktree + subagent (Gün 16)</td><td>Koordinasyon overhead&#x27;i gereksiz; hızlı ve ucuz</td></tr><tr><td>Birbirini sorgulaması gereken çok açılı bir inceleme (güvenlik+performans+test)</td><td>Agent Teams</td><td>Bulguların birbirine akması gerekiyor</td></tr><tr><td>Onlarca dosyada tekrarlanan bir denetim/tutarlılık kontrolü</td><td>Dynamic Workflow</td><td>Tek context window&#x27;a sığmayan ölçek; tekrarlanabilir script</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Karar kriteri hep aynı iki soru: (1) İşçiler birbirine konuşmalı mı? (2) İş, tek context window&#x27;un rahatça tutabileceği ölçekte mi? Hayır/Evet → worktree+subagent; Evet/Evet → Agent Teams; Hayır/Hayır → Dynamic Workflow.</div><h3 class="sub">3.2 Maliyet Farkındalığı</h3><p>Her katman farklı bir maliyet profiline sahiptir. Agent Teams&#x27;te her teammate tam bir context window&#x27;dur — üç teammate, kabaca tek session&#x27;ın birkaç katı token tüketebilir. Dynamic Workflows&#x27;ta agent sayısı onlara-yüzlere çıkabildiği için toplam token daha da büyüyebilir; bu yüzden 25 agent/1.5M token eşiği bir uyarı olarak var.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Aynı dosyaya iki teammate&#x27;in (veya iki workflow agent&#x27;ının) yazması en sık rastlanan hata sınıfıdır. Önlem Gün 16&#x27;dan tanıdık: net dosya sahipliği + contract-first + küçük scope.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Büyük bir migration&#x27;ı hiç test etmeden doğrudan Dynamic Workflow&#x27;a vermek riskli ve pahalıdır. Önce küçük bir slice ile (tek modül, tek dosya kümesi) dene, sonucu doğrula, sonra ölçeği büyüt.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>/effort ultracode</code>&#x27;u kapatmayı unutup rutin işe dönmek, her küçük görevi gereksiz yere workflow&#x27;a çevirir. Session bitmeden <code>/effort high</code>&#x27;a dön.</div><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Agent Team Spawn: Çok Açılı Code Review</div><pre><code>Auth modülünü (src/auth/) 3 açıdan incele. Üç teammate spawn et: 1) security-reviewer — token handling, session yönetimi, input validation, sadece src/auth/ dosyalarına bakar. 2) performance-reviewer — query ve API katmanındaki gecikme kaynaklarını arar, sadece backend/api/ dosyalarına bakar. 3) test-coverage-reviewer — eksik test senaryolarını listeler, sadece tests/ dizinine bakar. Her teammate sadece kendi alanına dokunsun, bulgularını birbirine bildirsin. Sonunda bana bulgu matrisi + risk sırası + merge önerisi getir.</code></pre><div class="note">Agent Teams etkinleştirildikten sonra çalıştır. Dosya sahipliğini prompt&#x27;ta açıkça belirtmek conflict riskini azaltır.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Task Partitioning: Takım İçi Bağımlılıklar</div><pre><code>Bu görevi takım içinde bağımlılıklı görevlere böl. Her görev için: hangi teammate sorumlu, hangi dosyalara dokunacak, hangi görev tamamlanmadan başlayamaz, kabul kriteri ne. Aynı dosyaya iki teammate&#x27;in yazmasını engelle.</code></pre><div class="note">Takımı spawn etmeden önce bu prompt&#x27;la planı netleştir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Dynamic Workflow: Codebase Denetimi (Audit)</div><pre><code>ultracode: SaaS Dashboard&#x27;daki tüm route&#x27;larda auth kontrolünün tutarlı uygulandığını denetle. Her endpoint için middleware&#x27;in var olup olmadığını, varsa hangi pattern&#x27;i kullandığını kontrol et. Eksik veya tutarsız olanları önem sırasına göre listele. Hiçbir dosyayı değiştirme, sadece rapor üret.</code></pre><div class="note">İlk workflow denemesi için yazma yapmayan bir audit görevi seç — migration gibi riskli işleri daha sonraya bırak.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Workflow Sonucunu Komuta Dönüştürme</div><pre><code>Az önce çalışan auth-tutarlılık denetim workflow&#x27;unu tekrar kullanılabilir bir komut olarak kaydetmek istiyorum. `.claude/workflows/` altına, proje genelinde paylaşılacak şekilde kaydet ve kısa bir kullanım notu ekle.</code></pre><div class="note"><code>/workflows</code> üzerinden <code>s</code> tuşuyla da yapılabilir; bu prompt Claude&#x27;a doğrudan istekle aynı işi yaptırır.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>CHALLENGE: SaaS Dashboard&#x27;a 3 Bağımsız Feature — Üç Farklı Orkestrasyon Katmanı</h3><p>SaaS Dashboard&#x27;a birbirinden bağımsız 3 küçük iyileştirme ekleyeceksin. Her birini farklı bir katmanla geliştir: biri worktree+subagent (Gün 16), biri Agent Teams, biri Dynamic Workflow ile. Amaç sadece feature&#x27;ları tamamlamak değil, hangi katmanı ne zaman seçeceğine dair gerekçeli bir karar vermek.</p><p><strong>Gereksinimler:</strong></p><ul><li>Feature 1 (worktree+subagent): küçük, net sınırlı bir iyileştirme — örn. bir endpoint&#x27;e input validation eklemek. <code>claude -w</code> ile izole worktree&#x27;de geliştir.</li><li>Feature 2 (Agent Teams): birden fazla açıdan bakılması gereken bir görev — örn. yeni bir &#x27;export data&#x27; endpoint&#x27;ini güvenlik + performans açısından incelettirip geliştirt. En az 2 teammate spawn et, dosya sahipliğini ayır.</li><li>Feature 3 (Dynamic Workflow): tekrarlanan bir denetim/tutarlılık kontrolü — örn. tüm API response&#x27;larının hata formatının tutarlı olup olmadığını denetle, bulunan 1-2 sorunu küçük bir patch ile düzelt.</li><li>Her feature için hangi katmanı neden seçtiğini bir cümleyle not et.</li><li>Agent Teams&#x27;te takımı düzgün kapat (shutdown isteği); Dynamic Workflow&#x27;u <code>/workflows</code>&#x27;tan izle.</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>Üç feature de tamamlandı ve doğru katmanla geliştirildi</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>Worktree feature&#x27;ı ayrı branch&#x27;te, temiz bir commit ile bitti</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>Agent Teams feature&#x27;ında en az 2 teammate net dosya sahipliğiyle çalıştı, bulgular birbirine iletildi</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>Dynamic Workflow feature&#x27;ında <code>/workflows</code> ile run izlendi, sonuç küçük bir patch&#x27;e dönüştürüldü</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>Her feature için katman seçim gerekçesi yazılı olarak belirtildi</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>Agent Teams session&#x27;ı temiz şekilde kapatıldı (orphaned tmux session kalmadı)</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge üç katmanı aynı projede, art arda kullanmanı sağlar. Sıra önemlidir: önce en ucuz katmandan (worktree+subagent) başla, sonra koordinasyon gerektiren işe (Agent Teams) geç, en sona ölçek gerektiren denetimi (Dynamic Workflow) bırak.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) Worktree + Subagent Feature</div><pre><code>claude -w input-validation komutuyla worktree aç. Ardından: &#x27;/api/reports endpoint&#x27;ine input validation ekle — tarih aralığı ve sayfa numarası parametrelerini doğrula, hatalı girişte 400 ve açık hata mesajı dön. Testini yaz ve çalıştır. Commit et.&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) Agent Teams Feature</div><pre><code>&#x27;export data&#x27; endpoint&#x27;ini ekleyeceğim. Bir güvenlik teammate (rate limiting ve yetkilendirme kontrolü, sadece backend/export/ dosyalarına dokunur) ve bir performans teammate (büyük veri setlerinde streaming response, sadece aynı dizine dokunur) spawn et. İkisi bulgularını paylaşıp ortak bir implementasyon planında anlaşsın, sonra uygulasınlar.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) Dynamic Workflow Feature</div><pre><code>ultracode: Tüm API endpoint&#x27;lerinin hata response formatını denetle — aynı { error, code, message } şemasını kullanıyorlar mı? Tutarsız olanları listele, hiçbir dosyayı değiştirme.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4) Workflow Sonucunu Patch&#x27;e Dönüştürme</div><pre><code>Denetim raporundaki en öncelikli 2 tutarsızlığı düzelt: response formatlarını ortak şemaya çevir, testleri çalıştır, commit et.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Worktree feature&#x27;ı en ucuz ve en hızlı olduğu için önce bitirmek, sonraki iki katmanın maliyetini daha rahat gözlemlemeni sağlar.</li><li>Agent Teams&#x27;te teammate&#x27;lerin &#x27;ortak bir planda anlaşması&#x27; istendiğinde, lead bulguları senteze dönüştürüp tek bir implementasyon kararına varır.</li><li>Dynamic Workflow&#x27;un raporu değişiklik yapmadan geldiği için, patch&#x27;i ayrı bir adımda (workflow dışında) uygulaman gerekir — bu bilinçli bir güvenlik sınırıdır.</li><li><code>/workflows</code> ve agent panelini (Agent Teams için) yan yana açık tutmak, hangi katmanın ne kadar sürdüğünü karşılaştırmanı kolaylaştırır.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ Agent Teams&#x27;te dosya sahipliğini belirtmemek → İki teammate aynı dosyaya yazar, merge conflict kaçınılmaz olur.</li><li>⚠️ Dynamic Workflow&#x27;dan doğrudan dosya değişikliği beklemek → Workflow rapor üretir; patch ayrı bir adımdır.</li><li>⚠️ İlk workflow denemesini büyük bir migration ile yapmak → Token maliyeti sürpriz olur; küçük audit ile başla.</li><li>⚠️ Agent Teams session&#x27;ını <code>/exit</code> yerine terminali kapatarak bitirmek → Orphaned tmux session kalabilir; <code>tmux ls</code> ile kontrol et.</li><li>⚠️ <code>/effort ultracode</code>&#x27;u açık unutmak → Rutin görevler bile workflow&#x27;a döner, maliyet artar.</li><li>⚠️ Worktree feature&#x27;ı için Agent Teams kurmak → Tek dosyalık iş için gereksiz koordinasyon overhead&#x27;i; katman seçimi göreve göre yapılmalı.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Agent Teams&#x27;te koordinasyonu Claude (team lead) yapar; Dynamic Workflows&#x27;ta koordinasyonu Claude&#x27;un yazdığı bir script yapar — &#x27;planı kim tutuyor&#x27; sorusu iki katmanı ayıran temel eksendir.</li><li>Agent Teams hâlâ deneysel ve varsayılan kapalı: <code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code> ile açılır; teammate&#x27;ler tam context window&#x27;lu bağımsız session&#x27;lardır ve lead&#x27;in konuşma geçmişini almazlar.</li><li>Subagent&#x27;lar sadece ana agent&#x27;a rapor eder; Agent Teams&#x27;te teammate&#x27;ler doğrudan birbirine mesaj atar ve paylaşılan task list&#x27;ten görev claim eder.</li><li>Dynamic Workflow script&#x27;i <code>agent()</code>/<code>pipeline()</code> çağrılarıyla onlarca-yüzlerce subagent&#x27;ı orkestre eder; sen script&#x27;i yazmazsın, okur ve beğendiğini komut olarak kaydedersin.</li><li><code>ultracode</code> iki ayrı mekanizmadır: prompt içindeki kelime tek görevi workflow&#x27;a çevirir, <code>/effort ultracode</code> oturum geneli her önemli görevi otomatik workflow&#x27;a çevirir.</li><li>Dynamic Workflows&#x27;ta somut limitler var: 16 eşzamanlı agent, run başına 1000 agent üst sınırı, 25 agent/1.5M token eşiğinde bilgilendirici &#x27;Large workflow&#x27; uyarısı.</li><li>Agent Teams&#x27;te ayrı bir cleanup adımı yoktur — session çıkışında paylaşılan dizinler otomatik temizlenir; orphaned tmux session&#x27;lar tek manuel troubleshooting durumudur.</li><li>Katman seçimi iki soruya indirgenir: işçiler birbirine konuşmalı mı, iş tek context window&#x27;a sığar mı — cevaba göre worktree+subagent / Agent Teams / Dynamic Workflow arasında seçim yapılır.</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/agent-teams" target="_blank" rel="noopener">Orchestrate teams of Claude Code sessions — Agent Teams mimarisi, etkinleştirme, task list, mailbox, shutdown ve known limitations</a></li><li>⭐ <a href="https://code.claude.com/docs/en/workflows" target="_blank" rel="noopener">Orchestrate subagents at scale with dynamic workflows — script yapısı, ultracode tetikleyicileri, limitler, /workflows kullanımı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/agents" target="_blank" rel="noopener">Run agents in parallel — subagent, agent view, agent teams ve dynamic workflows&#x27;u karşılaştıran resmi köprü sayfa</a></li><li>⭐ <a href="https://code.claude.com/docs/en/sub-agents" target="_blank" rel="noopener">Create custom subagents — teammate spawn prompt&#x27;larını tasarlarken referans alınacak subagent tanımı</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 18)</span>Yarın (Gün 18) Claude Code&#x27;u pipeline&#x27;ına ve takvimine sokuyorsun: headless mode (Agent SDK), GitHub Actions/GitLab CI entegrasyonu, otomatik PR review ve zamanlanmış Routines ile Claude&#x27;un bilgisayarın kapalıyken bile çalışmasını sağlayacaksın.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Agent Teams&#x27;i <code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code> ile (shell env veya settings.json) etkinleştirdim</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span>Dosya sahipliği net ayrılmış en az 2 teammate spawn ettim</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>Task list&#x27;i <code>Ctrl+T</code> ile görüntüledim, en az bir teammate&#x27;e doğrudan mesaj gönderdim</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>Agent Teams session&#x27;ını düzgün kapattım (shutdown isteği) ve orphaned tmux session kontrolü yaptım</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span><code>ultracode</code> anahtar kelimesiyle veya doğal dille bir görevi Dynamic Workflow&#x27;a çevirdim</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span><code>/workflows</code> ile run&#x27;ı izledim, en az bir fazın agent sayısı ve token toplamını inceledim</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>Claude&#x27;un yazdığı workflow script&#x27;ini açıp <code>agent()</code>/<code>pipeline()</code> çağrılarını yorumladım (değiştirmedim)</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Workflow sonucunu küçük bir patch&#x27;e dönüştürüp commit ettim</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span><code>ultracode</code> keyword ile <code>/effort ultracode</code> arasındaki farkı açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Skill / Subagent / Agent View+Worktree / Agent Teams / Dynamic Workflow arasında hangi görevi hangi katmana vereceğime karar verebiliyorum</span></label></li><li><label><input type="checkbox" data-k="final10" data-final="1"><span>Challenge&#x27;ı tamamladım: 3 feature, 3 farklı katman, her biri için seçim gerekçesi yazılı</span></label></li></ul><div class="pager"><a href="gun16-paralel-agent-view-worktrees.html"><div class="dir">← Önceki</div><div class="tt">Gün 16</div><div>Paralel Çalışma, Agent View ve Worktrees</div></a><a class="next disabled">&nbsp;</a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 17/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=17;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>

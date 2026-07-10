@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 16 — Paralel Çalışma, Agent View ve Worktrees · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><a href="gun11-subagentlar.html"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></a><a href="gun12-hooks-sandboxing.html"><span class="num">12</span><span>Hooks ve Sandboxing</span></a><a href="gun13-skills-plugins.html"><span class="num">13</span><span>Skills &amp; Plugins</span></a><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><span class="cur"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></span><a href="gun17-agent-teams-dynamic-workflows.html"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></a><span class="locked" title="yakında"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><span class="locked" title="yakında"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><span class="locked" title="yakında"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></span></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 4 — Master · Gün 16 / 20</div><div class="tierbadge">🟠 Kademe 3</div><h1>Paralel Çalışma, Agent View ve Worktrees</h1><p class="tagline">“Birden fazla Claude&#x27;u aynı anda çalıştır ve tek ekrandan yönet”</p><p class="intro">Gün 15&#x27;te her yazılım rolü için uzmanlaşmış agent&#x27;lar tanımladın. Bugün bu agent&#x27;ları ve Claude Code oturumlarını aynı anda çalıştırmayı öğreniyorsun. Tek bir terminal sekmesinde sırayla iş yapmak yerine, birden fazla worktree&#x27;de izole oturumlar açıp agent view ile hepsini tek ekrandan yöneteceksin. Günün sonunda SaaS Dashboard&#x27;a paralel olarak backend ve frontend feature ekleyip, contract-first bir workflow ile merge edeceksin — üstelik çakışma riski olmadan.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Teorik: Paralellik Zihinsel Modeli</div><div class="du">35 dk</div><div class="de">Neden paralel çalışılır, worktree vs agent view, task partitioning kuralları, karar matrisi</div></div><div class="step"><div class="ph">2 · Pratik: Worktrees ile İzolasyon</div><div class="du">40 dk</div><div class="de">--worktree / -w, .worktreeinclude, subagent worktree izolasyonu, cleanup</div></div><div class="step"><div class="ph">3 · Pratik: Agent View</div><div class="du">45 dk</div><div class="de">claude agents, dispatch/peek/attach, claude --bg, /background, state okuma, pattern&#x27;ler</div></div><div class="step"><div class="ph">4 · Mini Challenge</div><div class="du">30 dk</div><div class="de">SaaS Dashboard&#x27;a Usage Metrics feature&#x27;ı: backend + frontend + integration, paralel worktree&#x27;ler</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-15 tamamlanmış: Claude Code kurulu, subagent&#x27;lar (Gün 11), hooks (Gün 12), skill/plugin (Gün 13), SaaS Dashboard projesi başlatılmış (Gün 14), rol agent&#x27;ları (Gün 15); SaaS Dashboard projesi Git repository&#x27;si olarak init edilmiş (en az bir commit); Terminal ve Claude Code çalışır durumda (v2.1.139+ önerilir, agent view için)</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); İkinci bir terminal sekmesi/penceresi (tmux, iterm2 split, VS Code terminal vb.); Git (worktree desteği için zorunlu); VS Code veya tercih edilen editör</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Worktrees, agent view, agent teams ve dynamic workflows arasındaki farkı — &#x27;kim koordine ediyor, işçiler birbirine konuşuyor mu, aynı dosyaya mı yazıyorlar&#x27; eksenlerinde — açıklayabileceksin</li><li><code>--worktree</code> / <code>-w</code> flag&#x27;i ile izole git worktree&#x27;lerde oturum başlatabilecek; <code>.worktreeinclude</code> ile gitignored dosyaları otomatik taşıyabileceksin</li><li><code>claude agents</code> (agent view) ile arka plan oturumları dispatch edip tek ekrandan izleyebilecek; <code>claude --bg</code> ile shell&#x27;den, <code>/background</code> ile mevcut session&#x27;dan arka plan oturumu başlatabileceksin</li><li>Writer/Reviewer ve Test-first paralel çalışma pattern&#x27;lerini uygulayabileceksin</li><li>Paralel task partitioning kurallarını (contract-first, dosya ayrımı, scope sınırlama, integration pass) uygulayabileceksin</li><li>Ne zaman paralel, ne zaman sıralı çalışmanın daha verimli olduğuna — bağımlılık, rate limit ve maliyet çarpanı farkındalığıyla — karar verebileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Neden Paralel Çalışma?</h3><p>Claude Code oturumları hızlandıkça asıl darboğaz AI&#x27;ın kodu yazması değil, senin bekleme ve context-switch süren oluyor. Tek terminal sekmesinde sırayla bir feature geliştirip, bir bug düzeltip, bir de review yapmak yüzlerce dakika demek. Paralel çalışma bu sırayı kırar: bir oturum feature yazarken, ikincisi bug düzeltir, üçüncüsünü sadece hazır olduğunda kontrol edersin.</p><p>Ancak paralellik bedava değil. Her oturum senin abonelik kotanı bağımsız tüketir — üç paralel oturum, üç kat token harcar. Yanlış bölünmüş görevler aynı dosyaya iki oturumun yazmasına, dolayısıyla merge conflict&#x27;e yol açar. Bu yüzden bugün iki şey öğreneceğiz: paralelliğin mekanikleri (worktree + agent view) ve paralelliğin tasarımı (task partitioning).</p><h3 class="sub">1.2 Karar Matrisi: Bugün Worktrees + Agent View, Yarın Agent Teams + Dynamic Workflows</h3><p>Claude Code&#x27;da paralel çalışmanın dört yaklaşımı var. Bunlar farklı soruları çözer; üst üste biner değil, yan yana durur:</p><table><thead><tr><th>Yaklaşım</th><th>Kim koordine eder?</th><th>İşçiler konuşur mu?</th><th>Dosya izolasyonu</th><th>Ne zaman?</th></tr></thead><tbody><tr><td>Worktrees</td><td>Sen (veya otomatik)</td><td>Hayır</td><td>Her oturum ayrı git checkout</td><td>Her zaman — dosya çakışmasını önler</td></tr><tr><td>Agent View</td><td>Sen (dispatch/peek/attach)</td><td>Hayır</td><td>Dispatch edilen her session otomatik worktree alır</td><td>Bağımsız görevleri paralel yürütmek istediğinde</td></tr><tr><td>Agent Teams</td><td>Claude (team lead)</td><td>Evet (mesajlaşma + task claim)</td><td>Git tabanlı</td><td>Birbiriyle koordineli çalışması gereken görevler — Gün 17</td></tr><tr><td>Dynamic Workflows</td><td>Script (sen yazarsın)</td><td>Hayır (script yönlendirir)</td><td>Worktree</td><td>Büyük migrasyon/denetim; tekrarlanabilir plan — Gün 17</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Bugünün odağı ilk iki satır: Worktrees dosya çakışmasını çözer, Agent View senin dikkatini yönetir. İkisi farklı problemi çözer ama birlikte kullanılır — agent view zaten dispatch ettiği her oturumu otomatik worktree&#x27;ye taşır.</div><p>Agent teams ve dynamic workflows&#x27;u yarın (Gün 17) derinlemesine göreceğiz. Aradaki temel fark: bugün koordinasyonu sen yapıyorsun (dispatch, peek, attach); yarın koordinasyonu Claude veya bir script yapacak.</p><h3 class="sub">1.3 Git Worktree Temelleri ve Claude Code&#x27;un Native Desteği</h3><p>Git worktree, aynı repository&#x27;ye bağlı ama dosya sistemi üzerinde ayrı bir dizinde yaşayan ikinci (üçüncü, dördüncü…) bir çalışma kopyadır. Her worktree kendi branch&#x27;ine sahiptir; ancak tümü aynı git history ve remote&#x27;u paylaşır. Bu sayede bir worktree&#x27;deki değişiklik diğerini etkilemez.</p><p>Claude Code, git worktree desteğini <code>--worktree</code> (kısa: <code>-w</code>) flag&#x27;i ile native olarak sunar. Bu flag&#x27;i kullandığında Claude Code:</p><ul><li>Projenin kök dizininde <code>.claude/worktrees/&lt;isim&gt;/</code> altında yeni bir worktree oluşturur.</li><li><code>worktree-&lt;isim&gt;</code> adında yeni bir branch açar (varsayılan olarak remote&#x27;un default branch&#x27;inden dallanır).</li><li>Claude Code oturumunu doğrudan bu izole dizinde başlatır.</li><li>Oturum bittiğinde (değişiklik yoksa) worktree ve branch&#x27;i otomatik temizler.</li></ul><pre><code># Terminal 1: feature-auth worktree&#x27;sinde oturum başlat
+claude --worktree feature-auth
+# veya kısa form:
+claude -w feature-auth
+
+# Terminal 2: aynı repo, farklı worktree
+claude -w bugfix-sidebar
+
+# İsimsiz worktree (Claude otomatik isim üretir, ör. bright-running-fox)
+claude -w</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span><code>.claude/worktrees/</code> dizinini <code>.gitignore</code> dosyana ekle; worktree içerikleri ana checkout&#x27;ta untracked dosya olarak görünmesin: <code>echo &#x27;.claude/worktrees/&#x27; &gt;&gt; .gitignore</code>.</div><h3 class="sub">1.4 Agent View: Tüm Oturumları Tek Ekrandan Yönet</h3><p>Agent view, <code>claude agents</code> komutu ile açılan terminal tabanlı bir dashboard&#x27;dur. Makine üzerinde çalışan tüm arka plan Claude Code oturumlarını tek bir listede gösterir. Her satır bir tam Claude Code konuşmasıdır — terminale bağlı olmadan çalışmaya devam eder.</p><p>Agent view&#x27;daki temel session state&#x27;leri:</p><table><thead><tr><th>State</th><th>İkon</th><th>Anlamı</th></tr></thead><tbody><tr><td>Working</td><td>✽ / ✻</td><td>Claude aktif olarak yanıt üretiyor veya bir araç çalıştırıyor</td></tr><tr><td>Needs input</td><td>Sarı nokta</td><td>Claude senden bir karar bekliyor — müdahale et</td></tr><tr><td>Idle</td><td>—</td><td>Bekliyor ama spesifik bir bloklayıcı soru yok</td></tr><tr><td>Completed</td><td>Yeşil ✢</td><td>Görev başarıyla tamamlandı</td></tr><tr><td>Failed</td><td>Kırmızı</td><td>Terminal bir hata ile durdu</td></tr><tr><td>Stopped</td><td>Gri</td><td>Oturum durduruldu</td></tr></tbody></table><p>Bunlara ek olarak, liste görünümünde PR açılmış işler &#x27;Ready for review&#x27; grubu altında toplanabilir. Bu ayrı bir state değil, bir sunum gruplamasıdır.</p><p>Agent view&#x27;a girmek ve arka plan oturumu başlatmak için iki farklı yol var. Ayrımı bilmek önemli:</p><table><thead><tr><th>Kullanım</th><th>Komut</th><th>Bağlam</th></tr></thead><tbody><tr><td>Dashboard&#x27;u aç</td><td>claude agents</td><td>Terminal&#x27;den; tüm session&#x27;ları listeler</td></tr><tr><td>Shell&#x27;den yeni arka plan oturumu başlat</td><td>claude --bg &quot;görev açıklaması&quot;</td><td>Scriptable; session ID döner</td></tr><tr><td>Mevcut oturumu arka plana gönder</td><td>/background veya /bg</td><td>Aktif konuşmanın içinden; konuşma arka planda devam eder</td></tr><tr><td>Arka plan oturumuna bağlan</td><td>claude attach &lt;session-id&gt;</td><td>Tam konuşma transcript&#x27;ine dönersin</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Agent view Temmuz 2026 itibarıyla Research Preview aşamasında (v2.1.139+). Arayüz ve kısayol tuşları değişebilir. Oturumlar local&#x27;dir — laptop uykuya geçerse oturumlar durur; <code>claude respawn --all</code> ile yeniden başlatılır. Her paralel oturum kotanı bağımsız tüketir.</div><h3 class="sub">1.5 Desktop App&#x27;te Paralel Oturumlar</h3><p>Claude Code Desktop App&#x27;in Code tab&#x27;inde, local Git repository üzerinde açılan paralel session&#x27;lar varsayılan olarak ayrı git worktree içinde çalışır. Bu sayede split pane&#x27;lerde birden fazla oturumu görsel olarak yan yana izleyebilir, görsel diff inceleyebilir ve PR durumlarını takip edebilirsin.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Bu davranış local Git repository session&#x27;ları için geçerlidir. Git repository&#x27;si olmayan bir dizinde veya farklı environment&#x27;larda (cloud, cowork) aynı izolasyon davranışı garanti edilmez.</div><div class="callout tip"><span class="lbl">💡 İpucu</span>Desktop App&#x27;i CLI ile birlikte kullanabilirsin: CLI&#x27;dan <code>claude --bg</code> ile dispatch ettiğin oturumlar Desktop App&#x27;in agent view panelinde de görünür. İkisi aynı supervisor process&#x27;i paylaşır.</div><h3 class="sub">1.6 Paralel Task Partitioning Kuralları</h3><p>Paralel çalışmanın başarısı komutları bilmekten çok, işi doğru bölmeye bağlıdır. Yanlış bölünmüş görevler conflict, tekrar ve zaman kaybı yaratır. Beş temel kural:</p><table><thead><tr><th>Kural</th><th>Açıklama</th><th>Kötü örnek → İyi örnek</th></tr></thead><tbody><tr><td>Aynı dosyaya iki agent yazmasın</td><td>Conflict riskini doğrudan azaltır</td><td>&#x27;Dashboard&#x27;u geliştir&#x27; → &#x27;Backend: /api/metrics endpoint&#x27;i ekle / Frontend: MetricsCard component&#x27;i yaz&#x27;</td></tr><tr><td>Contract önce yazılsın</td><td>Backend ve frontend paralel çalışacaksa API contract veya mock schema önceden sabitlenmeli</td><td>İkisi birden &#x27;bir şeyler yapsın&#x27; → Önce UsageSummary type tanımla, sonra paralel başlat</td></tr><tr><td>Her agent&#x27;ın scope&#x27;u küçük olsun</td><td>Tek sorumluluk ilkesi: bir oturum bir iş</td><td>&#x27;Dashboard&#x27;u tamamla&#x27; → &#x27;/api/usage/summary endpoint&#x27;i ekle&#x27;</td></tr><tr><td>Her session kendi commit&#x27;ini atsın</td><td>Merge ve rollback kolaylaşır; her branch izlenebilir</td><td>Commit&#x27;siz çalışıp sonra toplu → Her oturum kendi branch&#x27;inde commit</td></tr><tr><td>Integration agent ayrı olsun</td><td>Son bir oturum tüm branch&#x27;leri entegre edip test çalıştırsın</td><td>Herkes merge etsin → Bir integration pass tüm branch&#x27;leri birleştirir</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>İyi partitioning conflict&#x27;i azaltır. Eğer paralel çalışırken sürekli conflict çıkıyorsa, sorun araçta değil görev bölümünde. Bugünkü challenge&#x27;da bunu bizzat deneyimleyeceksin.</div><h3 class="sub">1.7 Ne Zaman Paralel, Ne Zaman Sıralı?</h3><p>Her iş paralele uygun değildir. Karar verirken şu soruları sor:</p><ul><li><strong>Görevler birbirinden bağımsız mı?</strong> Bağımsızsa paralel; Feature B, Feature A&#x27;nın çıktısına bağlıysa sıralı.</li><li><strong>Aynı dosyalara dokunacaklar mı?</strong> Dokunacaklarsa scope&#x27;u daralt veya sıralı çalış.</li><li><strong>Kotam yeterli mi?</strong> 3 paralel oturum = 3× token tüketimi. Pro plan&#x27;da 5+ eşzamanlı oturum rate limit&#x27;e takılabilir.</li><li><strong>Görev kısa mı?</strong> 10 dakikada biten bir düzeltme için worktree kurulumu overhead yaratır; doğrudan ana session&#x27;da yap.</li><li><strong>Sonuçları bütünleştirmem gerekecek mi?</strong> Integration pass planlıyorsan zaman ayır.</li></ul><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 İlk Worktree Oturumunu Başlat</h3><p>SaaS Dashboard proje dizinine git. Bu proje Gün 14&#x27;te oluşturuldu ve en az bir commit içeriyor olmalı (worktree, git repository gerektirir).</p><ol><li>SaaS Dashboard proje dizinine gir: <code>cd ~/projects/saas-dashboard</code> (veya senin dizinin).</li><li>İlk worktree oturumunu başlat: <code>claude --worktree feature-metrics-api</code></li><li>Claude Code&#x27;un <code>.claude/worktrees/feature-metrics-api/</code> dizinini oluşturduğunu gözlemle.</li><li>Worktree&#x27;nin hangi branch&#x27;te olduğunu kontrol et: <code>git branch</code> (worktree-feature-metrics-api branch&#x27;i görünecek).</li><li>Bu oturumda küçük bir değişiklik yap (ör. bir yorum satırı ekle) ve commit et.</li></ol><pre><code># Worktree başlatıldıktan sonra Claude oturumunda:
+# Claude otomatik olarak .claude/worktrees/feature-metrics-api/ dizininde çalışır
+
+# Aktif worktree&#x27;leri listele (ayrı bir terminal&#x27;den):
+git worktree list
+# Çıktı:
+# /home/user/projects/saas-dashboard                        abc1234 [main]
+# /home/user/projects/saas-dashboard/.claude/worktrees/feature-metrics-api  def5678 [worktree-feature-metrics-api]</code></pre><h3 class="sub">2.2 İkinci Worktree ile Paralel Çalışma</h3><ol><li>Yeni bir terminal sekmesi/penceresi aç (ana proje dizininde ol).</li><li>İkinci bir worktree oturumu başlat: <code>claude -w feature-metrics-widget</code></li><li>Şimdi iki ayrı Claude Code oturumun var: biri API, diğeri frontend widget üzerinde çalışabilir.</li><li><code>git worktree list</code> ile iki worktree&#x27;yi doğrula.</li><li>Her iki oturumda da bağımsız değişiklikler yap ve commit et.</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>tmux kullanıyorsan <code>Ctrl+B %</code> ile terminal&#x27;i dikey böl; sol panelde bir worktree, sağda diğeri. VS Code&#x27;da Terminal → Split Terminal ile aynı sonucu alırsın.</div><h3 class="sub">2.3 .worktreeinclude ile Gitignored Dosyaları Taşıma</h3><p>Worktree yeni bir git checkout olduğu için <code>.env</code>, <code>.env.local</code> gibi gitignored dosyalar otomatik gelmez. <code>.worktreeinclude</code> dosyası bu sorunu çözer.</p><ol><li>Proje kök dizininde <code>.worktreeinclude</code> dosyası oluştur:</li><li>İçine taşınmasını istediğin gitignored dosya pattern&#x27;lerini yaz (<code>.gitignore</code> sözdizimi).</li><li>Yeni bir worktree başlattığında bu dosyalar otomatik kopyalanır.</li></ol><pre><code># .worktreeinclude dosyası (proje kök dizini)
+.env
+.env.local
+config/secrets.yaml</code></pre><p>Kural: Yalnızca bir pattern&#x27;e uyan ve aynı zamanda gitignored olan dosyalar kopyalanır — tracked dosyalar asla çoğaltılmaz. Bu mekanizma <code>--worktree</code>, subagent worktree&#x27;leri ve Desktop App paralel session&#x27;ları için geçerlidir.</p><h3 class="sub">2.4 Subagent Worktree İzolasyonu</h3><p>Gün 11&#x27;de öğrendiğin subagent&#x27;lar da kendi worktree&#x27;lerinde çalışabilir. Bu özellikle birden fazla subagent&#x27;ın paralel dosya düzenlemesi gereken durumlarda (ör. her modülü ayrı bir subagent migrate etsin) kritiktir.</p><pre><code># .claude/agents/migration-worker.md
+---
+name: migration-worker
+description: Kod migration uzmanı
+tools: Read, Write, Edit, Bash, Grep, Glob
+model: sonnet
+effort: high
+isolation: worktree
+---
+Sen bir kod migration uzmanısın. Verilen modülü migrate et,
+build&#x27;ın geçtiğini doğrula.</code></pre><p>Subagent worktree&#x27;leri geçicidir: subagent değişiklik yapmadan biterse worktree ve branch otomatik silinir. Değişiklik varsa commit&#x27;lenmiş olarak kalır ve ana oturumdan merge edilebilir.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Prompt&#x27;ta da isteyebilirsin: &#x27;Subagent&#x27;larını worktree izolasyonuyla çalıştır&#x27; — Claude bunu anlayıp her subagent&#x27;a ayrı worktree verir.</div><h3 class="sub">2.5 Worktree Cleanup ve Yaşam Döngüsü</h3><p>Bir worktree oturumundan çıktığında temizlik davranışı şöyle çalışır:</p><table><thead><tr><th>Durum</th><th>Davranış</th></tr></thead><tbody><tr><td>Uncommitted değişiklik yok, yeni commit yok, untracked dosya yok</td><td>Worktree ve branch otomatik silinir</td></tr><tr><td>Oturumun bir ismi var (--worktree ile verdiysen)</td><td>Claude sorar: sakla mı sil mi?</td></tr><tr><td>Commit&#x27;lenmiş değişiklikler var</td><td>Worktree kalır; merge veya push yapman beklenir</td></tr><tr><td>-p (non-interactive) ile oluşturulmuş worktree</td><td>Otomatik temizlenmez; manuel <code>git worktree remove</code> gerekir</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Worktree&#x27;yi kapatmadan/silmeden önce mutlaka <code>git status</code> çalıştır. Commit edilmemiş veya push edilmemiş değişikliklerin kaybolmaması için merge veya push yap. <code>git worktree remove --force</code> ile zorla silersen commit&#x27;lenmemiş değişiklikler gider.</div><pre><code># Aktif worktree&#x27;leri listele:
+git worktree list
+
+# Belirli bir worktree&#x27;yi kaldır (değişiklik yoksa):
+git worktree remove .claude/worktrees/feature-metrics-api
+
+# Zorla kaldır (dikkatli!):
+git worktree remove --force .claude/worktrees/eski-deneme</code></pre><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ / UYGULAMA</h2><h3 class="sub">3.1 Agent View ile Çoklu Oturumları Yönetme</h3><ol><li>Ana proje dizininde <code>claude agents</code> komutunu çalıştır. Agent view dashboard&#x27;u açılır.</li><li>Alt kısımdaki input alanına bir görev yaz ve Enter&#x27;a bas. Yeni bir arka plan oturumu başlar ve tabloda bir satır olarak görünür.</li><li>İkinci bir görev daha dispatch et (her prompt ayrı bir oturum başlatır).</li><li>Space tuşu ile bir satıra peek yap — son çıktıyı göreceksin, konuşmaya girmeden.</li><li>Enter ile bir oturuma attach ol — tam konuşma transcript&#x27;ine dönersin.</li><li>Boş prompt&#x27;ta ← (sol ok) ile agent view&#x27;a geri dön; oturum arka planda çalışmaya devam eder.</li><li>Esc ile agent view&#x27;dan çık — oturumlar çalışmaya devam eder.</li></ol><pre><code># Agent view&#x27;ı aç:
+claude agents
+
+# Tek projeye filtrele:
+claude agents --cwd ~/projects/saas-dashboard
+
+# Shell&#x27;den doğrudan arka plan oturumu başlat (agent view açmadan):
+claude --bg &quot;SaaS Dashboard&#x27;daki flaky test&#x27;i bul, düzelt ve PR aç&quot;
+
+# Belirli bir agent ile arka plan oturumu:
+claude --agent code-reviewer --bg &quot;PR #42&#x27;deki review yorumlarını çöz&quot;</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>Agent view&#x27;da Ctrl+S ile gruplalamayı dizine göre / duruma göre geçiş yapabilirsin. Ctrl+R ile bir oturumu yeniden adlandırabilirsin — satırlar bir task board gibi okunabilir olsun.</div><h3 class="sub">3.2 Mevcut Oturumdan Arka Plana Geçiş</h3><p>Shell&#x27;den <code>claude --bg</code> ile yeni oturum başlatmak dışında, aktif bir Claude Code konuşmasını da arka plana gönderebilirsin. Bu iki farklı mekanizmayı karıştırmamak önemli:</p><table><thead><tr><th>Durum</th><th>Kullanım</th><th>Ne olur</th></tr></thead><tbody><tr><td>Yeni arka plan oturumu başlat (shell&#x27;den)</td><td>claude --bg &quot;görev&quot;</td><td>Yeni session ID alırsın; agent view&#x27;da satır olarak görünür</td></tr><tr><td>Mevcut konuşmayı arka plana gönder</td><td>/background veya /bg</td><td>Aktif konuşma arka planda çalışmaya devam eder; agent view&#x27;da görünür olur</td></tr><tr><td>Arka plan oturumuna bağlan</td><td>claude attach &lt;id&gt;</td><td>Tam transcript ile oturuma dönersin</td></tr><tr><td>Arka plan oturumunu durdur</td><td>/stop (içinden) veya claude stop &lt;id&gt;</td><td>Oturum sonlanır, worktree kalır</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>← (sol ok), Ctrl+C, Ctrl+D, Ctrl+Z ve /exit ile oturumdan ayrılsan bile arka plan oturumu çalışmaya devam eder. Oturumu tamamen durdurmak için /stop kullan.</div><h3 class="sub">3.3 Writer/Reviewer Pattern</h3><p>Paralel çalışmanın en yaygın pattern&#x27;i: bir oturum yazar, diğeri inceler. Bu pattern kod kalitesini artırır çünkü reviewer farklı bir context&#x27;te, yazarın varsayımlarından bağımsız bakabilir.</p><ol><li>Birinci worktree&#x27;de (writer): <code>claude -w feature-new-endpoint</code> — &#x27;SaaS Dashboard&#x27;a /api/usage/summary endpoint&#x27;i ekle, testini yaz.&#x27;</li><li>İkinci worktree&#x27;de (reviewer): <code>claude -w review-endpoint</code> — writer branch&#x27;teki değişiklikleri review etmek için bekle.</li><li>Writer commit edince, reviewer worktree&#x27;sinde: &#x27;worktree-feature-new-endpoint branch&#x27;indeki son commit&#x27;leri incele, potansiyel sorunları listele.&#x27;</li><li>Reviewer&#x27;ın bulduğu sorunları writer oturumuna geri bildir ve düzeltilmesini iste.</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Agent view ile bu pattern daha verimli olur: writer&#x27;ı <code>claude --bg</code> ile dispatch et, reviewer&#x27;ı ayrı bir <code>--bg</code> ile başlat, agent view&#x27;dan ikisini birden izle.</div><h3 class="sub">3.4 Test-First Pattern</h3><p>Bir diğer güçlü pattern: önce testleri yazan bir oturum, sonra testleri geçecek implementasyonu yazan ikinci oturum.</p><ol><li>Birinci oturum (test writer): &#x27;UsageSummary API endpoint&#x27;i için pytest testleri yaz. Endpoint henüz yok, mock kullanma, gerçek HTTP istekleri yap. Beklenen response shape&#x27;i şu: {activeUsers, requestsToday, errorRate, costEstimateUsd}.&#x27;</li><li>İkinci oturum (implementer): &#x27;Bu branch&#x27;teki testleri çalıştır, fail edenleri geçecek şekilde endpoint&#x27;i implement et.&#x27;</li><li>İkinci oturumun testleri geçirip geçirmediğini agent view&#x27;dan izle.</li></ol><h3 class="sub">3.5 Desktop App Paralel Panelleri (İsteğe Bağlı)</h3><p>Claude Code Desktop App kullanıyorsan, Code tab&#x27;de birden fazla session panelini yan yana açabilirsin. Her panel kendi worktree&#x27;sinde çalışır. Görsel diff inceleme ve PR durumu takibi için Desktop App özellikle kullanışlı. CLI&#x27;dan dispatch ettiğin arka plan oturumları burada da görünür.</p><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Worktree Başlatma + Göreve Bağlama</div><pre><code>SaaS Dashboard projesinde yeni bir worktree aç ve /api/usage/summary endpoint&#x27;ini implement et. Endpoint şu alanları dönsün: activeUsers (number), requestsToday (number), errorRate (number), costEstimateUsd (number). SQLite&#x27;tan mock veri çek. Testini yaz ve çalıştır.</code></pre><div class="note">claude -w feature-usage-api komutuyla başlattıktan sonra bu prompt&#x27;u gir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Agent View&#x27;dan Dispatch: Kapsamlı Arka Plan Görevi</div><pre><code>SaaS Dashboard&#x27;daki flaky test&#x27;i bul: testlerin rastgele fail ettiği senaryoyu izole et, root cause&#x27;u belirle ve minimal bir fix yaz. Fix&#x27;i commit et ve PR aç. PR açıklamasında root cause&#x27;u açıkla.</code></pre><div class="note">claude agents dashboard&#x27;unda veya claude --bg ile dispatch et.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Writer → Reviewer Devri</div><pre><code>worktree-feature-usage-api branch&#x27;indeki son commit&#x27;leri incele. API response shape&#x27;inin contracts/usage-summary.contract.ts ile uyumunu kontrol et. Güvenlik, performans ve hata yönetimi açısından potansiyel sorunları listele. Her sorun için önerilen düzeltmeyi tek cümleyle yaz.</code></pre><div class="note">Reviewer worktree&#x27;sinde veya ayrı bir agent view oturumunda kullan.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Merge Conflict Çözüm Rehberliği</div><pre><code>feature-usage-api ve feature-usage-widget branch&#x27;lerini main&#x27;e merge etmem gerekiyor. Önce merge sırası öner (hangisi önce merge edilmeli?), sonra merge et. Conflict çıkarsa nedenini açıkla ve minimal çözüm öner. Merge sonrası testleri çalıştır.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Task Partitioning: Paralel İş Paketleri Oluşturma</div><pre><code>Bu feature&#x27;ı paralel çalışmaya uygun küçük iş paketlerine böl. Her iş paketinin hangi dosyalara dokunacağını, hangi branch/worktree&#x27;de çalışacağını, bağımlılıklarını ve acceptance criteria&#x27;larını listele. Aynı dosyaya iki agent&#x27;ın yazmasını engelle. Her paket için scope sınırını açıkça belirt.</code></pre><div class="note">Paralel çalışmaya başlamadan önce bu prompt&#x27;u çalıştır — plan yapmadan dispatch etme.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Integration Agent: Branch Birleştirme ve Test</div><pre><code>Aşağıdaki worktree branch&#x27;lerindeki değişiklikleri incele: worktree-feature-usage-api, worktree-feature-usage-widget. Önce API contract uyumunu kontrol et (contracts/ dizinindeki type tanımlarına bak), sonra merge sırası öner, ardından merge et ve test komutlarını çalıştır. Conflict çıkarsa nedenini açıkla ve minimal çözüm öner.</code></pre><div class="note">Integration worktree&#x27;sinde (claude -w usage-integration) çalıştır.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>CHALLENGE: SaaS Dashboard&#x27;a Usage Metrics Feature&#x27;ı — Paralel Worktree Workflow</h3><p>SaaS Dashboard&#x27;a &#x27;Usage Metrics&#x27; feature&#x27;ı ekleyeceksin. Backend API ve frontend widget&#x27;ı paralel olarak ayrı worktree&#x27;lerde geliştir, bir integration pass ile birleştir. Amaç feature&#x27;ı tamamlamak kadar, contract-first paralel workflow&#x27;u deneyimlemek.</p><p><strong>Gereksinimler:</strong></p><ul><li>Önce bir API contract tanımla (ör. UsageSummary type: activeUsers, requestsToday, errorRate, costEstimateUsd alanları)</li><li>Backend oturumu ayrı bir worktree&#x27;de çalışsın (claude -w usage-api)</li><li>Frontend oturumu ayrı bir worktree&#x27;de çalışsın (claude -w usage-widget)</li><li>Her oturum kendi branch&#x27;inde commit atsın</li><li>Bir integration pass ile branch&#x27;ler birleştirilsin ve testler çalıştırılsın</li><li>Agent view&#x27;dan en az iki arka plan oturumu izlensin (peek veya attach)</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>Her oturum ayrı worktree&#x27;de izole çalıştı — <code>git worktree list</code> ile doğrulandı</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>Backend ve frontend scope&#x27;u önceden API contract ile ayrıldı</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>Her oturum kendi branch&#x27;inde en az bir commit attı</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>Integration pass sonunda testler çalıştırıldı ve feature entegre çalışıyor</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>Conflict çıkarsa Claude ile çözüldü; çıkmazsa iyi partitioning&#x27;in sonucu olduğu açıklandı</span></label></li><li><label><input type="checkbox" data-k="succ5"><span>Agent view&#x27;dan en az iki oturum izlenip birine peek veya attach yapıldı</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge contract-first paralel geliştirme yaklaşımını adım adım uygular. Önce paylaşılan sözleşmeyi yaz, sonra bağımsız worktree&#x27;lerde paralel çalış, son olarak bir integration pass ile birleştir.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">0) Contract Tanımla (ana branch&#x27;te, paralel başlamadan önce)</div><pre><code>SaaS Dashboard projesinde contracts/ dizini oluştur. İçine usage-summary.contract.ts dosyası ekle. UsageSummary type&#x27;ını tanımla: activeUsers (number), requestsToday (number), errorRate (number, 0-1 aralığında), costEstimateUsd (number). Bu dosyayı commit et.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) Backend Worktree Başlat</div><pre><code>claude -w usage-api komutuyla worktree aç. Ardından: &#x27;/api/usage/summary endpoint&#x27;ini implement et. Response shape&#x27;i contracts/usage-summary.contract.ts ile birebir uyumlu olsun. SQLite&#x27;tan örnek veri çek veya mock data kullan. Endpoint&#x27;in testini yaz ve çalıştır. Commit et.&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) Frontend Worktree Başlat (paralel)</div><pre><code>İkinci bir terminal&#x27;de: claude -w usage-widget komutuyla worktree aç. Ardından: &#x27;Dashboard&#x27;a UsageMetrics card component&#x27;i ekle. contracts/usage-summary.contract.ts type&#x27;ını kullan. Şimdilik mock data ile çalışsın (API henüz main&#x27;de yok). Component&#x27;in testini yaz. Commit et.&#x27;</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) Integration Pass</div><pre><code>İki worktree branch&#x27;ini main&#x27;e merge et (sıra: önce backend, sonra frontend). Frontend&#x27;deki mock data&#x27;yı gerçek API endpoint&#x27;e bağla. Tüm testleri çalıştır. Çalışıyorsa commit et.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Contract&#x27;ı ana branch&#x27;e commit ettikten sonra worktree&#x27;ler bu commit&#x27;i görecektir (aynı repository history&#x27;yi paylaşırlar).</li><li>Backend ve frontend birbirinden bağımsız çalışır; bağlantı noktası contract type&#x27;ıdır.</li><li>Integration pass&#x27;te frontend&#x27;in mock data&#x27;sını gerçek fetch&#x27;e çevirmek en yaygın adımdır.</li><li><code>git worktree list</code> ile worktree durumlarını, <code>claude agents</code> ile session durumlarını kontrol et.</li><li>Agent view&#x27;dan dispatch ettiğin oturumlar otomatik worktree alır — ekstra <code>-w</code> flag&#x27;ine gerek yok.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ Contract tanımlamadan paralel başlamak → Backend ve frontend uyumsuz response shape&#x27;leri üretir.</li><li>⚠️ Worktree&#x27;yi commit etmeden silmek → Değişiklikler kaybolur. Silmeden önce <code>git status</code> çalıştır.</li><li>⚠️ İki worktree&#x27;de aynı dosyayı düzenlemek → Merge conflict kaçınılmaz. Scope&#x27;u dosya bazında ayır.</li><li>⚠️ Merge sırasını düşünmemek → Backend önce merge edilmeli ki frontend gerçek API&#x27;ye bağlanabilsin.</li><li>⚠️ Agent view&#x27;daki oturumları unutmak → Laptop uykuya geçerse oturumlar durur; <code>claude respawn --all</code>.</li><li>⚠️ Rate limit&#x27;i hesaplamamak → Üç paralel oturum üç kat kota tüketir; Pro plan&#x27;da dikkatli ol.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Worktrees dosya izolasyonunu, agent view dikkat yönetimini çözer — ikisi farklı problemi çözer ama birlikte kullanılır.</li><li><code>claude --worktree &lt;isim&gt;</code> veya <code>claude -w</code> ile bir komutta izole oturum açarsın; <code>.worktreeinclude</code> ile <code>.env</code> gibi gitignored dosyaları otomatik taşırsın.</li><li><code>claude agents</code> tek ekrandan tüm arka plan oturumlarını listeler; <code>claude --bg</code> shell&#x27;den, <code>/background</code> aktif konuşmadan arka plan oturumu başlatır.</li><li>İyi paralel çalışmanın anahtarı task partitioning: aynı dosyaya iki agent yazmaz, contract önce yazılır, scope küçük tutulur, integration pass ayrıdır.</li><li>Her paralel oturum kotanı bağımsız tüketir; ne zaman paralel ne zaman sıralı çalışılacağı bilinçli bir mühendislik kararıdır.</li><li>Writer/Reviewer ve Test-first pattern&#x27;leri kod kalitesini artırır — paralel çalışma sadece hız değil, kalite aracı da olabilir.</li><li>Agent view Research Preview aşamasında; oturumlar local&#x27;dir, laptop uykuya geçince durur (<code>claude respawn --all</code>), arayüz değişebilir.</li><li>Worktree cleanup otomatiktir (değişiklik yoksa); commit etmeden worktree silmek en sık yapılan hata — <code>git status</code> alışkanlığı edin.</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/worktrees" target="_blank" rel="noopener">Run parallel sessions with worktrees — --worktree, .worktreeinclude, subagent izolasyonu, cleanup</a></li><li>⭐ <a href="https://code.claude.com/docs/en/agent-view" target="_blank" rel="noopener">Manage multiple agents with agent view — claude agents, dispatch, peek, attach, background sessions</a></li><li>⭐ <a href="https://code.claude.com/docs/en/agents" target="_blank" rel="noopener">Run agents in parallel — Worktrees, agent view, agent teams, dynamic workflows karşılaştırması</a></li><li>⭐ <a href="https://code.claude.com/docs/en/desktop" target="_blank" rel="noopener">Desktop application — Paralel session&#x27;lar, görsel diff, PR izleme</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://www.dandoescode.com/blog/parallel-vibe-coding-with-git-worktrees" target="_blank" rel="noopener">Parallel Vibe Coding: Using Git Worktrees with Claude Code (Dan Does Code)</a></li><li><a href="https://towardsdatascience.com/how-to-run-claude-code-agents-in-parallel/" target="_blank" rel="noopener">How to Run Claude Code Agents in Parallel (Towards Data Science)</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://git-scm.com/docs/git-worktree" target="_blank" rel="noopener">Git Worktree resmi dokümantasyonu</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 17)</span>Yarın (Gün 17) koordinasyonu sen değil, Claude yapacak: Agent Teams ile team lead + worker mimarisi kuracak, dynamic workflows ile script tabanlı çoklu-agent orkestrasyonu deneyecek ve SaaS Dashboard&#x27;a paralel 3 bağımsız feature ekleyeceksin.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Worktrees, agent view, agent teams ve dynamic workflows arasındaki farkı (kim koordine eder, işçiler konuşur mu, dosya izolasyonu) açıklayabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span><code>claude --worktree &lt;isim&gt;</code> veya <code>claude -w</code> ile izole worktree oturumu başlatabildim</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span><code>.worktreeinclude</code> dosyası oluşturup gitignored dosyaları (ör. .env) yeni worktree&#x27;ye otomatik taşıyabildim</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span><code>git worktree list</code> ile aktif worktree&#x27;leri listeledim ve cleanup davranışını gözlemledim</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>Worktree kapatmadan/silmeden önce <code>git status</code> ile commit durumunu kontrol etme alışkanlığını edindim</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span><code>claude agents</code> ile agent view dashboard&#x27;unu açtım, en az bir görev dispatch ettim</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span><code>claude --bg</code> (shell&#x27;den) ve <code>/background</code> (aktif oturumdan) arasındaki farkı biliyorum ve en az birini denedim</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Agent view&#x27;da bir oturuma peek (Space) ve attach (Enter) yaptım</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Writer/Reviewer veya Test-first pattern&#x27;lerinden en az birini uyguladım</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Task partitioning kurallarını (contract-first, dosya ayrımı, scope sınırlama) en az bir kez uyguladım</span></label></li><li><label><input type="checkbox" data-k="final10" data-final="1"><span>Challenge&#x27;ı tamamladım: backend + frontend paralel worktree&#x27;lerde geliştirildi, integration pass ile birleştirildi</span></label></li></ul><div class="pager"><a href="gun15-rol-agent-tasarimi.html"><div class="dir">← Önceki</div><div class="tt">Gün 15</div><div>Yazılım Rolleri İçin Agent Tasarımı</div></a><a class="next" href="gun17-agent-teams-dynamic-workflows.html"><div class="dir">Sonraki →</div><div class="tt">Gün 17</div><div>Agent Teams &amp; Dynamic Workflows</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 16/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=16;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>
