@@ -154,8 +154,13 @@ def render(L, built_days=None):
               f'<div class="pt">{esc(pr["title"])}</div>'
               f'<pre><code>{esc(pr["prompt"])}</code></pre></div>')
     if sol.get("notes"):
+        def _note(n):
+            if "\n" in n:  # çok satırlı not: ilk satır etiket, kalanı pre-formatted blok
+                first, rest = n.split("\n", 1)
+                return f"<li>{_inline(first)}<pre><code>{esc(rest)}</code></pre></li>"
+            return f"<li>{_inline(n)}</li>"
         a("<p><strong>Kontrol noktaları:</strong></p><ul>" +
-          "".join(f"<li>{_inline(n)}</li>" for n in sol["notes"]) + "</ul>")
+          "".join(_note(n) for n in sol["notes"]) + "</ul>")
     if sol.get("pitfalls"):
         a("<p><strong>Sık yapılan hatalar:</strong></p><ul>" +
           "".join(f"<li>⚠️ {_inline(pf)}</li>" for pf in sol["pitfalls"]) + "</ul>")
