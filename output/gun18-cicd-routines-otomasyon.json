@@ -1,0 +1,767 @@
+{
+  "day": 18,
+  "total_days": 20,
+  "week": 4,
+  "slug": "cicd-routines-otomasyon",
+  "title": "CI/CD, Routines ve Otomasyon",
+  "tagline": "Claude Code'u pipeline'ına ve takvimine sok",
+  "tier": null,
+  "date_label": "Temmuz 2026",
+  "intro": "Gün 17'de Agent Teams ve Dynamic Workflows ile Claude'ların birbirine konuşmasını ve bir script'in onlarca subagent'ı orkestre etmesini gördün. Bugün bu gücü terminalden çıkarıp CI/CD pipeline'ına, zamanlanmış görevlere ve entegrasyon yüzeylerine taşıyorsun. `claude -p` ile non-interactive çalıştırma, GitHub Actions ile otomatik PR review, üç farklı zamanlama katmanı (session-scoped `/loop`, Desktop scheduled task, cloud Routine) ve Chrome/Slack entegrasyonlarını öğreneceksin. Günün ana çıktısı: Claude Code'u bireysel coding assistant'tan engineering automation platformuna taşıyabilmek.",
+  "flow": [
+    {
+      "phase": "1 · Teorik: Automation Surfaces Karar Matrisi",
+      "dur": "30 dk",
+      "desc": "Headless CLI, --tools/--allowedTools/--disallowedTools ayrımı, GitHub entegrasyonları (Code Review / Actions / autofix-pr), üç zamanlama katmanı, Chrome & Slack demo tanıtımı, CI güvenlik modeli"
+    },
+    {
+      "phase": "2 · Pratik: CI Core",
+      "dur": "55 dk",
+      "desc": "claude -p ile non-interactive çalıştırma, --bare, --tools ile read-only review, JSON parse, GitHub Actions workflow YAML, Desktop scheduled task, Chrome debug demo"
+    },
+    {
+      "phase": "3 · Pratik: Scheduled Automation & Entegrasyonlar",
+      "dur": "35 dk",
+      "desc": "Cloud Routine kurma (schedule + GitHub event trigger), Slack delegation demo, end-to-end CI pipeline tasarımı"
+    },
+    {
+      "phase": "4 · Challenge",
+      "dur": "25 dk",
+      "desc": "Core: Safe Claude CI Review pipeline + Bonus: Routine/Chrome/Slack/autofix-pr"
+    }
+  ],
+  "prerequisites": [
+    "Gün 1-17 tamamlanmış: subagent'lar (Gün 11), hooks (Gün 12), Agent Teams & Dynamic Workflows (Gün 17), SaaS Dashboard projesi git repository'si olarak init edilmiş",
+    "Claude Code güncel sürümde — `claude --version` ile kontrol et",
+    "Pro, Max, Team veya Enterprise plan / Console hesabı — Routines ve Code Review özelliklerinin kullanılabilirliği plana göre değişir",
+    "GitHub hesabı (Actions workflow ve Code Review kurulumu için)"
+  ],
+  "tools_needed": [
+    "Terminal (Claude Code çalışır durumda)",
+    "Git + GitHub CLI (`gh`) — PR ve Actions entegrasyonu için",
+    "VS Code veya tercih edilen editör",
+    "Chrome veya Edge tarayıcısı (Chrome debug demo için; opsiyonel)",
+    "Slack workspace (Slack demo için; opsiyonel)"
+  ],
+  "objectives": [
+    "`claude -p` ile non-interactive çalıştırma yapabilecek; `--bare`, `--tools`, `--allowedTools`, `--disallowedTools`, `--permission-mode` ve `--output-format json` flag'lerinin availability vs permission ayrımını bilerek kullanabileceksin",
+    "GitHub Actions workflow dosyası yazarak PR'da otomatik Claude Code review ve `@claude` mention tetiklemesi kurabileceksin",
+    "GitHub Code Review (managed, multi-agent) ile GitHub Actions (self-hosted, custom workflow) arasındaki mimari farkı anlayıp doğru senaryoya doğru aracı seçebileceksin",
+    "Üç zamanlama katmanını (`/loop` session-scoped, Desktop scheduled tasks, cloud Routines) karşılaştırarak ihtiyaca uygun olanı kurabileceksin",
+    "Chrome entegrasyonuyla canlı web app debugging döngüsünü tanıyabilecek ve Slack'ten coding task delegasyonunun modelini açıklayabileceksin",
+    "CI ortamında `--bare` + `--tools` + `--disallowedTools` + `--permission-mode dontAsk` + secret yönetimi ile güvenli, öngörülebilir otomasyon tasarlayabileceksin"
+  ],
+  "sections": [
+    {
+      "num": "BÖLÜM 1",
+      "title": "TEORİK TEMEL",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "1.1 Headless Mode ve Agent SDK CLI"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code'un asıl gücü interaktif terminalde değil, non-interactive modda ortaya çıkar. `claude -p` (veya `--print`) bir prompt alır, çalışır, çıktıyı döner ve çıkar — bir session açmaz. Bu sayede CI pipeline'ında, pre-commit hook'ta veya herhangi bir bash script'te Claude Code'u tıpkı `grep` veya `jq` gibi bir Unix aracı olarak kullanabilirsin."
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# Basit non-interactive kullanım\nclaude -p \"Explain what this project does\"\n\n# Structured output — script/jq ile parse\nclaude -p \"List all API endpoints\" --output-format json\n\n# Streaming — gerçek zamanlı işleme\nclaude -p \"Analyze this log file\" --output-format stream-json --verbose"
+        },
+        {
+          "t": "p",
+          "text": "stdin pipe desteği sayesinde build loglarını, diff çıktılarını veya herhangi bir metin akışını doğrudan Claude'a besleyebilirsin. Pipe girişi 10 MB ile sınırlı — daha büyük inputları dosya olarak yaz ve dosya yolunu prompt'ta referans ver."
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# Build log analizi — stdin pipe\ncat build-error.txt | claude -p 'concisely explain the root cause of this build error' > output.txt\n\n# Git diff'i review'e gönder\ngit diff main | claude -p 'review these changes for security issues'"
+        },
+        {
+          "t": "p",
+          "text": "`--output-format json` kullandığında response payload'ı `total_cost_usd` ve model bazında maliyet dağılımı içerir — scripted çağrılarda harcamayı usage dashboard'a gitmeden izleyebilirsin."
+        },
+        {
+          "t": "h",
+          "text": "1.2 Availability vs Permission: Flag'leri Doğru Anlamak"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code CLI'da tool erişimini kontrol eden beş flag var ve bunlar iki farklı katmanda çalışır. Bu ayrımı bilmeden CI job tasarlamak güvenlik yanılsaması yaratır:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Flag",
+            "Katman",
+            "Ne yapar",
+            "Ne yapmaz"
+          ],
+          "rows": [
+            [
+              "--tools",
+              "Built-in tool availability",
+              "Claude'un kullanabileceği built-in tool setini sınırlar (ör. \"Read,Glob,Grep\" → sadece bunlar mevcut)",
+              "MCP tool'larını etkilemez"
+            ],
+            [
+              "--allowedTools",
+              "Permission allow rule",
+              "Belirtilen tool/pattern için izin sormadan çalıştırır",
+              "Tool availability kısıtlamaz — listelenmemiş tool hâlâ mevcut, sadece prompt ister"
+            ],
+            [
+              "--disallowedTools",
+              "Deny rule / availability",
+              "Bare tool name → tool'u context'ten kaldırır; scoped pattern → o pattern'i bloklar",
+              "MCP tool'lar için ayrıca \"mcp__*\" gerekir"
+            ],
+            [
+              "--permission-mode dontAsk",
+              "Runtime approval policy",
+              "Pre-approved olmayan tool çağrılarını reddeder",
+              "Allowlist'teki tool'ların güvenliğini garanti etmez"
+            ],
+            [
+              "--bare",
+              "Startup/context minimization",
+              "Customization discovery atlar: hooks, skills, plugins, MCP, auto memory, CLAUDE.md yüklenmez",
+              "Tool erişimini kısıtlamaz (Bash/Read/Edit hâlâ açık)"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "CI'da read-only Claude job'u tasarlamanın doğru formülü: `--bare` (öngörülebilir startup) + `--tools \"Read,Glob,Grep\"` (built-in availability kısıtla) + `--disallowedTools \"mcp__*\"` (MCP bypass engelle) + `--permission-mode dontAsk` (unlisted her şeyi reddet). Tek bir flag 'güvenlik modu' değildir; katmanları birlikte kullanman gerekir."
+        },
+        {
+          "t": "p",
+          "text": "`--bare` modu, CI ve script çağrılarında context yüzeyini küçültmek, startup davranışını öngörülebilir yapmak ve project/user customization etkisini azaltmak için kullanılır. Hangi makinede çalıştırırsan çalıştır, aynı sonucu alırsın — bir takım arkadaşının `~/.claude`'ındaki hook veya projedeki `.mcp.json`'daki MCP server çalışmaz. Ama `--bare` tek başına güvenlik sandbox'ı sağlamaz: Bash, file read ve file edit tool'ları açık kalır."
+        },
+        {
+          "t": "warn",
+          "text": "`--bare` artık scripted ve SDK çağrıları için önerilen moddur ve gelecekte `-p` kullanıldığında varsayılan olacak. CI pipeline'ında `--bare` yoksa, proje dizinindeki hooks, MCP server'lar ve CLAUDE.md yüklenebilir — bu hem tutarsız sonuçlara hem de güvenlik riskine yol açabilir."
+        },
+        {
+          "t": "p",
+          "text": "Son olarak, `--continue` ve `--resume` flag'leri ile non-interactive çağrıları zincirlemenin mümkün olduğunu bil. Session ID'yi JSON çıktısından yakalayıp bir sonraki çağrıda kullanabilirsin — çok aşamalı CI pipeline'ları için faydalı."
+        },
+        {
+          "t": "tip",
+          "text": "Agent SDK'nın Python ve TypeScript paketleri de mevcut; structured output, tool approval callback ve native message nesneleri sunarlar. CLI'daki `--tools`'un SDK karşılığı da `tools` opsiyonudur. Detay: code.claude.com/docs/en/agent-sdk"
+        },
+        {
+          "t": "h",
+          "text": "1.3 GitHub Entegrasyonları — Net Ayrım"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code'un GitHub ile çalışmasının dört farklı yolu var. Bunlar farklı altyapılarda, farklı tetikleyicilerle çalışır ve farklı soruları cevaplar. İkisini karıştırmak — özellikle Code Review ile Actions'ı — CI pipeline tasarımında en yaygın hatadır:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Araç",
+            "Nerede çalışır",
+            "Tetikleme",
+            "Tipik kullanım",
+            "Kullanılabilirlik"
+          ],
+          "rows": [
+            [
+              "GitHub Code Review",
+              "Anthropic managed infra",
+              "PR open / push / @claude review",
+              "Deep multi-agent PR review, inline finding",
+              "Team/Enterprise (ZDR'da yok)"
+            ],
+            [
+              "GitHub Actions",
+              "GitHub runner (self/cloud)",
+              "issue/PR mention, workflow event",
+              "Custom automation, implementation, CI step",
+              "Tüm planlar (API key gerekir)"
+            ],
+            [
+              "/autofix-pr",
+              "Claude Code on the web session",
+              "Current branch PR + CI/review events",
+              "CI failure ve reviewer comment fix loop",
+              "claude.ai subscription + gh CLI"
+            ],
+            [
+              "Local /code-review",
+              "Developer machine",
+              "Manuel command",
+              "Local diff review, günlük sürüş",
+              "Tüm yüzeyler"
+            ]
+          ]
+        },
+        {
+          "t": "p",
+          "text": "GitHub Code Review, Anthropic'in yönettiği bir servistir: PR açıldığında (veya push/manual `@claude review` ile) bir filo uzmanlaşmış agent, değişiklikleri full codebase bağlamında inceler ve inline comment olarak bulgularını bırakır. Severity seviyeleri: Important (ciddi bug veya güvenlik açığı), Nit (stil veya küçük iyileştirme), Pre-existing (değişiklikten önce zaten olan sorun). Her comment'te 👍/👎 butonları gelir — bu feedback Anthropic'in reviewer'ı iyileştirmesi için kullanılır."
+        },
+        {
+          "t": "p",
+          "text": "CLAUDE.md'nin yanı sıra proje kökünde bir `REVIEW.md` dosyası oluşturabilirsin — Code Review bunu en yüksek öncelikle okur. Nit hacmini sınırlama, belirli path'leri atlama, repo-spesifik kontrol kuralları eklemek için kullan."
+        },
+        {
+          "t": "p",
+          "text": "GitHub Actions ise kendi runner'ında Claude Code Action çalıştırır. `/install-github-app` ile kurulur; `@claude` mention ile PR/issue'da tetiklenir veya workflow event'le çalışır. Custom automation, feature implementation, CI step olarak kullanılabilir. 3P provider (Bedrock/Vertex) desteği var."
+        },
+        {
+          "t": "p",
+          "text": "`/autofix-pr` ise mevcut checked-out branch'teki open PR'ı `gh pr view` ile bulur, bir Claude Code on the web session'ı başlatır ve PR'daki CI failure ve reviewer comment'lere otomatik tepki verir. Net fix'leri uygular, belirsiz durumlarda sana sorar."
+        },
+        {
+          "t": "keypoint",
+          "text": "Code Review = 'PR'ıma bağımsız gözlerle baksın'; Actions = 'Claude ile custom otomasyonu tetikleyeyim'; /autofix-pr = 'CI failure'ları otomatik fix etsin'. Üçü birbirinin yerine geçmez, birbirini tamamlar."
+        },
+        {
+          "t": "h",
+          "text": "1.4 Zamanlama Üç Katmanı"
+        },
+        {
+          "t": "p",
+          "text": "Claude Code'da tekrarlayan veya zamanlanmış iş çalıştırmanın üç farklı katmanı var. Doğru katmanı seçmek verimliliği ve güvenilirliği doğrudan etkiler:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Katman",
+            "Nerede çalışır",
+            "Tetikleme",
+            "Yaşam süresi",
+            "En iyi kullanım"
+          ],
+          "rows": [
+            [
+              "/loop",
+              "Mevcut CLI session içi",
+              "Cron expression veya doğal dil",
+              "Session-scoped; recurring 7 gün expiry",
+              "5-60 dk geçici polling (deploy, CI check)"
+            ],
+            [
+              "Desktop scheduled task",
+              "Lokal makine (Desktop app)",
+              "Cron / one-off / doğal dil",
+              "App açıkken; catch-up on wake",
+              "Local dosya/tool erişimi gereken periyodik iş"
+            ],
+            [
+              "Cloud Routine",
+              "Anthropic managed infra",
+              "Cron / one-off / API / GitHub event",
+              "Laptop kapalıyken bile çalışır",
+              "Repo/connector gerektiren otonom, tekrarlayan iş"
+            ]
+          ]
+        },
+        {
+          "t": "p",
+          "text": "Seçim heuristiği şu sorularla başlar: Laptop kapalıyken çalışmalı mı? → Cloud Routine. Local dosyalara erişmeli mi? → Desktop scheduled task. Sadece bu session'da geçici bir polling mi? → `/loop`. CI event kaynaklı deterministic iş mi? → GitHub Actions. PR review kalitesi ve inline finding mi? → Code Review managed."
+        },
+        {
+          "t": "p",
+          "text": "Desktop scheduled task'lar bilgisayar uyandığında son 7 gündeki kaçırılmış run'lardan yalnızca en güncel olanı çalıştırır — eski missed run'lar tek tek yakalanmaz. 6 gün uyuduysa, tek bir catch-up run yapılır. Task'ın kendi permission mode'u vardır; Ask/manual mode'da kurulursa tool approval bekleyip stall olabilir — ilk 'Run now' ile izinleri gözlemle, 'always allow' kuralları tanımla."
+        },
+        {
+          "t": "p",
+          "text": "Cloud Routines ise tamamen farklı bir modelde çalışır: Anthropic altyapısında, otonom bir Claude Code cloud session olarak yürütülür. Permission-mode picker ve approval prompt yoktur — bu yüzden scope'u (repo, branch-push, environment, connector) dikkatli sınırla. Varsayılan olarak yalnızca `claude/` prefix'li branch'lara push edebilir."
+        },
+        {
+          "t": "warn",
+          "text": "Routines research preview'dadır; plan/organization policy ve daily run allowance kısıtlamaları var. Routine actions, bağlı GitHub/Slack identity üzerinden 'kullanıcı adına' görünür — commit'ler senin GitHub kullanıcınla, Slack mesajları senin hesabınla gider. Routine prompt'unu self-contained yaz ve repo/connector scope'unu minimum tut."
+        },
+        {
+          "t": "tip",
+          "text": "CLI'dan `claude /schedule` ile doğal dille routine oluşturabilirsin: '/schedule her pazartesi 9'da açık PR'ları incele'. Web (claude.ai/code/routines) ve Desktop app'ten de oluşturulabilir — üç yüzey aynı cloud hesabına yazar."
+        },
+        {
+          "t": "h",
+          "text": "1.5 Chrome ve Slack Entegrasyonları"
+        },
+        {
+          "t": "p",
+          "text": "Chrome entegrasyonu, Claude Code'u canlı web uygulamasının console log'larına, DOM'una ve network request'lerine bağlar. Debugging döngüsü: console error → kaynak dosya tespit → fix → browser'da doğrulama. Claude in Chrome browser extension'ı gerektirir, Chrome ve Edge'de çalışır, WSL'de desteklenmez. `/chrome` komutuyla bağlantıyı yönetirsin."
+        },
+        {
+          "t": "p",
+          "text": "Slack entegrasyonuyla `@Claude` mention, bir coding task'ı otomatik tespit edip Claude Code on the web session'ı başlatır. Routing mode: Code + Chat — yanlış yönlenirse 'Retry as Code' veya 'Retry as Chat' butonlarıyla düzelt. Sadece channel'larda (public/private) çalışır, DM'lerde çalışmaz."
+        },
+        {
+          "t": "warn",
+          "text": "Claude Code in Slack, Team/Enterprise tarafında Claude Tag ile değiştiriliyor. Aynı Slack app, yeniden kurulum gereksiz; ama kesin UI ve kurulum adımları plan/tenant'a göre değişebilir. Bugün amacımız: Slack'ten coding intent ile web session delegation modelini anlamak, spesifik kurulum yapmak değil."
+        },
+        {
+          "t": "warn",
+          "text": "Slack thread context'i bir prompt injection yüzeyi oluşturabilir — Claude, thread'deki diğer mesajlardan gelen yönlendirmeleri takip edebilir. `@Claude`'u yalnızca güvenilir kanallarda kullan."
+        },
+        {
+          "t": "h",
+          "text": "1.6 CI Güvenlik Modeli"
+        },
+        {
+          "t": "p",
+          "text": "CI ortamında Claude Code çalıştırırken güvenlik tek bir flag'le değil, katmanların birleşimiyle sağlanır:"
+        },
+        {
+          "t": "list",
+          "items": [
+            "`--bare`: Predictability — hooks, MCP, plugins, auto memory yüklenmez; hangi runner'da çalışırsa çalışsın aynı sonuç",
+            "`--tools \"Read,Glob,Grep\"`: Built-in availability — Claude sadece belirtilen tool'ları kullanabilir (Edit, Write, Bash mevcut değil)",
+            "`--disallowedTools \"mcp__*\"`: MCP bypass engeli — `--tools` MCP tool'ları etkilemez, bu flag onları kapatır",
+            "`--permission-mode dontAsk`: Runtime safety net — pre-approved olmayan her çağrı reddedilir",
+            "Runner/sandbox isolation: GitHub Actions runner veya Docker container ile OS seviyesinde izolasyon",
+            "Secret yönetimi: `ANTHROPIC_API_KEY` GitHub Secrets'ta saklanır; `--bare` modda OAuth/keychain okunmaz, kimlik doğrulama `ANTHROPIC_API_KEY` env var veya `apiKeyHelper` ile yapılır"
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "`--bare` öngörülebilirlik sağlar ama güvenlik garantisi vermez. `--tools` built-in availability kısıtlar ama MCP'yi kapamaz. `--permission-mode dontAsk` run-time net oluşturur ama allowlist'teki tool'ların kendisi zararlı olabilir. Güvenlik = katmanların birleşimi + runner izolasyonu + secret yönetimi."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 2",
+      "title": "PRATİK — ADIM ADIM",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "2.1 İlk Non-Interactive Çalıştırma"
+        },
+        {
+          "t": "p",
+          "text": "En basit kullanımla başla: projenin kök dizininde `claude -p` ile bir codebase özeti al."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "SaaS Dashboard proje dizinine geç.",
+            "Şu komutu çalıştır:\n`claude -p \"Summarize the project structure and list the main API endpoints\"`",
+            "Çıktıyı incele — Claude projeyi okudu, analiz etti ve sonucu döndü; interaktif session açmadan çıktı.",
+            "Şimdi aynı komutu `--output-format json` ile tekrar çalıştır ve JSON çıktısındaki `result`, `total_cost_usd` ve `session_id` alanlarını incele."
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# JSON çıktılı çalıştırma\nclaude -p \"List all API endpoints\" --output-format json\n\n# jq ile parse\nclaude -p \"List all API endpoints\" --output-format json | jq '.result'"
+        },
+        {
+          "t": "h",
+          "text": "2.2 --bare + --tools ile Read-Only Review"
+        },
+        {
+          "t": "p",
+          "text": "Şimdi CI'da kullanacağın read-only review pattern'ini oluştur. Amacımız: Claude sadece dosyaları okusun, hiçbir şey düzenlemesin, hiçbir komut çalıştırmasın."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Aşağıdaki komutu çalıştır — `--tools` built-in tool setini Read/Glob/Grep ile sınırlar; `--disallowedTools \"mcp__*\"` MCP bypass'ı engeller:",
+            "`--permission-mode dontAsk` ile Claude allowlist dışındaki hiçbir tool'u çalıştıramaz — en sıkı runtime kontrolü.",
+            "Çıktıdaki findings'i incele. JSON formatında file, line, risk ve recommendation alanlarını gözlemle."
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "claude --bare -p \"Review this repository for OWASP Top 10 risks. Do not edit files. Return findings with file, line, risk, evidence, and recommendation.\" \\\n  --tools \"Read,Glob,Grep\" \\\n  --disallowedTools \"mcp__*\" \\\n  --permission-mode dontAsk \\\n  --output-format json"
+        },
+        {
+          "t": "tip",
+          "text": "Bu pattern'i bir bash script'e sarıp `.github/scripts/claude-review.sh` olarak kaydet — GitHub Actions workflow'unda bu script'i çağırabilirsin."
+        },
+        {
+          "t": "h",
+          "text": "2.3 stdin Pipe ile Build Log Analizi"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Kasıtlı bir build hatası oluştur (ör. bir import'u kır).",
+            "Build'ı çalıştır ve çıktıyı bir dosyaya kaydet:\n`npm run build 2>&1 > build-error.txt` (veya projenin build komutu)",
+            "Build logunu Claude'a pipe et:\n`cat build-error.txt | claude -p 'concisely explain the root cause of this build error' > analysis.txt`",
+            "`analysis.txt`'i aç ve Claude'un root cause analizini incele."
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Pipe girişi 10 MB ile sınırlıdır. Daha büyük log dosyaları için içeriği bir dosyaya yaz ve prompt'ta dosya yolunu referans ver: `claude -p 'Analyze the build log at ./build-error.txt'`"
+        },
+        {
+          "t": "h",
+          "text": "2.4 Permission Mode Deneyimi"
+        },
+        {
+          "t": "p",
+          "text": "`--permission-mode` seçeneklerini karşılaştırarak run-time davranış farkını gör:"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Aynı review prompt'unu `--permission-mode dontAsk` ile çalıştır — allowlist dışındaki her tool call reddedilir.",
+            "Şimdi `--permission-mode acceptEdits` ile dene — dosya yazma izni otomatik verilir, ama diğer shell komutları hâlâ prompt ister (non-interactive'de abort eder).",
+            "Farkı gözlemle: `dontAsk` en sıkı (CI için ideal), `acceptEdits` dosya düzenleme otomasyonu için uygun."
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "bash",
+          "text": "# dontAsk: sadece allowedTools çalışır, geri kalan denied\nclaude --bare -p \"Apply lint fixes\" \\\n  --permission-mode dontAsk \\\n  --allowedTools \"Read,Edit,Bash(npm run lint *)\" \\\n  --output-format json\n\n# acceptEdits: dosya yazma otomatik, shell hâlâ kısıtlı\nclaude --bare -p \"Apply lint fixes\" \\\n  --permission-mode acceptEdits"
+        },
+        {
+          "t": "h",
+          "text": "2.5 GitHub Actions Workflow Yazma"
+        },
+        {
+          "t": "p",
+          "text": "PR'da otomatik Claude Code review çalıştıran basit bir GitHub Actions workflow dosyası oluştur."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Proje kökünde `.github/workflows/claude-review.yml` dosyası oluştur.",
+            "Workflow'u `pull_request` event'ine bağla.",
+            "İki job tanımla: (1) standart lint/test, (2) Claude Code review — böylece code quality ve AI review ayrı raporlanır.",
+            "Claude job'unda `ANTHROPIC_API_KEY`'i GitHub Secrets'tan oku.",
+            "Çıktıyı `gh pr comment` ile PR'a yaz veya workflow artifact olarak kaydet."
+          ]
+        },
+        {
+          "t": "code",
+          "lang": "yaml",
+          "text": "# .github/workflows/claude-review.yml (basitleştirilmiş)\nname: Claude Code Review\non:\n  pull_request:\n    types: [opened, synchronize]\n\njobs:\n  lint-test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci && npm test\n\n  claude-review:\n    runs-on: ubuntu-latest\n    needs: lint-test\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - name: Install Claude Code\n        run: |\n          curl -fsSL https://claude.ai/install.sh | bash\n      - name: Run review\n        env:\n          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}\n        run: |\n          git diff origin/main...HEAD | \\\n          claude --bare -p 'Review this diff for bugs, security issues, and improvements. Format as markdown.' \\\n            --tools \"Read,Glob,Grep\" \\\n            --disallowedTools \"mcp__*\" \\\n            --permission-mode dontAsk \\\n            > review.md\n      - name: Post comment\n        run: gh pr comment ${{ github.event.number }} -F review.md\n        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}"
+        },
+        {
+          "t": "warn",
+          "text": "Bu basitleştirilmiş bir örnektir. Prodüksiyonda Claude Code GitHub Actions (anthropics/claude-code-action) kullanmak daha iyi entegrasyon ve güvenlik sağlar. Ayrıca managed Code Review (Team/Enterprise) `@claude review` ile daha derin, multi-agent analiz yapar — self-hosted pipeline'dan farklı bir üründür."
+        },
+        {
+          "t": "h",
+          "text": "2.6 Desktop Scheduled Task Kurma"
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Desktop app'te Routines → New routine → Local seç.",
+            "Name: 'dependency-audit', Instructions: 'Check for outdated dependencies, list any with known vulnerabilities, and suggest update commands.'",
+            "Schedule: her gün sabah 09:00.",
+            "Permission mode: 'Accept edits' (veya daha güvenli 'Ask' — ama ilk run'da izinleri 'always allow' ile tanımla).",
+            "Folder: SaaS Dashboard proje dizini.",
+            "'Run now' ile test et ve çıktıyı incele."
+          ]
+        },
+        {
+          "t": "p",
+          "text": "Alternatif olarak doğal dille de oluşturabilirsin — herhangi bir session'da şunu yaz: 'Set up a daily code review that runs every morning at 9am'. Claude otomatik olarak bir scheduled task oluşturur."
+        },
+        {
+          "t": "tip",
+          "text": "Task prompt'unu `~/.claude/scheduled-tasks/<task-name>/SKILL.md` dosyasından düzenleyebilirsin. YAML frontmatter'da name ve description, body'de prompt bulunur."
+        },
+        {
+          "t": "h",
+          "text": "2.7 Chrome Debug Demo"
+        },
+        {
+          "t": "p",
+          "text": "Bu adım gösterimli bir demhodur — Chrome extension kurulumu ve site permission'lar ortama bağlıdır. WSL kullanıyorsan bu adımı atla."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Terminal'de `--chrome` flag'iyle veya session içinde `/chrome` komutuyla Chrome entegrasyonunu aktif et.",
+            "Claude'a şu prompt'u ver: 'Open localhost:3000, fill the login form with test credentials, submit, and check the console for errors.'",
+            "Claude'un Chrome'da tab açıp, formu doldurup, console loglarını okuyup, varsa hata kaynağını tespit etmesini gözlemle.",
+            "Eğer hata bulunursa, Claude'dan düzeltme yapmasını iste ve browser'da doğrulamasını izle."
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Chrome entegrasyonunun değeri 'code → browser → console → source → fix' döngüsünü tek session'da kapatmasıdır. Context switch'i ortadan kaldırır."
+        }
+      ]
+    },
+    {
+      "num": "BÖLÜM 3",
+      "title": "PRATİK — DERİNLEŞ",
+      "blocks": [
+        {
+          "t": "h",
+          "text": "3.1 Cloud Routine Kurma"
+        },
+        {
+          "t": "p",
+          "text": "Desktop task'tan farklı olarak cloud Routine, Anthropic'in yönettiği bir VM'de çalışır — laptop kapalı olsa bile. Şimdi CLI'dan bir haftalık bağımlılık denetimi routine'i kuracaksın."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Terminal'de şu komutu çalıştır:\n`/schedule every Monday at 09:00, inspect package.json for outdated or vulnerable dependencies, summarize findings, and post to the configured Slack connector`",
+            "Claude seni GitHub bağlantısı ve cloud environment kurulumu için yönlendirecek — `/web-setup` çalıştırman gerekebilir.",
+            "Routine oluşturulduktan sonra claude.ai/code/routines sayfasında veya Desktop app'in Routines sekmesinde görüntüle.",
+            "'Run now' ile test et ve session transcript'ini oku."
+          ]
+        },
+        {
+          "t": "warn",
+          "text": "Cloud Routine'ler autonomous çalışır — permission-mode picker ve approval prompt yoktur. Scope'u kontrol et: hangi repo'lar bağlı, branch-push açık mı, hangi connector'lar mevcut. Varsayılan olarak sadece `claude/` prefix'li branch'lara push edebilir."
+        },
+        {
+          "t": "h",
+          "text": "3.2 GitHub Event Tetikli Routine"
+        },
+        {
+          "t": "p",
+          "text": "Schedule dışında, Routine'leri GitHub event'leriyle de tetikleyebilirsin — örneğin PR açıldığında otomatik bir review oturumu başlatmak."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "claude.ai/code/routines → yeni routine oluştur veya mevcut routine'i düzenle.",
+            "Trigger olarak 'GitHub event' seç → pull_request.opened.",
+            "Filter ekle: base branch = 'main', head branch contains 'feature'.",
+            "Prompt: 'Review this PR for correctness and security issues. Leave inline comments on findings.'",
+            "Kaydet ve bir test PR aç — routine'in tetiklenip tetiklenmediğini session listesinden kontrol et."
+          ]
+        },
+        {
+          "t": "tip",
+          "text": "Filter'da `matches regex` operatörü tüm field değerini test eder; substring match için `contains` kullan. Örn. `.*hotfix.*` regex ile, `hotfix` contains ile — ikisi aynı sonucu verir ama regex syntax hatası riski taşır."
+        },
+        {
+          "t": "h",
+          "text": "3.3 Slack Delegation Demo"
+        },
+        {
+          "t": "p",
+          "text": "Bu adım gösterimli bir demhodur — Slack app kurulumu workspace admin gerektirir ve plan/tenant'a bağlıdır."
+        },
+        {
+          "t": "steps",
+          "items": [
+            "Slack channel'ında `@Claude` ile bir bug report yaz: '@Claude the /api/reports endpoint returns 500 when date range is empty. Fix it in the backend repo and create a PR.'",
+            "Claude'un coding intent'i tespit edip bir Claude Code on the web session'ı başlattığını gözlemle.",
+            "Slack thread'inde progress update'ler görünecek; tamamlandığında 'View Session' ve 'Create PR' butonları gelecek.",
+            "Session'ı aç ve Claude'un yaptığı değişiklikleri incele."
+          ]
+        },
+        {
+          "t": "h",
+          "text": "3.4 End-to-End CI Pipeline Tasarımı"
+        },
+        {
+          "t": "p",
+          "text": "Şimdiye kadar öğrendiğin parçaları bir araya getirerek production-ready bir CI pipeline akışı tasarla:"
+        },
+        {
+          "t": "table",
+          "headers": [
+            "Adım",
+            "Araç",
+            "Ne yapar"
+          ],
+          "rows": [
+            [
+              "1. Push",
+              "GitHub webhook",
+              "Kod push edildiğinde workflow tetiklenir"
+            ],
+            [
+              "2. Lint + Test",
+              "Standard Actions (npm test)",
+              "Deterministik code quality kontrolü"
+            ],
+            [
+              "3. Claude Review",
+              "Claude Code Action veya -p",
+              "AI-powered diff analizi, findings report"
+            ],
+            [
+              "4. Managed Code Review",
+              "GitHub Code Review (Team/Ent.)",
+              "Multi-agent deep review, inline findings: Important / Nit / Pre-existing"
+            ],
+            [
+              "5. Auto-fix",
+              "/autofix-pr",
+              "CI failure ve reviewer comment'lere otomatik tepki"
+            ],
+            [
+              "6. Merge",
+              "Human review + approval",
+              "Son karar her zaman insanda"
+            ]
+          ]
+        },
+        {
+          "t": "keypoint",
+          "text": "Bu pipeline'da Claude üç farklı rolde görünür: (3) non-interactive CI step, (4) managed review service, (5) reactive auto-fix agent. Her biri farklı altyapıda çalışır, farklı scope'a sahiptir ve farklı maliyeti vardır. Hepsini birden kullanmak gerekmez — takım büyüklüğü, güvenlik gereksinimleri ve bütçeye göre seç."
+        },
+        {
+          "t": "warn",
+          "text": "CI pipeline'da Claude'un bulgusu, son karar değildir. Code Review inline finding'leri PR'ı approve veya block etmez — mevcut review workflow'unu bozmaz. AI review, insan review'ını tamamlar, yerine geçmez."
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "title": "CI Read-Only Review",
+      "prompt": "claude --bare -p \"Review this repository for OWASP Top 10 risks. Do not edit files. Return findings with file, line, risk, evidence, and recommendation.\" \\\n  --tools \"Read,Glob,Grep\" \\\n  --disallowedTools \"mcp__*\" \\\n  --permission-mode dontAsk \\\n  --output-format json",
+      "note": "--tools built-in availability kısıtlar, --disallowedTools MCP bypass'ı engeller, --permission-mode dontAsk unlisted her şeyi reddeder. Üç katman birlikte read-only garanti eder."
+    },
+    {
+      "title": "Otomatik Commit",
+      "prompt": "claude -p \"Review staged changes and create a conventional commit message, then commit.\" \\\n  --allowedTools \"Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)\"",
+      "note": "Local/dev ortamı için uygundur. CI'da otomatik commit/push çok daha sıkı branch protection ve review gate ister. Bash(git diff *) 'taki boşluk + * prefix match sağlar — boşluksuz yazmak git diff-index'e de izin verir."
+    },
+    {
+      "title": "Build Log Analiz",
+      "prompt": "cat build-error.txt | claude -p 'concisely explain the root cause of this build error' > output.txt",
+      "note": "stdin pipe 10 MB ile sınırlı. Daha büyük inputlar için dosya yolunu prompt'ta referans ver. --output-format json ile total_cost_usd alabilirsin."
+    },
+    {
+      "title": "Cloud Routine — Haftalık Dependency Audit",
+      "prompt": "/schedule every Monday at 09:00, inspect the selected repository for outdated or vulnerable dependencies, summarize findings in a markdown report, and post to the configured Slack connector. Do not push changes unless the routine is explicitly configured with branch-push permission.",
+      "note": "Routine autonomous çalışır — permission prompt yok. Prompt'u self-contained yaz: 'başarılı sonuç neye benzer' ve 'sonuçla ne yap' açık olmalı, çünkü çalışırken sana soru soramaz."
+    },
+    {
+      "title": "Chrome Debug",
+      "prompt": "Open localhost:3000, reproduce the form submission error, inspect console logs, identify the source file, propose a minimal fix, apply it, and verify in the browser.",
+      "note": "Chrome entegrasyonu --chrome flag'i veya /chrome komutu ile aktif edilir. Chrome/Edge destekli, WSL'de desteklenmez. Plan mode'da read-only browser tool'lar (read_page, get_page_text) prompt gerekmez; state-changing tool'lar onay ister."
+    }
+  ],
+  "challenge": {
+    "title": "CHALLENGE: Safe Claude CI Review Pipeline",
+    "task": "SaaS Dashboard için güvenli bir CI pipeline oluştur: PR açıldığında lint/test çalıştıran bir GitHub Actions workflow yaz, ayrı bir job'da Claude Code ile read-only diff analizi yap, API key'i güvenli şekilde yönet ve sonucu PR'a raporla.",
+    "requirements": [
+      "`.github/workflows/claude-review.yml` oluştur; `pull_request` event'ine bağla.",
+      "İki ayrı job: (1) `lint-test` — standart npm test, (2) `claude-review` — AI-powered diff analizi.",
+      "Claude job'unda `--bare`, `--tools \"Read,Glob,Grep\"`, `--disallowedTools \"mcp__*\"` ve `--permission-mode dontAsk` kullan.",
+      "`ANTHROPIC_API_KEY`'i GitHub Secrets'tan oku (`${{ secrets.ANTHROPIC_API_KEY }}`).",
+      "Çıktıyı `gh pr comment`, `actions/github-script` veya workflow artifact olarak PR'a raporla.",
+      "'Pipeline failure' (test kırıldı) ile 'review finding' (Claude bulgu raporladı ama CI yeşil) ayrımını README veya workflow comment'inde açıkla."
+    ],
+    "success": [
+      "Workflow YAML dosyası sözdizimi doğru (act veya GitHub'da validate et)",
+      "Secret adı doğru tanımlı ve workflow'da referans ediliyor",
+      "Claude adımı `--bare` + `--tools` + `--disallowedTools \"mcp__*\"` + `--permission-mode dontAsk` içeriyor",
+      "Lint/test ve Claude review ayrı job/step olarak ayrılmış",
+      "'Pipeline failure' vs 'review finding' ayrımı açıklanmış"
+    ],
+    "bonus": [
+      "Cloud Routine: haftalık dependency audit kurma ve 'Run now' ile test etme.",
+      "/autofix-pr: açık bir PR üzerinde CI failure watcher deneme — kasıtlı bir test failure oluştur, autofix'in tepkisini gözlemle.",
+      "Slack: bir bug report thread'inden `@Claude` ile Claude Code web session başlatma.",
+      "Chrome: localhost app'te console error → source fix → browser verify debugging döngüsü."
+    ],
+    "solution": {
+      "intro": "Bu challenge'ın çekirdeği güvenli bir non-interactive CI job tasarlamaktır. İlk adım workflow YAML iskeletini oluşturmak, ikinci adım Claude job'unu doğru flag'lerle kilitlemek, üçüncü adım çıktıyı PR'a raporlamaktır.",
+      "prompts": [
+        {
+          "title": "1) Workflow YAML İskeleti",
+          "prompt": "SaaS Dashboard için bir GitHub Actions workflow oluştur: PR açıldığında (1) npm test çalıştır, (2) ayrı bir job'da claude --bare -p ile git diff'i review et. ANTHROPIC_API_KEY GitHub Secrets'tan okunmalı. Çıktıyı gh pr comment ile PR'a yaz."
+        },
+        {
+          "title": "2) Read-Only Flag Kombinasyonu",
+          "prompt": "claude --bare -p ile bir review komutu yaz. Şartlar: sadece Read, Glob, Grep tool'ları mevcut olsun (--tools), MCP tool'ları devre dışı (--disallowedTools \"mcp__*\"), izin istemeden çalışsın ama allowlist dışı reddedilsin (--permission-mode dontAsk). JSON çıktı versin."
+        },
+        {
+          "title": "3) Pipeline Failure vs Finding Açıklaması",
+          "prompt": "README'ye bir bölüm ekle: 'CI pipeline'da test failure (CI kırmızı, merge bloklanır) ile Claude review finding (CI yeşil kalır, yalnızca bilgilendirme) arasındaki fark nedir?' Teknik olmayan bir PM'in anlayacağı şekilde yaz."
+        },
+        {
+          "title": "4) (Bonus) Routine Kurulumu",
+          "prompt": "/schedule every Monday at 09:00, inspect this repository for outdated dependencies and known CVEs, summarize in markdown, post to Slack."
+        }
+      ],
+      "notes": [
+        "Workflow YAML'ı yazarken `fetch-depth: 0` ile tam git history alınmalı — aksi halde `git diff origin/main...HEAD` boş dönebilir.",
+        "GitHub Secrets'a `ANTHROPIC_API_KEY` eklemeyi unutma — workflow bunu bulamazsa Claude adımı sessizce fail olur.",
+        "Claude job'unu `needs: lint-test` ile bağlarsan, test kırıldığında review çalışmaz — bu genellikle istenen davranıştır.",
+        "`gh pr comment` komutu `GITHUB_TOKEN` env var gerektirir; Actions'ın otomatik sağladığı `secrets.GITHUB_TOKEN` yeterlidir."
+      ],
+      "pitfalls": [
+        "`--allowedTools`'un tool availability kısıtladığını sanmak — bu flag sadece permission katmanında çalışır; availability için `--tools` kullan.",
+        "`--bare` yokken CI'da çalıştırmak — proje dizinindeki hooks, MCP server'lar ve CLAUDE.md öngörülemeyen davranışlara yol açar.",
+        "Desktop scheduled task'ı Ask mode'da kurup tool approval stall yaşamak — ilk 'Run now' ile izinleri 'always allow' olarak tanımla.",
+        "`Bash(git diff*)` yazıp boşluk koymamak — boşluksuz yazımda `git diff-index` gibi istenmeyen komutlara da izin verilir.",
+        "Cloud Routine scope'unu kontrol etmemek — routine bağlı GitHub identity'nle commit atar ve Slack mesajı senin adına gider.",
+        "Code Review severity'lerini yanlış bilmek — Important/Nit/Pre-existing, 🔴🟠🟡 gibi emoji değil."
+      ]
+    }
+  },
+  "takeaways": [
+    "`claude -p` ile non-interactive çalıştırma, Claude Code'u CI/CD pipeline'ına, pre-commit hook'a ve bash script'e entegre etmenin temel mekanizmasıdır; stdin pipe ve `--output-format json` ile Unix araç zincirinin doğal bir parçası olur.",
+    "Tool erişim kontrolü iki katmanlıdır: `--tools` built-in availability kısıtlar (Edit, Write, Bash mevcut değil), `--allowedTools` sadece permission katmanında çalışır (listelenmemiş tool hâlâ mevcut, sadece izin ister). MCP tool'ları `--tools` tarafından etkilenmez — `--disallowedTools \"mcp__*\"` ayrıca gerekir.",
+    "`--bare` güvenlik modu değil, öngörülebilir startup modudur: hooks, skills, plugins, MCP, auto memory ve CLAUDE.md yüklenmez, ama Bash/Read/Edit tool'ları açık kalır. CI'da güvenlik = --bare + --tools + --disallowedTools + --permission-mode dontAsk + runner isolation.",
+    "GitHub Code Review (managed, multi-agent, inline finding) ile GitHub Actions (self-hosted, custom workflow) farklı ürünlerdir. Code Review severity'leri: Important, Nit, Pre-existing. İkisi birbirinin yerine geçmez, birbirini tamamlar.",
+    "Zamanlama üç katmandır: `/loop` session-scoped geçici polling, Desktop scheduled task local dosya/tool erişimli periyodik iş, Cloud Routine laptop kapalıyken bile çalışan otonom cloud session. Seçim kriteri: 'nerede çalışmalı, ne kadar yaşamalı, neye erişmeli.'",
+    "Cloud Routine'ler autonomous çalışır — permission prompt ve approval mekanizması yok. Actions bağlı kullanıcı kimliğiyle görünür. Scope'u (repo, branch-push, connector) minimum tut ve prompt'u self-contained yaz.",
+    "Chrome entegrasyonu 'code → browser → console → source → fix' döngüsünü tek session'da kapatır; Slack entegrasyonu coding intent'i tespit edip web session başlatır — ikisi de core CI değil, tamamlayıcı otomasyon yüzeyleridir.",
+    "CI pipeline'da AI review, insan review'ını tamamlar, yerine geçmez. Code Review inline finding'leri PR'ı approve veya block etmez — son karar her zaman mühendistedir."
+  ],
+  "reading": {
+    "official": [
+      {
+        "label": "Run Claude Code programmatically — claude -p, bare mode, stdin, output formatları, session chaining, Agent SDK CLI",
+        "url": "https://code.claude.com/docs/en/headless"
+      },
+      {
+        "label": "Automate work with routines — cloud routines, schedule/API/GitHub event triggers, connectors, branch push kısıtları",
+        "url": "https://code.claude.com/docs/en/routines"
+      },
+      {
+        "label": "Claude Code GitHub Actions — setup, @claude mention, custom workflow, Claude Code Action, 3P provider desteği",
+        "url": "https://code.claude.com/docs/en/github-actions"
+      },
+      {
+        "label": "Code Review — managed multi-agent PR review, REVIEW.md, severity (Important/Nit/Pre-existing), feedback mekanizması",
+        "url": "https://code.claude.com/docs/en/code-review"
+      },
+      {
+        "label": "Schedule recurring tasks in Desktop — local scheduled tasks, worktree toggle, catch-up on wake, permission mode",
+        "url": "https://code.claude.com/docs/en/desktop-scheduled-tasks"
+      },
+      {
+        "label": "Use Claude Code with Chrome — browser debugging, extension kurulumu, site permissions, plan mode tool ayrımı",
+        "url": "https://code.claude.com/docs/en/chrome"
+      },
+      {
+        "label": "Claude Code in Slack — @Claude mention, coding intent routing, web session, Claude Tag geçişi",
+        "url": "https://code.claude.com/docs/en/slack"
+      }
+    ],
+    "community": [
+      {
+        "label": "Claude Code Best Practices (Anthropic Engineering) — non-interactive usage, CI patterns, scheduling stratejileri",
+        "url": "https://www.anthropic.com/engineering/claude-code-best-practices"
+      }
+    ],
+    "extra": [
+      {
+        "label": "CLI reference — tüm flag'lerin (--tools, --allowedTools, --disallowedTools, --bare, --permission-mode) tam referansı",
+        "url": "https://code.claude.com/docs/en/cli-reference"
+      }
+    ]
+  },
+  "next_preview": "Yarın (Gün 19) Claude Code'u bireysel kullanımdan takım ve organizasyon ölçeğine taşıyorsun: managed/server-managed settings ile merkezi konfigürasyon, model allowlist, sandbox ortamları, maliyet optimizasyonu ve enterprise güvenlik best practices.",
+  "checklist": [
+    "`claude -p` ile non-interactive komut çalıştırıp JSON çıktı aldım",
+    "`--bare` modun ne yaptığını doğru tanımlayabilirim: 'customization discovery atlar, öngörülebilir startup sağlar — ama tool erişimini kısıtlamaz'",
+    "`--tools` (built-in availability), `--allowedTools` (permission), `--disallowedTools` (deny/availability) farkını açıklayabilirim",
+    "`--tools \"Read,Glob,Grep\"` + `--disallowedTools \"mcp__*\"` + `--permission-mode dontAsk` kombinasyonuyla read-only CI job tasarlayabilirim",
+    "GitHub Actions workflow YAML dosyası yazıp Claude Code entegrasyonu ekleyebilirim",
+    "Code Review (managed, inline findings: Important/Nit/Pre-existing) ile Actions (custom workflow) arasındaki farkı söyleyebilirim",
+    "Üç zamanlama katmanını (`/loop`, Desktop task, cloud Routine) karşılaştırıp senaryo bazında seçebilirim",
+    "Cloud Routine kurabilir ve 'autonomous, no approval prompt' çalışma modelini açıklayabilirim",
+    "Chrome debugging döngüsünü (console → source → fix → verify) tanıyabilirim",
+    "CI ortamında `ANTHROPIC_API_KEY` secret yönetimini ve `total_cost_usd` harcama izlemeyi açıklayabilirim"
+  ]
+}

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 18 — CI/CD, Routines ve Otomasyon · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><a href="gun11-subagentlar.html"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></a><a href="gun12-hooks-sandboxing.html"><span class="num">12</span><span>Hooks ve Sandboxing</span></a><a href="gun13-skills-plugins.html"><span class="num">13</span><span>Skills &amp; Plugins</span></a><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><a href="gun16-paralel-agent-view-worktrees.html"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></a><a href="gun17-agent-teams-dynamic-workflows.html"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></a><span class="cur"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></span><a href="gun19-enterprise-patterns.html"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></a><a href="gun20-capstone-mikroservis.html"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></a></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 4 — Master · Gün 18 / 20</div><h1>CI/CD, Routines ve Otomasyon</h1><p class="tagline">“Claude Code&#x27;u pipeline&#x27;ına ve takvimine sok”</p><p class="intro">Gün 17&#x27;de Agent Teams ve Dynamic Workflows ile Claude&#x27;ların birbirine konuşmasını ve bir script&#x27;in onlarca subagent&#x27;ı orkestre etmesini gördün. Bugün bu gücü terminalden çıkarıp CI/CD pipeline&#x27;ına, zamanlanmış görevlere ve entegrasyon yüzeylerine taşıyorsun. <code>claude -p</code> ile non-interactive çalıştırma, GitHub Actions ile otomatik PR review, üç farklı zamanlama katmanı (session-scoped <code>/loop</code>, Desktop scheduled task, cloud Routine) ve Chrome/Slack entegrasyonlarını öğreneceksin. Günün ana çıktısı: Claude Code&#x27;u bireysel coding assistant&#x27;tan engineering automation platformuna taşıyabilmek.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Teorik: Automation Surfaces Karar Matrisi</div><div class="du">30 dk</div><div class="de">Headless CLI, --tools/--allowedTools/--disallowedTools ayrımı, GitHub entegrasyonları (Code Review / Actions / autofix-pr), üç zamanlama katmanı, Chrome &amp; Slack demo tanıtımı, CI güvenlik modeli</div></div><div class="step"><div class="ph">2 · Pratik: CI Core</div><div class="du">55 dk</div><div class="de">claude -p ile non-interactive çalıştırma, --bare, --tools ile read-only review, JSON parse, GitHub Actions workflow YAML, Desktop scheduled task, Chrome debug demo</div></div><div class="step"><div class="ph">3 · Pratik: Scheduled Automation &amp; Entegrasyonlar</div><div class="du">35 dk</div><div class="de">Cloud Routine kurma (schedule + GitHub event trigger), Slack delegation demo, end-to-end CI pipeline tasarımı</div></div><div class="step"><div class="ph">4 · Challenge</div><div class="du">25 dk</div><div class="de">Core: Safe Claude CI Review pipeline + Bonus: Routine/Chrome/Slack/autofix-pr</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-17 tamamlanmış: subagent&#x27;lar (Gün 11), hooks (Gün 12), Agent Teams &amp; Dynamic Workflows (Gün 17), SaaS Dashboard projesi git repository&#x27;si olarak init edilmiş; Claude Code güncel sürümde — <code>claude --version</code> ile kontrol et; Pro, Max, Team veya Enterprise plan / Console hesabı — Routines ve Code Review özelliklerinin kullanılabilirliği plana göre değişir; GitHub hesabı (Actions workflow ve Code Review kurulumu için)</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); Git + GitHub CLI (<code>gh</code>) — PR ve Actions entegrasyonu için; VS Code veya tercih edilen editör; Chrome veya Edge tarayıcısı (Chrome debug demo için; opsiyonel); Slack workspace (Slack demo için; opsiyonel)</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li><code>claude -p</code> ile non-interactive çalıştırma yapabilecek; <code>--bare</code>, <code>--tools</code>, <code>--allowedTools</code>, <code>--disallowedTools</code>, <code>--permission-mode</code> ve <code>--output-format json</code> flag&#x27;lerinin availability vs permission ayrımını bilerek kullanabileceksin</li><li>GitHub Actions workflow dosyası yazarak PR&#x27;da otomatik Claude Code review ve <code>@claude</code> mention tetiklemesi kurabileceksin</li><li>GitHub Code Review (managed, multi-agent) ile GitHub Actions (self-hosted, custom workflow) arasındaki mimari farkı anlayıp doğru senaryoya doğru aracı seçebileceksin</li><li>Üç zamanlama katmanını (<code>/loop</code> session-scoped, Desktop scheduled tasks, cloud Routines) karşılaştırarak ihtiyaca uygun olanı kurabileceksin</li><li>Chrome entegrasyonuyla canlı web app debugging döngüsünü tanıyabilecek ve Slack&#x27;ten coding task delegasyonunun modelini açıklayabileceksin</li><li>CI ortamında <code>--bare</code> + <code>--tools</code> + <code>--disallowedTools</code> + <code>--permission-mode dontAsk</code> + secret yönetimi ile güvenli, öngörülebilir otomasyon tasarlayabileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL</h2><h3 class="sub">1.1 Headless Mode ve Agent SDK CLI</h3><p>Claude Code&#x27;un asıl gücü interaktif terminalde değil, non-interactive modda ortaya çıkar. <code>claude -p</code> (veya <code>--print</code>) bir prompt alır, çalışır, çıktıyı döner ve çıkar — bir session açmaz. Bu sayede CI pipeline&#x27;ında, pre-commit hook&#x27;ta veya herhangi bir bash script&#x27;te Claude Code&#x27;u tıpkı <code>grep</code> veya <code>jq</code> gibi bir Unix aracı olarak kullanabilirsin.</p><pre><code># Basit non-interactive kullanım
+claude -p &quot;Explain what this project does&quot;
+
+# Structured output — script/jq ile parse
+claude -p &quot;List all API endpoints&quot; --output-format json
+
+# Streaming — gerçek zamanlı işleme
+claude -p &quot;Analyze this log file&quot; --output-format stream-json --verbose</code></pre><p>stdin pipe desteği sayesinde build loglarını, diff çıktılarını veya herhangi bir metin akışını doğrudan Claude&#x27;a besleyebilirsin. Pipe girişi 10 MB ile sınırlı — daha büyük inputları dosya olarak yaz ve dosya yolunu prompt&#x27;ta referans ver.</p><pre><code># Build log analizi — stdin pipe
+cat build-error.txt | claude -p &#x27;concisely explain the root cause of this build error&#x27; &gt; output.txt
+
+# Git diff&#x27;i review&#x27;e gönder
+git diff main | claude -p &#x27;review these changes for security issues&#x27;</code></pre><p><code>--output-format json</code> kullandığında response payload&#x27;ı <code>total_cost_usd</code> ve model bazında maliyet dağılımı içerir — scripted çağrılarda harcamayı usage dashboard&#x27;a gitmeden izleyebilirsin.</p><h3 class="sub">1.2 Availability vs Permission: Flag&#x27;leri Doğru Anlamak</h3><p>Claude Code CLI&#x27;da tool erişimini kontrol eden beş flag var ve bunlar iki farklı katmanda çalışır. Bu ayrımı bilmeden CI job tasarlamak güvenlik yanılsaması yaratır:</p><table><thead><tr><th>Flag</th><th>Katman</th><th>Ne yapar</th><th>Ne yapmaz</th></tr></thead><tbody><tr><td>--tools</td><td>Built-in tool availability</td><td>Claude&#x27;un kullanabileceği built-in tool setini sınırlar (ör. &quot;Read,Glob,Grep&quot; → sadece bunlar mevcut)</td><td>MCP tool&#x27;larını etkilemez</td></tr><tr><td>--allowedTools</td><td>Permission allow rule</td><td>Belirtilen tool/pattern için izin sormadan çalıştırır</td><td>Tool availability kısıtlamaz — listelenmemiş tool hâlâ mevcut, sadece prompt ister</td></tr><tr><td>--disallowedTools</td><td>Deny rule / availability</td><td>Bare tool name → tool&#x27;u context&#x27;ten kaldırır; scoped pattern → o pattern&#x27;i bloklar</td><td>MCP tool&#x27;lar için ayrıca &quot;mcp__*&quot; gerekir</td></tr><tr><td>--permission-mode dontAsk</td><td>Runtime approval policy</td><td>Pre-approved olmayan tool çağrılarını reddeder</td><td>Allowlist&#x27;teki tool&#x27;ların güvenliğini garanti etmez</td></tr><tr><td>--bare</td><td>Startup/context minimization</td><td>Customization discovery atlar: hooks, skills, plugins, MCP, auto memory, CLAUDE.md yüklenmez</td><td>Tool erişimini kısıtlamaz (Bash/Read/Edit hâlâ açık)</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>CI&#x27;da read-only Claude job&#x27;u tasarlamanın doğru formülü: <code>--bare</code> (öngörülebilir startup) + <code>--tools &quot;Read,Glob,Grep&quot;</code> (built-in availability kısıtla) + <code>--disallowedTools &quot;mcp__*&quot;</code> (MCP bypass engelle) + <code>--permission-mode dontAsk</code> (unlisted her şeyi reddet). Tek bir flag &#x27;güvenlik modu&#x27; değildir; katmanları birlikte kullanman gerekir.</div><p><code>--bare</code> modu, CI ve script çağrılarında context yüzeyini küçültmek, startup davranışını öngörülebilir yapmak ve project/user customization etkisini azaltmak için kullanılır. Hangi makinede çalıştırırsan çalıştır, aynı sonucu alırsın — bir takım arkadaşının <code>~/.claude</code>&#x27;ındaki hook veya projedeki <code>.mcp.json</code>&#x27;daki MCP server çalışmaz. Ama <code>--bare</code> tek başına güvenlik sandbox&#x27;ı sağlamaz: Bash, file read ve file edit tool&#x27;ları açık kalır.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>--bare</code> artık scripted ve SDK çağrıları için önerilen moddur ve gelecekte <code>-p</code> kullanıldığında varsayılan olacak. CI pipeline&#x27;ında <code>--bare</code> yoksa, proje dizinindeki hooks, MCP server&#x27;lar ve CLAUDE.md yüklenebilir — bu hem tutarsız sonuçlara hem de güvenlik riskine yol açabilir.</div><p>Son olarak, <code>--continue</code> ve <code>--resume</code> flag&#x27;leri ile non-interactive çağrıları zincirlemenin mümkün olduğunu bil. Session ID&#x27;yi JSON çıktısından yakalayıp bir sonraki çağrıda kullanabilirsin — çok aşamalı CI pipeline&#x27;ları için faydalı.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Agent SDK&#x27;nın Python ve TypeScript paketleri de mevcut; structured output, tool approval callback ve native message nesneleri sunarlar. CLI&#x27;daki <code>--tools</code>&#x27;un SDK karşılığı da <code>tools</code> opsiyonudur. Detay: code.claude.com/docs/en/agent-sdk</div><h3 class="sub">1.3 GitHub Entegrasyonları — Net Ayrım</h3><p>Claude Code&#x27;un GitHub ile çalışmasının dört farklı yolu var. Bunlar farklı altyapılarda, farklı tetikleyicilerle çalışır ve farklı soruları cevaplar. İkisini karıştırmak — özellikle Code Review ile Actions&#x27;ı — CI pipeline tasarımında en yaygın hatadır:</p><table><thead><tr><th>Araç</th><th>Nerede çalışır</th><th>Tetikleme</th><th>Tipik kullanım</th><th>Kullanılabilirlik</th></tr></thead><tbody><tr><td>GitHub Code Review</td><td>Anthropic managed infra</td><td>PR open / push / @claude review</td><td>Deep multi-agent PR review, inline finding</td><td>Team/Enterprise (ZDR&#x27;da yok)</td></tr><tr><td>GitHub Actions</td><td>GitHub runner (self/cloud)</td><td>issue/PR mention, workflow event</td><td>Custom automation, implementation, CI step</td><td>Tüm planlar (API key gerekir)</td></tr><tr><td>/autofix-pr</td><td>Claude Code on the web session</td><td>Current branch PR + CI/review events</td><td>CI failure ve reviewer comment fix loop</td><td>claude.ai subscription + gh CLI</td></tr><tr><td>Local /code-review</td><td>Developer machine</td><td>Manuel command</td><td>Local diff review, günlük sürüş</td><td>Tüm yüzeyler</td></tr></tbody></table><p>GitHub Code Review, Anthropic&#x27;in yönettiği bir servistir: PR açıldığında (veya push/manual <code>@claude review</code> ile) bir filo uzmanlaşmış agent, değişiklikleri full codebase bağlamında inceler ve inline comment olarak bulgularını bırakır. Severity seviyeleri: Important (ciddi bug veya güvenlik açığı), Nit (stil veya küçük iyileştirme), Pre-existing (değişiklikten önce zaten olan sorun). Her comment&#x27;te 👍/👎 butonları gelir — bu feedback Anthropic&#x27;in reviewer&#x27;ı iyileştirmesi için kullanılır.</p><p>CLAUDE.md&#x27;nin yanı sıra proje kökünde bir <code>REVIEW.md</code> dosyası oluşturabilirsin — Code Review bunu en yüksek öncelikle okur. Nit hacmini sınırlama, belirli path&#x27;leri atlama, repo-spesifik kontrol kuralları eklemek için kullan.</p><p>GitHub Actions ise kendi runner&#x27;ında Claude Code Action çalıştırır. <code>/install-github-app</code> ile kurulur; <code>@claude</code> mention ile PR/issue&#x27;da tetiklenir veya workflow event&#x27;le çalışır. Custom automation, feature implementation, CI step olarak kullanılabilir. 3P provider (Bedrock/Vertex) desteği var.</p><p><code>/autofix-pr</code> ise mevcut checked-out branch&#x27;teki open PR&#x27;ı <code>gh pr view</code> ile bulur, bir Claude Code on the web session&#x27;ı başlatır ve PR&#x27;daki CI failure ve reviewer comment&#x27;lere otomatik tepki verir. Net fix&#x27;leri uygular, belirsiz durumlarda sana sorar.</p><div class="callout kp"><span class="lbl">🔑 Önemli</span>Code Review = &#x27;PR&#x27;ıma bağımsız gözlerle baksın&#x27;; Actions = &#x27;Claude ile custom otomasyonu tetikleyeyim&#x27;; /autofix-pr = &#x27;CI failure&#x27;ları otomatik fix etsin&#x27;. Üçü birbirinin yerine geçmez, birbirini tamamlar.</div><h3 class="sub">1.4 Zamanlama Üç Katmanı</h3><p>Claude Code&#x27;da tekrarlayan veya zamanlanmış iş çalıştırmanın üç farklı katmanı var. Doğru katmanı seçmek verimliliği ve güvenilirliği doğrudan etkiler:</p><table><thead><tr><th>Katman</th><th>Nerede çalışır</th><th>Tetikleme</th><th>Yaşam süresi</th><th>En iyi kullanım</th></tr></thead><tbody><tr><td>/loop</td><td>Mevcut CLI session içi</td><td>Cron expression veya doğal dil</td><td>Session-scoped; recurring 7 gün expiry</td><td>5-60 dk geçici polling (deploy, CI check)</td></tr><tr><td>Desktop scheduled task</td><td>Lokal makine (Desktop app)</td><td>Cron / one-off / doğal dil</td><td>App açıkken; catch-up on wake</td><td>Local dosya/tool erişimi gereken periyodik iş</td></tr><tr><td>Cloud Routine</td><td>Anthropic managed infra</td><td>Cron / one-off / API / GitHub event</td><td>Laptop kapalıyken bile çalışır</td><td>Repo/connector gerektiren otonom, tekrarlayan iş</td></tr></tbody></table><p>Seçim heuristiği şu sorularla başlar: Laptop kapalıyken çalışmalı mı? → Cloud Routine. Local dosyalara erişmeli mi? → Desktop scheduled task. Sadece bu session&#x27;da geçici bir polling mi? → <code>/loop</code>. CI event kaynaklı deterministic iş mi? → GitHub Actions. PR review kalitesi ve inline finding mi? → Code Review managed.</p><p>Desktop scheduled task&#x27;lar bilgisayar uyandığında son 7 gündeki kaçırılmış run&#x27;lardan yalnızca en güncel olanı çalıştırır — eski missed run&#x27;lar tek tek yakalanmaz. 6 gün uyuduysa, tek bir catch-up run yapılır. Task&#x27;ın kendi permission mode&#x27;u vardır; Ask/manual mode&#x27;da kurulursa tool approval bekleyip stall olabilir — ilk &#x27;Run now&#x27; ile izinleri gözlemle, &#x27;always allow&#x27; kuralları tanımla.</p><p>Cloud Routines ise tamamen farklı bir modelde çalışır: Anthropic altyapısında, otonom bir Claude Code cloud session olarak yürütülür. Permission-mode picker ve approval prompt yoktur — bu yüzden scope&#x27;u (repo, branch-push, environment, connector) dikkatli sınırla. Varsayılan olarak yalnızca <code>claude/</code> prefix&#x27;li branch&#x27;lara push edebilir.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Routines research preview&#x27;dadır; plan/organization policy ve daily run allowance kısıtlamaları var. Routine actions, bağlı GitHub/Slack identity üzerinden &#x27;kullanıcı adına&#x27; görünür — commit&#x27;ler senin GitHub kullanıcınla, Slack mesajları senin hesabınla gider. Routine prompt&#x27;unu self-contained yaz ve repo/connector scope&#x27;unu minimum tut.</div><div class="callout tip"><span class="lbl">💡 İpucu</span>CLI&#x27;dan <code>claude /schedule</code> ile doğal dille routine oluşturabilirsin: &#x27;/schedule her pazartesi 9&#x27;da açık PR&#x27;ları incele&#x27;. Web (claude.ai/code/routines) ve Desktop app&#x27;ten de oluşturulabilir — üç yüzey aynı cloud hesabına yazar.</div><h3 class="sub">1.5 Chrome ve Slack Entegrasyonları</h3><p>Chrome entegrasyonu, Claude Code&#x27;u canlı web uygulamasının console log&#x27;larına, DOM&#x27;una ve network request&#x27;lerine bağlar. Debugging döngüsü: console error → kaynak dosya tespit → fix → browser&#x27;da doğrulama. Claude in Chrome browser extension&#x27;ı gerektirir, Chrome ve Edge&#x27;de çalışır, WSL&#x27;de desteklenmez. <code>/chrome</code> komutuyla bağlantıyı yönetirsin.</p><p>Slack entegrasyonuyla <code>@Claude</code> mention, bir coding task&#x27;ı otomatik tespit edip Claude Code on the web session&#x27;ı başlatır. Routing mode: Code + Chat — yanlış yönlenirse &#x27;Retry as Code&#x27; veya &#x27;Retry as Chat&#x27; butonlarıyla düzelt. Sadece channel&#x27;larda (public/private) çalışır, DM&#x27;lerde çalışmaz.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Claude Code in Slack, Team/Enterprise tarafında Claude Tag ile değiştiriliyor. Aynı Slack app, yeniden kurulum gereksiz; ama kesin UI ve kurulum adımları plan/tenant&#x27;a göre değişebilir. Bugün amacımız: Slack&#x27;ten coding intent ile web session delegation modelini anlamak, spesifik kurulum yapmak değil.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Slack thread context&#x27;i bir prompt injection yüzeyi oluşturabilir — Claude, thread&#x27;deki diğer mesajlardan gelen yönlendirmeleri takip edebilir. <code>@Claude</code>&#x27;u yalnızca güvenilir kanallarda kullan.</div><h3 class="sub">1.6 CI Güvenlik Modeli</h3><p>CI ortamında Claude Code çalıştırırken güvenlik tek bir flag&#x27;le değil, katmanların birleşimiyle sağlanır:</p><ul><li><code>--bare</code>: Predictability — hooks, MCP, plugins, auto memory yüklenmez; hangi runner&#x27;da çalışırsa çalışsın aynı sonuç</li><li><code>--tools &quot;Read,Glob,Grep&quot;</code>: Built-in availability — Claude sadece belirtilen tool&#x27;ları kullanabilir (Edit, Write, Bash mevcut değil)</li><li><code>--disallowedTools &quot;mcp__*&quot;</code>: MCP bypass engeli — <code>--tools</code> MCP tool&#x27;ları etkilemez, bu flag onları kapatır</li><li><code>--permission-mode dontAsk</code>: Runtime safety net — pre-approved olmayan her çağrı reddedilir</li><li>Runner/sandbox isolation: GitHub Actions runner veya Docker container ile OS seviyesinde izolasyon</li><li>Secret yönetimi: <code>ANTHROPIC_API_KEY</code> GitHub Secrets&#x27;ta saklanır; <code>--bare</code> modda OAuth/keychain okunmaz, kimlik doğrulama <code>ANTHROPIC_API_KEY</code> env var veya <code>apiKeyHelper</code> ile yapılır</li></ul><div class="callout kp"><span class="lbl">🔑 Önemli</span><code>--bare</code> öngörülebilirlik sağlar ama güvenlik garantisi vermez. <code>--tools</code> built-in availability kısıtlar ama MCP&#x27;yi kapamaz. <code>--permission-mode dontAsk</code> run-time net oluşturur ama allowlist&#x27;teki tool&#x27;ların kendisi zararlı olabilir. Güvenlik = katmanların birleşimi + runner izolasyonu + secret yönetimi.</div><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM</h2><h3 class="sub">2.1 İlk Non-Interactive Çalıştırma</h3><p>En basit kullanımla başla: projenin kök dizininde <code>claude -p</code> ile bir codebase özeti al.</p><ol><li>SaaS Dashboard proje dizinine geç.</li><li>Şu komutu çalıştır:
+<code>claude -p &quot;Summarize the project structure and list the main API endpoints&quot;</code></li><li>Çıktıyı incele — Claude projeyi okudu, analiz etti ve sonucu döndü; interaktif session açmadan çıktı.</li><li>Şimdi aynı komutu <code>--output-format json</code> ile tekrar çalıştır ve JSON çıktısındaki <code>result</code>, <code>total_cost_usd</code> ve <code>session_id</code> alanlarını incele.</li></ol><pre><code># JSON çıktılı çalıştırma
+claude -p &quot;List all API endpoints&quot; --output-format json
+
+# jq ile parse
+claude -p &quot;List all API endpoints&quot; --output-format json | jq &#x27;.result&#x27;</code></pre><h3 class="sub">2.2 --bare + --tools ile Read-Only Review</h3><p>Şimdi CI&#x27;da kullanacağın read-only review pattern&#x27;ini oluştur. Amacımız: Claude sadece dosyaları okusun, hiçbir şey düzenlemesin, hiçbir komut çalıştırmasın.</p><ol><li>Aşağıdaki komutu çalıştır — <code>--tools</code> built-in tool setini Read/Glob/Grep ile sınırlar; <code>--disallowedTools &quot;mcp__*&quot;</code> MCP bypass&#x27;ı engeller:</li><li><code>--permission-mode dontAsk</code> ile Claude allowlist dışındaki hiçbir tool&#x27;u çalıştıramaz — en sıkı runtime kontrolü.</li><li>Çıktıdaki findings&#x27;i incele. JSON formatında file, line, risk ve recommendation alanlarını gözlemle.</li></ol><pre><code>claude --bare -p &quot;Review this repository for OWASP Top 10 risks. Do not edit files. Return findings with file, line, risk, evidence, and recommendation.&quot; \
+  --tools &quot;Read,Glob,Grep&quot; \
+  --disallowedTools &quot;mcp__*&quot; \
+  --permission-mode dontAsk \
+  --output-format json</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>Bu pattern&#x27;i bir bash script&#x27;e sarıp <code>.github/scripts/claude-review.sh</code> olarak kaydet — GitHub Actions workflow&#x27;unda bu script&#x27;i çağırabilirsin.</div><h3 class="sub">2.3 stdin Pipe ile Build Log Analizi</h3><ol><li>Kasıtlı bir build hatası oluştur (ör. bir import&#x27;u kır).</li><li>Build&#x27;ı çalıştır ve çıktıyı bir dosyaya kaydet:
+<code>npm run build 2&gt;&amp;1 &gt; build-error.txt</code> (veya projenin build komutu)</li><li>Build logunu Claude&#x27;a pipe et:
+<code>cat build-error.txt | claude -p &#x27;concisely explain the root cause of this build error&#x27; &gt; analysis.txt</code></li><li><code>analysis.txt</code>&#x27;i aç ve Claude&#x27;un root cause analizini incele.</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Pipe girişi 10 MB ile sınırlıdır. Daha büyük log dosyaları için içeriği bir dosyaya yaz ve prompt&#x27;ta dosya yolunu referans ver: <code>claude -p &#x27;Analyze the build log at ./build-error.txt&#x27;</code></div><h3 class="sub">2.4 Permission Mode Deneyimi</h3><p><code>--permission-mode</code> seçeneklerini karşılaştırarak run-time davranış farkını gör:</p><ol><li>Aynı review prompt&#x27;unu <code>--permission-mode dontAsk</code> ile çalıştır — allowlist dışındaki her tool call reddedilir.</li><li>Şimdi <code>--permission-mode acceptEdits</code> ile dene — dosya yazma izni otomatik verilir, ama diğer shell komutları hâlâ prompt ister (non-interactive&#x27;de abort eder).</li><li>Farkı gözlemle: <code>dontAsk</code> en sıkı (CI için ideal), <code>acceptEdits</code> dosya düzenleme otomasyonu için uygun.</li></ol><pre><code># dontAsk: sadece allowedTools çalışır, geri kalan denied
+claude --bare -p &quot;Apply lint fixes&quot; \
+  --permission-mode dontAsk \
+  --allowedTools &quot;Read,Edit,Bash(npm run lint *)&quot; \
+  --output-format json
+
+# acceptEdits: dosya yazma otomatik, shell hâlâ kısıtlı
+claude --bare -p &quot;Apply lint fixes&quot; \
+  --permission-mode acceptEdits</code></pre><h3 class="sub">2.5 GitHub Actions Workflow Yazma</h3><p>PR&#x27;da otomatik Claude Code review çalıştıran basit bir GitHub Actions workflow dosyası oluştur.</p><ol><li>Proje kökünde <code>.github/workflows/claude-review.yml</code> dosyası oluştur.</li><li>Workflow&#x27;u <code>pull_request</code> event&#x27;ine bağla.</li><li>İki job tanımla: (1) standart lint/test, (2) Claude Code review — böylece code quality ve AI review ayrı raporlanır.</li><li>Claude job&#x27;unda <code>ANTHROPIC_API_KEY</code>&#x27;i GitHub Secrets&#x27;tan oku.</li><li>Çıktıyı <code>gh pr comment</code> ile PR&#x27;a yaz veya workflow artifact olarak kaydet.</li></ol><pre><code># .github/workflows/claude-review.yml (basitleştirilmiş)
+name: Claude Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci &amp;&amp; npm test
+
+  claude-review:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+      - name: Run review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          git diff origin/main...HEAD | \
+          claude --bare -p &#x27;Review this diff for bugs, security issues, and improvements. Format as markdown.&#x27; \
+            --tools &quot;Read,Glob,Grep&quot; \
+            --disallowedTools &quot;mcp__*&quot; \
+            --permission-mode dontAsk \
+            &gt; review.md
+      - name: Post comment
+        run: gh pr comment ${{ github.event.number }} -F review.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}</code></pre><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Bu basitleştirilmiş bir örnektir. Prodüksiyonda Claude Code GitHub Actions (anthropics/claude-code-action) kullanmak daha iyi entegrasyon ve güvenlik sağlar. Ayrıca managed Code Review (Team/Enterprise) <code>@claude review</code> ile daha derin, multi-agent analiz yapar — self-hosted pipeline&#x27;dan farklı bir üründür.</div><h3 class="sub">2.6 Desktop Scheduled Task Kurma</h3><ol><li>Desktop app&#x27;te Routines → New routine → Local seç.</li><li>Name: &#x27;dependency-audit&#x27;, Instructions: &#x27;Check for outdated dependencies, list any with known vulnerabilities, and suggest update commands.&#x27;</li><li>Schedule: her gün sabah 09:00.</li><li>Permission mode: &#x27;Accept edits&#x27; (veya daha güvenli &#x27;Ask&#x27; — ama ilk run&#x27;da izinleri &#x27;always allow&#x27; ile tanımla).</li><li>Folder: SaaS Dashboard proje dizini.</li><li>&#x27;Run now&#x27; ile test et ve çıktıyı incele.</li></ol><p>Alternatif olarak doğal dille de oluşturabilirsin — herhangi bir session&#x27;da şunu yaz: &#x27;Set up a daily code review that runs every morning at 9am&#x27;. Claude otomatik olarak bir scheduled task oluşturur.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Task prompt&#x27;unu <code>~/.claude/scheduled-tasks/&lt;task-name&gt;/SKILL.md</code> dosyasından düzenleyebilirsin. YAML frontmatter&#x27;da name ve description, body&#x27;de prompt bulunur.</div><h3 class="sub">2.7 Chrome Debug Demo</h3><p>Bu adım gösterimli bir demhodur — Chrome extension kurulumu ve site permission&#x27;lar ortama bağlıdır. WSL kullanıyorsan bu adımı atla.</p><ol><li>Terminal&#x27;de <code>--chrome</code> flag&#x27;iyle veya session içinde <code>/chrome</code> komutuyla Chrome entegrasyonunu aktif et.</li><li>Claude&#x27;a şu prompt&#x27;u ver: &#x27;Open localhost:3000, fill the login form with test credentials, submit, and check the console for errors.&#x27;</li><li>Claude&#x27;un Chrome&#x27;da tab açıp, formu doldurup, console loglarını okuyup, varsa hata kaynağını tespit etmesini gözlemle.</li><li>Eğer hata bulunursa, Claude&#x27;dan düzeltme yapmasını iste ve browser&#x27;da doğrulamasını izle.</li></ol><div class="callout kp"><span class="lbl">🔑 Önemli</span>Chrome entegrasyonunun değeri &#x27;code → browser → console → source → fix&#x27; döngüsünü tek session&#x27;da kapatmasıdır. Context switch&#x27;i ortadan kaldırır.</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ</h2><h3 class="sub">3.1 Cloud Routine Kurma</h3><p>Desktop task&#x27;tan farklı olarak cloud Routine, Anthropic&#x27;in yönettiği bir VM&#x27;de çalışır — laptop kapalı olsa bile. Şimdi CLI&#x27;dan bir haftalık bağımlılık denetimi routine&#x27;i kuracaksın.</p><ol><li>Terminal&#x27;de şu komutu çalıştır:
+<code>/schedule every Monday at 09:00, inspect package.json for outdated or vulnerable dependencies, summarize findings, and post to the configured Slack connector</code></li><li>Claude seni GitHub bağlantısı ve cloud environment kurulumu için yönlendirecek — <code>/web-setup</code> çalıştırman gerekebilir.</li><li>Routine oluşturulduktan sonra claude.ai/code/routines sayfasında veya Desktop app&#x27;in Routines sekmesinde görüntüle.</li><li>&#x27;Run now&#x27; ile test et ve session transcript&#x27;ini oku.</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Cloud Routine&#x27;ler autonomous çalışır — permission-mode picker ve approval prompt yoktur. Scope&#x27;u kontrol et: hangi repo&#x27;lar bağlı, branch-push açık mı, hangi connector&#x27;lar mevcut. Varsayılan olarak sadece <code>claude/</code> prefix&#x27;li branch&#x27;lara push edebilir.</div><h3 class="sub">3.2 GitHub Event Tetikli Routine</h3><p>Schedule dışında, Routine&#x27;leri GitHub event&#x27;leriyle de tetikleyebilirsin — örneğin PR açıldığında otomatik bir review oturumu başlatmak.</p><ol><li>claude.ai/code/routines → yeni routine oluştur veya mevcut routine&#x27;i düzenle.</li><li>Trigger olarak &#x27;GitHub event&#x27; seç → pull_request.opened.</li><li>Filter ekle: base branch = &#x27;main&#x27;, head branch contains &#x27;feature&#x27;.</li><li>Prompt: &#x27;Review this PR for correctness and security issues. Leave inline comments on findings.&#x27;</li><li>Kaydet ve bir test PR aç — routine&#x27;in tetiklenip tetiklenmediğini session listesinden kontrol et.</li></ol><div class="callout tip"><span class="lbl">💡 İpucu</span>Filter&#x27;da <code>matches regex</code> operatörü tüm field değerini test eder; substring match için <code>contains</code> kullan. Örn. <code>.*hotfix.*</code> regex ile, <code>hotfix</code> contains ile — ikisi aynı sonucu verir ama regex syntax hatası riski taşır.</div><h3 class="sub">3.3 Slack Delegation Demo</h3><p>Bu adım gösterimli bir demhodur — Slack app kurulumu workspace admin gerektirir ve plan/tenant&#x27;a bağlıdır.</p><ol><li>Slack channel&#x27;ında <code>@Claude</code> ile bir bug report yaz: &#x27;@Claude the /api/reports endpoint returns 500 when date range is empty. Fix it in the backend repo and create a PR.&#x27;</li><li>Claude&#x27;un coding intent&#x27;i tespit edip bir Claude Code on the web session&#x27;ı başlattığını gözlemle.</li><li>Slack thread&#x27;inde progress update&#x27;ler görünecek; tamamlandığında &#x27;View Session&#x27; ve &#x27;Create PR&#x27; butonları gelecek.</li><li>Session&#x27;ı aç ve Claude&#x27;un yaptığı değişiklikleri incele.</li></ol><h3 class="sub">3.4 End-to-End CI Pipeline Tasarımı</h3><p>Şimdiye kadar öğrendiğin parçaları bir araya getirerek production-ready bir CI pipeline akışı tasarla:</p><table><thead><tr><th>Adım</th><th>Araç</th><th>Ne yapar</th></tr></thead><tbody><tr><td>1. Push</td><td>GitHub webhook</td><td>Kod push edildiğinde workflow tetiklenir</td></tr><tr><td>2. Lint + Test</td><td>Standard Actions (npm test)</td><td>Deterministik code quality kontrolü</td></tr><tr><td>3. Claude Review</td><td>Claude Code Action veya -p</td><td>AI-powered diff analizi, findings report</td></tr><tr><td>4. Managed Code Review</td><td>GitHub Code Review (Team/Ent.)</td><td>Multi-agent deep review, inline findings: Important / Nit / Pre-existing</td></tr><tr><td>5. Auto-fix</td><td>/autofix-pr</td><td>CI failure ve reviewer comment&#x27;lere otomatik tepki</td></tr><tr><td>6. Merge</td><td>Human review + approval</td><td>Son karar her zaman insanda</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Bu pipeline&#x27;da Claude üç farklı rolde görünür: (3) non-interactive CI step, (4) managed review service, (5) reactive auto-fix agent. Her biri farklı altyapıda çalışır, farklı scope&#x27;a sahiptir ve farklı maliyeti vardır. Hepsini birden kullanmak gerekmez — takım büyüklüğü, güvenlik gereksinimleri ve bütçeye göre seç.</div><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>CI pipeline&#x27;da Claude&#x27;un bulgusu, son karar değildir. Code Review inline finding&#x27;leri PR&#x27;ı approve veya block etmez — mevcut review workflow&#x27;unu bozmaz. AI review, insan review&#x27;ını tamamlar, yerine geçmez.</div><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">CI Read-Only Review</div><pre><code>claude --bare -p &quot;Review this repository for OWASP Top 10 risks. Do not edit files. Return findings with file, line, risk, evidence, and recommendation.&quot; \
+  --tools &quot;Read,Glob,Grep&quot; \
+  --disallowedTools &quot;mcp__*&quot; \
+  --permission-mode dontAsk \
+  --output-format json</code></pre><div class="note">--tools built-in availability kısıtlar, --disallowedTools MCP bypass&#x27;ı engeller, --permission-mode dontAsk unlisted her şeyi reddeder. Üç katman birlikte read-only garanti eder.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Otomatik Commit</div><pre><code>claude -p &quot;Review staged changes and create a conventional commit message, then commit.&quot; \
+  --allowedTools &quot;Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)&quot;</code></pre><div class="note">Local/dev ortamı için uygundur. CI&#x27;da otomatik commit/push çok daha sıkı branch protection ve review gate ister. Bash(git diff *) &#x27;taki boşluk + * prefix match sağlar — boşluksuz yazmak git diff-index&#x27;e de izin verir.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Build Log Analiz</div><pre><code>cat build-error.txt | claude -p &#x27;concisely explain the root cause of this build error&#x27; &gt; output.txt</code></pre><div class="note">stdin pipe 10 MB ile sınırlı. Daha büyük inputlar için dosya yolunu prompt&#x27;ta referans ver. --output-format json ile total_cost_usd alabilirsin.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Cloud Routine — Haftalık Dependency Audit</div><pre><code>/schedule every Monday at 09:00, inspect the selected repository for outdated or vulnerable dependencies, summarize findings in a markdown report, and post to the configured Slack connector. Do not push changes unless the routine is explicitly configured with branch-push permission.</code></pre><div class="note">Routine autonomous çalışır — permission prompt yok. Prompt&#x27;u self-contained yaz: &#x27;başarılı sonuç neye benzer&#x27; ve &#x27;sonuçla ne yap&#x27; açık olmalı, çünkü çalışırken sana soru soramaz.</div></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Chrome Debug</div><pre><code>Open localhost:3000, reproduce the form submission error, inspect console logs, identify the source file, propose a minimal fix, apply it, and verify in the browser.</code></pre><div class="note">Chrome entegrasyonu --chrome flag&#x27;i veya /chrome komutu ile aktif edilir. Chrome/Edge destekli, WSL&#x27;de desteklenmez. Plan mode&#x27;da read-only browser tool&#x27;lar (read_page, get_page_text) prompt gerekmez; state-changing tool&#x27;lar onay ister.</div></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>CHALLENGE: Safe Claude CI Review Pipeline</h3><p>SaaS Dashboard için güvenli bir CI pipeline oluştur: PR açıldığında lint/test çalıştıran bir GitHub Actions workflow yaz, ayrı bir job&#x27;da Claude Code ile read-only diff analizi yap, API key&#x27;i güvenli şekilde yönet ve sonucu PR&#x27;a raporla.</p><p><strong>Gereksinimler:</strong></p><ul><li><code>.github/workflows/claude-review.yml</code> oluştur; <code>pull_request</code> event&#x27;ine bağla.</li><li>İki ayrı job: (1) <code>lint-test</code> — standart npm test, (2) <code>claude-review</code> — AI-powered diff analizi.</li><li>Claude job&#x27;unda <code>--bare</code>, <code>--tools &quot;Read,Glob,Grep&quot;</code>, <code>--disallowedTools &quot;mcp__*&quot;</code> ve <code>--permission-mode dontAsk</code> kullan.</li><li><code>ANTHROPIC_API_KEY</code>&#x27;i GitHub Secrets&#x27;tan oku (<code>${{ secrets.ANTHROPIC_API_KEY }}</code>).</li><li>Çıktıyı <code>gh pr comment</code>, <code>actions/github-script</code> veya workflow artifact olarak PR&#x27;a raporla.</li><li>&#x27;Pipeline failure&#x27; (test kırıldı) ile &#x27;review finding&#x27; (Claude bulgu raporladı ama CI yeşil) ayrımını README veya workflow comment&#x27;inde açıkla.</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>Workflow YAML dosyası sözdizimi doğru (act veya GitHub&#x27;da validate et)</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>Secret adı doğru tanımlı ve workflow&#x27;da referans ediliyor</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>Claude adımı <code>--bare</code> + <code>--tools</code> + <code>--disallowedTools &quot;mcp__*&quot;</code> + <code>--permission-mode dontAsk</code> içeriyor</span></label></li><li><label><input type="checkbox" data-k="succ3"><span>Lint/test ve Claude review ayrı job/step olarak ayrılmış</span></label></li><li><label><input type="checkbox" data-k="succ4"><span>&#x27;Pipeline failure&#x27; vs &#x27;review finding&#x27; ayrımı açıklanmış</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Bu challenge&#x27;ın çekirdeği güvenli bir non-interactive CI job tasarlamaktır. İlk adım workflow YAML iskeletini oluşturmak, ikinci adım Claude job&#x27;unu doğru flag&#x27;lerle kilitlemek, üçüncü adım çıktıyı PR&#x27;a raporlamaktır.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">1) Workflow YAML İskeleti</div><pre><code>SaaS Dashboard için bir GitHub Actions workflow oluştur: PR açıldığında (1) npm test çalıştır, (2) ayrı bir job&#x27;da claude --bare -p ile git diff&#x27;i review et. ANTHROPIC_API_KEY GitHub Secrets&#x27;tan okunmalı. Çıktıyı gh pr comment ile PR&#x27;a yaz.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">2) Read-Only Flag Kombinasyonu</div><pre><code>claude --bare -p ile bir review komutu yaz. Şartlar: sadece Read, Glob, Grep tool&#x27;ları mevcut olsun (--tools), MCP tool&#x27;ları devre dışı (--disallowedTools &quot;mcp__*&quot;), izin istemeden çalışsın ama allowlist dışı reddedilsin (--permission-mode dontAsk). JSON çıktı versin.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">3) Pipeline Failure vs Finding Açıklaması</div><pre><code>README&#x27;ye bir bölüm ekle: &#x27;CI pipeline&#x27;da test failure (CI kırmızı, merge bloklanır) ile Claude review finding (CI yeşil kalır, yalnızca bilgilendirme) arasındaki fark nedir?&#x27; Teknik olmayan bir PM&#x27;in anlayacağı şekilde yaz.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">4) (Bonus) Routine Kurulumu</div><pre><code>/schedule every Monday at 09:00, inspect this repository for outdated dependencies and known CVEs, summarize in markdown, post to Slack.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>Workflow YAML&#x27;ı yazarken <code>fetch-depth: 0</code> ile tam git history alınmalı — aksi halde <code>git diff origin/main...HEAD</code> boş dönebilir.</li><li>GitHub Secrets&#x27;a <code>ANTHROPIC_API_KEY</code> eklemeyi unutma — workflow bunu bulamazsa Claude adımı sessizce fail olur.</li><li>Claude job&#x27;unu <code>needs: lint-test</code> ile bağlarsan, test kırıldığında review çalışmaz — bu genellikle istenen davranıştır.</li><li><code>gh pr comment</code> komutu <code>GITHUB_TOKEN</code> env var gerektirir; Actions&#x27;ın otomatik sağladığı <code>secrets.GITHUB_TOKEN</code> yeterlidir.</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ <code>--allowedTools</code>&#x27;un tool availability kısıtladığını sanmak — bu flag sadece permission katmanında çalışır; availability için <code>--tools</code> kullan.</li><li>⚠️ <code>--bare</code> yokken CI&#x27;da çalıştırmak — proje dizinindeki hooks, MCP server&#x27;lar ve CLAUDE.md öngörülemeyen davranışlara yol açar.</li><li>⚠️ Desktop scheduled task&#x27;ı Ask mode&#x27;da kurup tool approval stall yaşamak — ilk &#x27;Run now&#x27; ile izinleri &#x27;always allow&#x27; olarak tanımla.</li><li>⚠️ <code>Bash(git diff*)</code> yazıp boşluk koymamak — boşluksuz yazımda <code>git diff-index</code> gibi istenmeyen komutlara da izin verilir.</li><li>⚠️ Cloud Routine scope&#x27;unu kontrol etmemek — routine bağlı GitHub identity&#x27;nle commit atar ve Slack mesajı senin adına gider.</li><li>⚠️ Code Review severity&#x27;lerini yanlış bilmek — Important/Nit/Pre-existing, 🔴🟠🟡 gibi emoji değil.</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li><code>claude -p</code> ile non-interactive çalıştırma, Claude Code&#x27;u CI/CD pipeline&#x27;ına, pre-commit hook&#x27;a ve bash script&#x27;e entegre etmenin temel mekanizmasıdır; stdin pipe ve <code>--output-format json</code> ile Unix araç zincirinin doğal bir parçası olur.</li><li>Tool erişim kontrolü iki katmanlıdır: <code>--tools</code> built-in availability kısıtlar (Edit, Write, Bash mevcut değil), <code>--allowedTools</code> sadece permission katmanında çalışır (listelenmemiş tool hâlâ mevcut, sadece izin ister). MCP tool&#x27;ları <code>--tools</code> tarafından etkilenmez — <code>--disallowedTools &quot;mcp__*&quot;</code> ayrıca gerekir.</li><li><code>--bare</code> güvenlik modu değil, öngörülebilir startup modudur: hooks, skills, plugins, MCP, auto memory ve CLAUDE.md yüklenmez, ama Bash/Read/Edit tool&#x27;ları açık kalır. CI&#x27;da güvenlik = --bare + --tools + --disallowedTools + --permission-mode dontAsk + runner isolation.</li><li>GitHub Code Review (managed, multi-agent, inline finding) ile GitHub Actions (self-hosted, custom workflow) farklı ürünlerdir. Code Review severity&#x27;leri: Important, Nit, Pre-existing. İkisi birbirinin yerine geçmez, birbirini tamamlar.</li><li>Zamanlama üç katmandır: <code>/loop</code> session-scoped geçici polling, Desktop scheduled task local dosya/tool erişimli periyodik iş, Cloud Routine laptop kapalıyken bile çalışan otonom cloud session. Seçim kriteri: &#x27;nerede çalışmalı, ne kadar yaşamalı, neye erişmeli.&#x27;</li><li>Cloud Routine&#x27;ler autonomous çalışır — permission prompt ve approval mekanizması yok. Actions bağlı kullanıcı kimliğiyle görünür. Scope&#x27;u (repo, branch-push, connector) minimum tut ve prompt&#x27;u self-contained yaz.</li><li>Chrome entegrasyonu &#x27;code → browser → console → source → fix&#x27; döngüsünü tek session&#x27;da kapatır; Slack entegrasyonu coding intent&#x27;i tespit edip web session başlatır — ikisi de core CI değil, tamamlayıcı otomasyon yüzeyleridir.</li><li>CI pipeline&#x27;da AI review, insan review&#x27;ını tamamlar, yerine geçmez. Code Review inline finding&#x27;leri PR&#x27;ı approve veya block etmez — son karar her zaman mühendistedir.</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/headless" target="_blank" rel="noopener">Run Claude Code programmatically — claude -p, bare mode, stdin, output formatları, session chaining, Agent SDK CLI</a></li><li>⭐ <a href="https://code.claude.com/docs/en/routines" target="_blank" rel="noopener">Automate work with routines — cloud routines, schedule/API/GitHub event triggers, connectors, branch push kısıtları</a></li><li>⭐ <a href="https://code.claude.com/docs/en/github-actions" target="_blank" rel="noopener">Claude Code GitHub Actions — setup, @claude mention, custom workflow, Claude Code Action, 3P provider desteği</a></li><li>⭐ <a href="https://code.claude.com/docs/en/code-review" target="_blank" rel="noopener">Code Review — managed multi-agent PR review, REVIEW.md, severity (Important/Nit/Pre-existing), feedback mekanizması</a></li><li>⭐ <a href="https://code.claude.com/docs/en/desktop-scheduled-tasks" target="_blank" rel="noopener">Schedule recurring tasks in Desktop — local scheduled tasks, worktree toggle, catch-up on wake, permission mode</a></li><li>⭐ <a href="https://code.claude.com/docs/en/chrome" target="_blank" rel="noopener">Use Claude Code with Chrome — browser debugging, extension kurulumu, site permissions, plan mode tool ayrımı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/slack" target="_blank" rel="noopener">Claude Code in Slack — @Claude mention, coding intent routing, web session, Claude Tag geçişi</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://www.anthropic.com/engineering/claude-code-best-practices" target="_blank" rel="noopener">Claude Code Best Practices (Anthropic Engineering) — non-interactive usage, CI patterns, scheduling stratejileri</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI reference — tüm flag&#x27;lerin (--tools, --allowedTools, --disallowedTools, --bare, --permission-mode) tam referansı</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 19)</span>Yarın (Gün 19) Claude Code&#x27;u bireysel kullanımdan takım ve organizasyon ölçeğine taşıyorsun: managed/server-managed settings ile merkezi konfigürasyon, model allowlist, sandbox ortamları, maliyet optimizasyonu ve enterprise güvenlik best practices.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span><code>claude -p</code> ile non-interactive komut çalıştırıp JSON çıktı aldım</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span><code>--bare</code> modun ne yaptığını doğru tanımlayabilirim: &#x27;customization discovery atlar, öngörülebilir startup sağlar — ama tool erişimini kısıtlamaz&#x27;</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span><code>--tools</code> (built-in availability), <code>--allowedTools</code> (permission), <code>--disallowedTools</code> (deny/availability) farkını açıklayabilirim</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span><code>--tools &quot;Read,Glob,Grep&quot;</code> + <code>--disallowedTools &quot;mcp__*&quot;</code> + <code>--permission-mode dontAsk</code> kombinasyonuyla read-only CI job tasarlayabilirim</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span>GitHub Actions workflow YAML dosyası yazıp Claude Code entegrasyonu ekleyebilirim</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>Code Review (managed, inline findings: Important/Nit/Pre-existing) ile Actions (custom workflow) arasındaki farkı söyleyebilirim</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>Üç zamanlama katmanını (<code>/loop</code>, Desktop task, cloud Routine) karşılaştırıp senaryo bazında seçebilirim</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Cloud Routine kurabilir ve &#x27;autonomous, no approval prompt&#x27; çalışma modelini açıklayabilirim</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Chrome debugging döngüsünü (console → source → fix → verify) tanıyabilirim</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>CI ortamında <code>ANTHROPIC_API_KEY</code> secret yönetimini ve <code>total_cost_usd</code> harcama izlemeyi açıklayabilirim</span></label></li></ul><div class="pager"><a href="gun17-agent-teams-dynamic-workflows.html"><div class="dir">← Önceki</div><div class="tt">Gün 17</div><div>Agent Teams &amp; Dynamic Workflows</div></a><a class="next" href="gun19-enterprise-patterns.html"><div class="dir">Sonraki →</div><div class="tt">Gün 19</div><div>Enterprise Patterns ve Best Practices</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 18/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=18;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>

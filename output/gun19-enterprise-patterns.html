@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gün 19 — Enterprise Patterns ve Best Practices · Claude Code Master</title>
+<style>/* ==========================================================================
+   Claude Code Master — Design Tokens + Component Styles
+   Tek stil kaynağı (single source of truth):
+     • generators/html_template.py bu dosyayı okuyup standalone HTML'e gömer
+     • React app → src/tokens.css olarak kopyalanır ve import edilir
+   Değişiklik burada yapılır, her iki çıktıya otomatik yansır.
+   ========================================================================== */
+
+/* ---------- Anthropic Palette (CSS custom properties) -------------------- */
+:root {
+  /* Yüzeyler */
+  --bg:         #F0EEE6;
+  --surface:    #FFFFFF;
+  --surface-2:  #F7F4EC;
+  --code-bg:    #F3EFE4;
+
+  /* Metin */
+  --ink:        #1A1915;
+  --ink-soft:   #57534A;
+  --ink-faint:  #8A857A;
+
+  /* Vurgu (coral) */
+  --accent:     #CC785C;
+  --accent-ink: #AE4E2C;
+
+  /* Çizgi / ayırıcı */
+  --line:       #E5E0D3;
+
+  /* Callout arka planları + kenarları */
+  --kp-bg:  #F6EADF;  --kp-br:  #CC785C;
+  --tip-bg: #ECEEE6;  --tip-br: #86977A;
+  --warn-bg:#F7EDD6;  --warn-br:#C79A3E;
+
+  /* Tipografi */
+  --serif: Georgia,"Times New Roman",serif;
+  --sans:  ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:  ui-monospace,"SF Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  /* Layout */
+  --sidebar-w: 288px;
+}
+
+/* ---------- Reset + Temel ------------------------------------------------ */
+*                  { box-sizing: border-box }
+html               { scroll-behavior: smooth }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior: auto } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+p          { margin: 12px 0 }
+ul, ol     { margin: 12px 0; padding-left: 24px }
+li         { margin: 5px 0 }
+a          { color: var(--accent-ink); text-underline-offset: 2px }
+
+/* ---------- Topbar ------------------------------------------------------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 40;
+  background: rgba(240,238,230,.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+}
+.topbar .brand               { font-weight: 700; font-size: 14px; letter-spacing: .02em; color: inherit; text-decoration: none }
+.topbar .brand b             { color: var(--accent) }
+.topbar .brand:hover         { opacity: .75 }
+.topbar .prog                { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; max-width: 340px }
+.topbar .prog > span         { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease }
+.topbar .proglabel           { font-size: 12px; color: var(--ink-soft); min-width: 74px; text-align: right }
+.menu-btn {
+  display: none;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 5px 9px; font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Layout ------------------------------------------------------- */
+.layout  { display: grid; grid-template-columns: var(--sidebar-w) 1fr; padding-top: 52px }
+
+/* ---------- Sidebar ------------------------------------------------------ */
+.sidebar {
+  position: sticky; top: 52px; align-self: start;
+  height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); background: var(--surface-2);
+  padding: 22px 16px 40px;
+}
+.sidebar h2        { font-family: var(--serif); font-size: 15px; margin: 0 0 4px; color: var(--ink) }
+.sidebar .sub      { font-size: 12px; color: var(--ink-faint); margin-bottom: 18px }
+.wk {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 18px 4px 6px;
+}
+.dnav                   { display: flex; flex-direction: column; gap: 1px }
+.dnav a, .dnav span {
+  display: flex; gap: 9px; align-items: baseline; text-decoration: none;
+  color: var(--ink-soft); padding: 7px 9px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.dnav a:hover            { background: #EFEADF; color: var(--ink) }
+.dnav .num               { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); min-width: 20px }
+.dnav .cur {
+  background: var(--surface); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 0 var(--line); border: 1px solid var(--line);
+}
+.dnav .cur .num          { color: var(--accent-ink) }
+.dnav .locked            { color: var(--ink-faint); opacity: .7; cursor: not-allowed }
+.dnav .locked .num       { color: var(--ink-faint) }
+.dnav .tier              { font-size: 11px; margin-left: auto; white-space: nowrap }
+.dnav .done::after       { content: "✓"; color: #5c8a4a; font-weight: 700; margin-left: auto }
+
+/* ---------- İçerik alanı ------------------------------------------------- */
+.main              { min-width: 0 }
+.content           { max-width: 800px; margin: 0 auto; padding: 40px 34px 90px }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.content h1 {
+  font-family: var(--serif); font-weight: 700; font-size: 38px;
+  line-height: 1.15; margin: 10px 0 6px; letter-spacing: -.01em;
+}
+.tagline           { font-family: var(--serif); font-style: italic; color: var(--ink-soft); font-size: 19px; margin: 0 0 14px }
+.intro             { font-size: 17px; color: var(--ink-soft) }
+.tierbadge {
+  display: inline-block; background: var(--kp-bg); border: 1px solid var(--kp-br);
+  color: var(--accent-ink); font-size: 12px; font-weight: 700;
+  border-radius: 99px; padding: 3px 11px; margin-bottom: 8px;
+}
+
+/* ---------- Bölüm başlıkları --------------------------------------------- */
+h2.sec {
+  font-family: var(--serif); font-size: 25px;
+  margin: 44px 0 6px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2.sec .k {
+  color: var(--accent); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; display: block; margin-bottom: 2px; font-family: var(--sans);
+}
+h3.sub             { font-family: var(--sans); font-size: 18px; font-weight: 700; margin: 26px 0 6px }
+
+/* ---------- Ders Akış kartları ------------------------------------------- */
+.flow              { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 }
+.flow .step {
+  flex: 1 1 150px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.flow .ph          { font-weight: 700; font-size: 14px }
+.flow .du          { color: var(--accent-ink); font-size: 12.5px; font-weight: 700 }
+.flow .de          { color: var(--ink-soft); font-size: 13px; margin-top: 3px }
+.meta {
+  font-size: 13.5px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+
+/* ---------- Callout'lar (kp / tip / warn) -------------------------------- */
+.callout {
+  border-left: 4px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin: 16px 0; background: var(--surface-2); font-size: 15px;
+}
+.callout .lbl      { font-weight: 700; font-size: 13px; letter-spacing: .02em; display: block; margin-bottom: 2px }
+.callout.kp        { background: var(--kp-bg);   border-color: var(--kp-br) }
+.callout.kp  .lbl  { color: var(--accent-ink) }
+.callout.tip       { background: var(--tip-bg);  border-color: var(--tip-br) }
+.callout.tip .lbl  { color: #4f6a43 }
+.callout.warn      { background: var(--warn-bg); border-color: var(--warn-br) }
+.callout.warn .lbl { color: #94701c }
+
+/* ---------- Kod blokları ------------------------------------------------- */
+pre {
+  background: var(--code-bg); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+}
+pre code           { font-family: var(--mono); font-size: 13.5px; color: #2a2722; background: none; padding: 0 }
+code {
+  font-family: var(--mono); font-size: .9em; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+pre code           { border: none }
+
+/* ---------- Tablo -------------------------------------------------------- */
+table {
+  border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden;
+}
+th, td             { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top }
+th                 { background: var(--surface-2); font-weight: 700; font-size: 12.5px; letter-spacing: .02em }
+tr:last-child td   { border-bottom: none }
+
+/* ---------- Prompt kartları ---------------------------------------------- */
+.prompt {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+}
+.prompt .pt        { font-weight: 700; margin-bottom: 6px }
+.prompt pre        { margin: 0; background: var(--code-bg) }
+.prompt .note      { font-size: 13px; color: var(--ink-soft); margin-top: 8px }
+.copybtn {
+  float: right; font-size: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); border-radius: 7px; padding: 3px 9px;
+  cursor: pointer; color: var(--ink-soft);
+}
+.copybtn:hover     { color: var(--accent-ink); border-color: var(--accent) }
+
+/* ---------- Challenge + Çözüm -------------------------------------------- */
+.challenge {
+  background: var(--kp-bg); border: 1px solid var(--kp-br);
+  border-radius: 16px; padding: 20px 22px; margin: 18px 0;
+}
+.challenge h3      { margin-top: 0 }
+.solution {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px 22px; margin: 18px 0;
+}
+
+/* ---------- Etkileşimli checklist ---------------------------------------- */
+.checks            { list-style: none; padding: 0; margin: 12px 0 }
+.checks li         { margin: 8px 0; padding: 0 }
+.checks label {
+  display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px;
+}
+.checks label:hover                  { border-color: var(--accent) }
+.checks input {
+  margin-top: 3px; width: 17px; height: 17px;
+  accent-color: var(--accent); flex: none;
+}
+.checks input:checked + span        { color: var(--ink-faint); text-decoration: line-through }
+
+/* ---------- Önceki/Sonraki navigasyon ------------------------------------ */
+.pager {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 44px; border-top: 1px solid var(--line); padding-top: 22px;
+}
+.pager a {
+  flex: 1; text-decoration: none; border: 1px solid var(--line);
+  background: var(--surface); border-radius: 12px; padding: 12px 16px; color: var(--ink);
+}
+.pager a:hover     { border-color: var(--accent) }
+.pager .dir        { font-size: 12px; color: var(--ink-faint) }
+.pager .tt         { font-weight: 700; color: var(--accent-ink) }
+.pager a.next      { text-align: right }
+.pager a.disabled  { opacity: .45; pointer-events: none }
+
+/* ---------- Alt bilgi ---------------------------------------------------- */
+.foot              { color: var(--ink-faint); font-size: 12.5px; margin-top: 30px; text-align: center }
+
+/* ---------- Mobil -------------------------------------------------------- */
+.scrim             { display: none }
+@media (max-width: 900px) {
+  .menu-btn        { display: inline-block }
+  .layout          { grid-template-columns: 1fr }
+  .sidebar {
+    position: fixed; left: 0; top: 52px; width: var(--sidebar-w); z-index: 35;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.12);
+  }
+  body.nav-open .sidebar { transform: translateX(0) }
+  body.nav-open .scrim {
+    display: block; position: fixed; inset: 52px 0 0;
+    background: rgba(20,20,18,.35); z-index: 34;
+  }
+  .content         { padding: 26px 20px 80px }
+  .content h1      { font-size: 30px }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-btn" aria-label="Menü">☰</button>
+  <a class="brand" href="index.html">Claude Code <b>Master</b></a>
+  <div class="prog"><span></span></div>
+  <span class="proglabel"></span>
+</header>
+<div class="scrim"></div>
+<div class="layout">
+  <aside class="sidebar"><h2>Claude Code Master</h2><div class="sub">20 Günlük Eğitim · v2.0</div><div class="wk">HAFTA 1 — Temel</div><nav class="dnav"><a href="gun01-claude-code-nedir-kurulum.html"><span class="num">01</span><span>Claude Code Nedir ve Kurulum</span></a><a href="gun02-temel-kullanim-izinler-auto-mode.html"><span class="num">02</span><span>Temel Kullanım, İzinler ve Auto Mode</span><span class="tier">🟢 Kademe 1</span></a><a href="gun03-claude-md-auto-memory.html"><span class="num">03</span><span>CLAUDE.md ve Auto Memory</span></a><a href="gun04-proje-klasor-yapisi.html"><span class="num">04</span><span>Proje Klasör Yapısı ve Başlangıç Şablonu</span><span class="tier">🟡 Kademe 2</span></a><a href="gun05-git-checkpointing-workflow.html"><span class="num">05</span><span>Git Entegrasyonu, Checkpointing ve Workflow</span></a></nav><div class="wk">HAFTA 2 — Orta</div><nav class="dnav"><a href="gun06-slash-commands-skills.html"><span class="num">06</span><span>Slash Commands &amp; Bundled Skills</span></a><a href="gun07-context-window-auto-mode.html"><span class="num">07</span><span>Context Window Yönetimi ve Verimli Çalışma</span></a><a href="gun08-debugging-test-kod-inceleme.html"><span class="num">08</span><span>Debugging, Test Yazma ve Kod İncelemesi</span></a><a href="gun09-mcp-temelleri.html"><span class="num">09</span><span>MCP (Model Context Protocol) Temelleri</span></a><a href="gun10-todo-app-fullstack-deploy.html"><span class="num">10</span><span>Todo App Full-stack + Deploy</span><span class="tier">🟡 Kademe 2</span></a></nav><div class="wk">HAFTA 3 — İleri</div><nav class="dnav"><a href="gun11-subagentlar.html"><span class="num">11</span><span>Subagent&#x27;lar: Uzmanlaşmış AI Takım Arkadaşları</span></a><a href="gun12-hooks-sandboxing.html"><span class="num">12</span><span>Hooks ve Sandboxing</span></a><a href="gun13-skills-plugins.html"><span class="num">13</span><span>Skills &amp; Plugins</span></a><a href="gun14-saas-dashboard.html"><span class="num">14</span><span>İleri Seviye Proje: SaaS Dashboard</span><span class="tier">🟠 Kademe 3</span></a><a href="gun15-rol-agent-tasarimi.html"><span class="num">15</span><span>Yazılım Rolleri İçin Agent Tasarımı</span></a></nav><div class="wk">HAFTA 4 — Master</div><nav class="dnav"><a href="gun16-paralel-agent-view-worktrees.html"><span class="num">16</span><span>Paralel Çalışma, Agent View ve Worktrees</span></a><a href="gun17-agent-teams-dynamic-workflows.html"><span class="num">17</span><span>Agent Teams &amp; Dynamic Workflows</span></a><a href="gun18-cicd-routines-otomasyon.html"><span class="num">18</span><span>CI/CD, Routines ve Otomasyon</span></a><span class="cur"><span class="num">19</span><span>Enterprise Patterns ve Best Practices</span></span><a href="gun20-capstone-mikroservis.html"><span class="num">20</span><span>Capstone: Enterprise Mikro-Servis Projesi</span><span class="tier">🔴 Kademe 4</span></a></nav></aside>
+  <div class="main"><article class="content"><div class="eyebrow">HAFTA 4 — Master · Gün 19 / 20</div><h1>Enterprise Patterns ve Best Practices</h1><p class="tagline">“Takımın için ölçeklenebilir bir Claude Code altyapısı kur”</p><p class="intro">Gün 18&#x27;de Claude Code&#x27;u CI/CD pipeline&#x27;ına ve takvime soktun — headless mode, GitHub Actions entegrasyonu, Routines ile zamanlanmış görevler. Bugün bakış açısını bireysel geliştirici&#x27;den takım ve organizasyona genişletiyorsun. Enterprise ortamında Claude Code kullanmak sadece &#x27;herkese hesap aç&#x27; demek değil: merkezi politika dağıtımı, model governance, sandbox izolasyonu, maliyet gözlemlenebilirliği ve standartlaştırılmış onboarding gerektirir. Günün sonunda bir &#x27;Team Starter Kit&#x27; — CLAUDE.md şablonu, agent&#x27;lar, skill&#x27;ler, hook&#x27;lar ve bunları bir plugin marketplace olarak paketleyen yapıyı — üretmiş, managed settings ve sandbox stratejisini kavramış, maliyet raporlama katmanlarını birbirinden ayırt edebilir hale gelmiş olacaksın.</p><h2 class="sec"><span class="k">DERS PLANI</span>⏱️ Bugünün Akışı</h2><div class="flow"><div class="step"><div class="ph">1 · Teorik: Enterprise Büyük Resim</div><div class="du">15 dk</div><div class="de">Bireysel → takım geçişi, admin karar haritası, erişim tiering (Local Sim / Team-Enterprise / Ops-Admin)</div></div><div class="step"><div class="ph">2 · Teorik: Governance + Güvenlik</div><div class="du">20 dk</div><div class="de">Managed settings, model governance, sandbox spectrum, managed MCP, veri gizliliği</div></div><div class="step"><div class="ph">3 · Teorik: Maliyet + Anti-Pattern</div><div class="du">20 dk</div><div class="de">/usage, billing ayrımı, OTel, analytics dashboard, anti-pattern&#x27;ler ve olgunluk merdiveni</div></div><div class="step"><div class="ph">4 · Pratik: Team Starter Kit</div><div class="du">30 dk</div><div class="de">CLAUDE.md template + 3 agent + 2 skill + 2 hook + managed settings simülasyonu</div></div><div class="step"><div class="ph">5 · Pratik: Plugin Marketplace + Maliyet</div><div class="du">25 dk</div><div class="de">Kit&#x27;i marketplace olarak paketle, /usage okuma, model/effort strateji kararı</div></div><div class="step"><div class="ph">6 · Mini Challenge</div><div class="du">10 dk</div><div class="de">Kit&#x27;i lokal marketplace&#x27;te yayınla, yeni projede kur, rollout checklist ile doğrula</div></div></div><div class="meta"><strong>Ön koşul:</strong> Gün 1-18 tamamlanmış: subagent&#x27;lar (Gün 11), hooks (Gün 12), plugins (Gün 13), rol agent&#x27;ları (Gün 15), CI/CD ve Routines (Gün 18); SaaS Dashboard projesi (Gün 14-17&#x27;den) çalışır durumda; Terminal ve Claude Code güncel sürümde çalışır durumda</div><div class="meta"><strong>Gerekli araçlar:</strong> Terminal (Claude Code çalışır durumda); SaaS Dashboard proje dizini (Gün 14-17&#x27;den); VS Code veya tercih edilen editör</div><h2 class="sec"><span class="k">HEDEFLER</span>🎯 Öğrenme Hedefleri</h2><ol><li>Managed settings precedence sırasını (Managed &gt; CLI args &gt; local &gt; project &gt; user) ve server-managed delivery mekanizmasını açıklayabileceksin; bunun client-side control olduğunu ve hard security boundary olmadığını bileceksin</li><li><code>availableModels</code> ve <code>enforceAvailableModels</code> ile merkezi model governance tanımlayabileceksin; <code>availableModels</code> managed source tarafından set edildiğinde kullanıcı/proje scope&#x27;undan genişletilemeyeceğini bileceksin</li><li>Sandbox isolation spectrum&#x27;unu (sandboxed Bash → sandbox runtime → dev container → Docker → VM) tehdit modeline göre seçebileceksin; built-in sandbox&#x27;ın yalnızca Bash komutlarını sınırladığını, Read/Edit/WebFetch/MCP/hooks&#x27;un aynı sınırda olmadığını bileceksin</li><li><code>managed-mcp.json</code> (fixed server set, server-managed settings ile dağıtılamaz) ile <code>allowedMcpServers</code>/<code>deniedMcpServers</code> (policy filtering) farkını uygulayabileceksin</li><li><code>/usage</code> (local estimate) ile Console billing (authoritative), OpenTelemetry (org-wide telemetry) ve Analytics dashboard (adoption/contribution) katmanlarını birbirinden ayırt edebileceksin</li><li>Team starter kit&#x27;i plugin marketplace formatında paketleyip lokal olarak dağıtabileceksin</li><li>Yeni takım üyesi için onboarding rehberi ve rollout checklist yazabileceksin</li></ol><h2 class="sec"><span class="k">BÖLÜM 1</span>TEORİK TEMEL — Enterprise&#x27;da Claude Code</h2><h3 class="sub">1.1 Enterprise Büyük Resim: Bireysel&#x27;den Organizasyona</h3><p>Bir geliştirici Claude Code&#x27;u kendi terminalinde kullandığında sorumluluk kendindedir: hangi modeli seçer, hangi MCP server&#x27;ı bağlar, hangi komutu onaylar — hepsine kendisi karar verir. 10 kişilik bir takımda bu serbestlik hızla kargaşaya dönüşür: herkesin farklı model seçimi maliyet tahminini anlamsızlaştırır, denetimsiz MCP server&#x27;lar güvenlik riski oluşturur, ortak standart olmaması code review kalitesini düşürür.</p><p>Enterprise&#x27;da Claude Code yönetişimi dört eksen etrafında döner: (1) Politika — merkezi ayar dağıtımı ve izin kontrolü, (2) Güvenlik — sandbox izolasyonu, MCP kısıtlaması ve veri gizliliği, (3) Maliyet — model/effort stratejisi, spend limitleri ve gözlemlenebilirlik, (4) Onboarding — standart kit ve rollout süreci. Bu dört eksen bugünün yapısını belirliyor.</p><p>Ancak bu günde anlatılan her özellik herkese açık değil. Aşağıdaki tiering tablosu, her başlık için minimum erişim seviyesini gösteriyor. Pratik adımlarda hangi tier&#x27;a düştüğünüzü parantez içinde belirteceğiz.</p><table><thead><tr><th>Erişim Seviyesi</th><th>Kimin İçin</th><th>Özellik Örnekleri</th></tr></thead><tbody><tr><td>Local Simulation</td><td>Herkes (Pro, Max, API dahil)</td><td>.claude/settings.json, .claude/agents/, .claude/skills/, lokal plugin marketplace, /usage, /sandbox, hook&#x27;lar</td></tr><tr><td>Team / Enterprise</td><td>Claude for Teams veya Enterprise planı</td><td>Server-managed settings, org model restrictions, org effort limits, analytics dashboard (claude.ai/analytics), Code Review</td></tr><tr><td>Ops / Admin</td><td>Organizasyon admin + MDM/altyapı yetkisi</td><td>managed-mcp.json (sistem path&#x27;e deploy), endpoint-managed settings (plist/registry), OTel collector, Claude apps gateway</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>Bu gün boyunca &#x27;Local Simulation&#x27; etiketli her adımı doğrudan uygulayabilirsin. &#x27;Team/Enterprise&#x27; ve &#x27;Ops/Admin&#x27; etiketli başlıklarda kavramı öğrenir, sample konfigürasyon yazarsın — ama gerçek enforcement için ilgili plan ve altyapı yetkisi gerekir.</div><h3 class="sub">1.2 Managed Settings: Merkezi Politika Dağıtımı</h3><p>Claude Code settings beş katmanlı bir öncelik sırasıyla çalışır. Üstteki katman alttakini override eder — merge etmez (array-valued settings gibi istisnalar aşağıda):</p><table><thead><tr><th>Öncelik</th><th>Katman</th><th>Kaynak</th><th>Kimin Kontrolünde</th></tr></thead><tbody><tr><td>1 (en yüksek)</td><td>Managed</td><td>Server-managed / endpoint-managed / policyHelper</td><td>Organizasyon admin</td></tr><tr><td>2</td><td>Command-line</td><td>--model, --allowedTools vb. CLI argümanları</td><td>Geliştirici (session bazlı)</td></tr><tr><td>3</td><td>Local</td><td>.claude/settings.local.json (gitignore&#x27;da)</td><td>Geliştirici (kişisel)</td></tr><tr><td>4</td><td>Project</td><td>.claude/settings.json (repo&#x27;da commit&#x27;li)</td><td>Takım (paylaşımlı)</td></tr><tr><td>5 (en düşük)</td><td>User</td><td>~/.claude/settings.json</td><td>Geliştirici (global)</td></tr></tbody></table><p>Managed tier kendi içinde de alt katmanlara ayrılır: policyHelper &gt; server-managed (remote / Claude apps gateway) &gt; endpoint-managed (MDM plist / HKLM registry / managed-settings.json dosyası) &gt; HKCU (Windows kullanıcı registry — bu katman admin-controlled sayılmaz). Managed kaynaklardan herhangi biri non-empty bir payload döndürdüğünde, diğer endpoint-managed kaynaklar yok sayılır. İstisna: sandbox allowlist lock&#x27;ları gibi küçük bir &#x27;cross-source lock&#x27; key seti her admin-controlled kaynaktan uygulanır.</p><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Server-managed settings client-side bir kontroldür, hard security boundary değildir. Yönetilmeyen (unmanaged) bir cihazda kullanıcı modified bir client veya eski sürümle bu kontrolleri atlayabilir. Güvenlik garantisi istiyorsan managed settings&#x27;i sandbox izolasyonu ve/veya managed MCP ile birleştirmelisin.</div><p>Server-managed settings, claude.ai admin console üzerinden dağıtılır — MDM altyapısı veya cihaz yönetimi gerektirmez. Claude Code başlangıçta settings&#x27;i fetch eder, oturum boyunca saatlik poll yapar ve <code>~/.claude/remote-settings.json</code>&#x27;a cache&#x27;ler. Tolerant parsing uygulanır: bir key schema validation&#x27;ı geçemezse o key strip edilir ama diğer geçerli key&#x27;ler uygulanır.</p><div class="callout tip"><span class="lbl">💡 İpucu</span>Managed settings&#x27;in aktif olduğunu doğrulamak için oturum içinde /status çalıştır. Status tab&#x27;ında &#x27;Setting sources&#x27; satırı &#x27;Enterprise managed settings (remote)&#x27; gibi aktif kaynağı gösterir.</div><h3 class="sub">1.3 Model Governance ve Maliyet Stratejisi</h3><p>Enterprise&#x27;da model seçimi bireysel tercihe bırakılamaz: Fable 5 en yetenekli ama en pahalı model, Haiku en ucuz ama basit görevler için. Merkezi model governance üç mekanizma ile sağlanır:</p><table><thead><tr><th>Mekanizma</th><th>Nasıl Çalışır</th><th>Gereksinim</th></tr></thead><tbody><tr><td>availableModels (managed settings)</td><td>Kullanıcının seçebileceği modelleri sınırlar. Ana session, subagent, skill ve advisor seçimlerini etkiler. enforceAvailableModels: true eklenirse Default model de allowlist&#x27;e zorlanır.</td><td>Managed settings (herhangi bir tier)</td></tr><tr><td>Organization model restrictions</td><td>Claude.ai admin console&#x27;dan modelleri disable eder. Server-side enforcement — client&#x27;tan bağımsız.</td><td>Claude Enterprise planı</td></tr><tr><td>Organization effort limits</td><td>Effort level&#x27;i rol bazında sınırlar (ör. max effort yalnızca senior developer rolüne açık).</td><td>Claude Enterprise planı</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span><code>availableModels</code> managed source tarafından tanımlandığında kullanıcı veya proje scope&#x27;u bu listeyi genişletemez. Çoğu scalar setting managed tarafından override edilir, çoğu array-valued setting merge edilir — ama <code>availableModels</code> istisnai olarak managed listeyi as-is uygular. Bu, &#x27;project settings&#x27;e model ekleyerek kısıtlamayı bypass ederim&#x27; yanılgısını önler.</div><pre><code>// managed-settings.json — model governance örneği
+{
+  &quot;availableModels&quot;: [&quot;sonnet&quot;, &quot;opus&quot;, &quot;haiku&quot;],
+  &quot;enforceAvailableModels&quot;: true,
+  &quot;model&quot;: &quot;sonnet&quot;
+}</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>Bu örnekte Fable 5 allowlist&#x27;te yok → hiçbir geliştirici /model fable ile geçiş yapamaz. &quot;model&quot;: &quot;sonnet&quot; başlangıç default&#x27;unu Sonnet 5 yapar ama kullanıcı session içinde opus veya haiku&#x27;ya geçebilir.</div><p>Model seçim stratejisi takım maliyetini doğrudan etkiler. Aşağıdaki matris, görev türüne göre önerilen model/effort kombinasyonlarını gösterir:</p><table><thead><tr><th>Görev Türü</th><th>Önerilen Model</th><th>Effort</th><th>Gerekçe</th></tr></thead><tbody><tr><td>Uzun otonom görev, 1M context</td><td>Fable 5</td><td>high-max</td><td>En yetenekli; ama varsayılan değil, açıkça seçilmeli</td></tr><tr><td>Karmaşık akıl yürütme, mimari karar</td><td>Opus 4.8</td><td>high</td><td>Güçlü reasoning; fast mode ile hız/maliyet dengesi</td></tr><tr><td>Günlük kodlama, review, test</td><td>Sonnet 5</td><td>high</td><td>Maliyet/yetenek sweet spot; çoğu takım için default</td></tr><tr><td>Basit format, lint, açıklama</td><td>Haiku 4.5</td><td>medium-low</td><td>En düşük maliyet; basit görevlerde yeterli</td></tr><tr><td>Plan Opus, uygulama Sonnet</td><td>opusplan alias</td><td>high</td><td>Planlama kalitesi + uygulama maliyeti dengesi</td></tr></tbody></table><div class="callout tip"><span class="lbl">💡 İpucu</span>Version pinning stratejisi: Claude Code sürümlerini güncel tutmak önemlidir; eski sürümler yeni managed settings key&#x27;lerini tanımayabilir. Managed settings&#x27;e spesifik bir &#x27;minimum version&#x27; key&#x27;i yerine, rollout sürecinde /status ve claude --version ile sürüm kontrolü yapın ve güncelleme politikası belirleyin.</div><h3 class="sub">1.4 Güvenlik Katmanları: İzin, Sandbox ve MCP</h3><p>Enterprise güvenliği üç katmanda ele alınır: (1) Permission modes — eylemin çalışıp çalışmayacağına ve onay gerekip gerekmediğine karar verir, (2) Sandbox — çalışan komutun neye erişebileceğini sınırlar, (3) Managed MCP — hangi dış araçların bağlanabileceğini kontrol eder. Bu üçü birbirini tamamlar; tek başına hiçbiri yeterli değildir.</p><p>Sandbox isolation bir spectrum üzerinde konumlanır. Her katman farklı bir tehdit modeline yanıt verir:</p><table><thead><tr><th>Katman</th><th>Ne İzole Eder</th><th>Ne İzole Etmez</th><th>Kurulum</th></tr></thead><tbody><tr><td>Sandboxed Bash (built-in)</td><td>Bash komutlarının filesystem ve network erişimi (macOS Seatbelt, Linux bubblewrap ile)</td><td>Read/Edit/Write file tools, WebFetch, MCP server&#x27;lar, hooks — bunlar sandbox sınırı dışında çalışır</td><td>/sandbox ile etkinleştir; zero-install (macOS), bubblewrap+iptables (Linux)</td></tr><tr><td>Sandbox Runtime</td><td>Tüm Claude Code sürecini containerd ile izole eder</td><td>Host kernel paylaşılır (VM düzeyinde değil)</td><td>claude sandbox init; Docker Desktop sandbox desteği</td></tr><tr><td>Dev Container</td><td>Proje bazlı izole ortam; filesystem, network, kimlik ayrı</td><td>Container escape riski (kernel paylaşımlı)</td><td>devcontainer.json + VS Code / CLI</td></tr><tr><td>Docker Container</td><td>Namespace izolasyonu, resource limits, network=none mümkün</td><td>Kernel paylaşımlı; gVisor ile güçlendirilebilir</td><td>docker run --cap-drop ALL --network none ...</td></tr><tr><td>VM / Firecracker</td><td>Kernel düzeyinde tam izolasyon</td><td>En yüksek overhead; cold-start süresi</td><td>Cloud instance, Firecracker microVM</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>Built-in sandboxed Bash sadece Bash komutlarını sınırlar. Read, Edit, Write gibi file tool&#x27;lar, WebFetch, MCP server&#x27;lar ve hook&#x27;lar aynı izolasyon sınırı içinde değildir — host üzerinde çalışmaya devam eder. &#x27;Sandbox açtım, artık her şey izole&#x27; varsayımı yanlıştır. Tüm Claude Code sürecini izole etmek gerekiyorsa sandbox runtime, dev container, Docker veya VM kullanılmalıdır.</div><p>Sandbox admin entegrasyonu: Managed settings ile sandbox politikasını tüm geliştiricilere zorunlu kılabilirsin. sandbox.credentials ile belirli env variable&#x27;ları sandboxed komutlardan gizleyebilir, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB ile Anthropic ve cloud provider credential&#x27;larını tüm alt süreçlerden strip edebilirsin.</p><h3 class="sub">1.4b Managed MCP: Dış Araç Erişimini Kontrol Etme</h3><p>MCP server&#x27;lar Claude Code&#x27;a güçlü dış yetenekler ekler — ama enterprise&#x27;da &#x27;herkes istediği server&#x27;ı bağlasın&#x27; kabul edilemez. İki farklı kontrol mekanizması var ve bunları karıştırmamak önemli:</p><table><thead><tr><th>Mekanizma</th><th>Ne Yapar</th><th>Nasıl Dağıtılır</th><th>Etki</th></tr></thead><tbody><tr><td>managed-mcp.json</td><td>Fixed server set tanımlar. Kullanıcı başka server ekleyemez; claude mcp add enterprise policy hatası verir.</td><td>Sistem path&#x27;e admin yetkisiyle deploy (Jamf, GPO, Intune vb.). Server-managed settings ile dağıtılamaz.</td><td>Exclusive: yalnızca bu dosyadaki server&#x27;lar yüklenir. Plugin-provided server&#x27;lar suppress edilir (allowAllClaudeAiMcps: true ile claude.ai connector&#x27;ları hariç).</td></tr><tr><td>allowedMcpServers / deniedMcpServers</td><td>Kullanıcının veya managed set&#x27;in eklediği server&#x27;ları allowlist/denylist ile filtreler.</td><td>Herhangi bir settings katmanında tanımlanabilir (managed dahil). Kullanıcı kendi deniedMcpServers&#x27;ını ekleyerek managed bir server&#x27;ı kendisi için engelleyebilir.</td><td>Additive filtering: managed-mcp.json ile birlikte de çalışır — managed set&#x27;teki server bile allowlist&#x27;e uymuyorsa yüklenmez.</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>managed-mcp.json exclusive bir deploy aracıdır ve admin yetkisi gerektirir. allowedMcpServers/deniedMcpServers ise policy filtering yapan, settings katmanlarına yerleştirilebilen kurallar setidir. İkisi birlikte kullanıldığında en güçlü kontrolü sağlar.</div><p>Hook güvenliği de benzer şekilde merkezi kontrol altına alınabilir. allowManagedHooksOnly: true ayarı, yalnızca managed settings ve managed settings&#x27;teki enabledPlugins tarafından sağlanan hook&#x27;ları yükler; kullanıcı ve proje hook&#x27;ları engellenir.</p><h3 class="sub">1.5 Veri Gizliliği ve Uyumluluk</h3><p>Claude Code&#x27;un veri akışı hesap türüne göre farklı retention politikalarına tabidir:</p><table><thead><tr><th>Hesap Türü</th><th>Retention</th><th>Model Eğitimine Katkı</th></tr></thead><tbody><tr><td>Consumer (Free/Pro/Max) — feedback izni var</td><td>Standart retention</td><td>Katkı sağlayabilir (privacy ayarlarına bağlı)</td></tr><tr><td>Consumer — feedback izni yok</td><td>30 gün retention</td><td>Hayır</td></tr><tr><td>Commercial (Team/Enterprise/API)</td><td>Standart commercial retention</td><td>Hayır — kod ve prompt&#x27;lar model eğitiminde kullanılmaz</td></tr><tr><td>Enterprise + ZDR (Zero Data Retention)</td><td>Zero data retention</td><td>Hayır</td></tr></tbody></table><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>ZDR (Zero Data Retention) standart Enterprise planında otomatik olarak dahil değildir. Qualified Claude for Enterprise hesapları için Anthropic account team tarafından per-organization bazında etkinleştirilir. &#x27;Enterprise aldık, ZDR&#x27;mız var&#x27; varsayımı doğru olmayabilir — account team ile doğrulanmalıdır.</div><p>Yerel veri: Claude Code oturum transcript&#x27;lerini ~/.claude/projects/ altında düz metin olarak saklar; varsayılan 30 gün sonra temizlenir. cleanupPeriodDays ayarıyla bu süre değiştirilebilir. Telemetry (operasyonel metrikler — kod veya dosya yolu içermez) varsayılan olarak açıktır; DISABLE_TELEMETRY=1 ile kapatılabilir.</p><h3 class="sub">1.6 Maliyet Gözlemlenebilirliği</h3><p>Claude Code maliyet takibinde beş farklı katman var. Her birinin kapsamı ve güvenilirlik seviyesi farklı:</p><table><thead><tr><th>Katman</th><th>Kapsam</th><th>Erişim</th><th>Not</th></tr></thead><tbody><tr><td>/usage (ana komut; /cost ve /stats alias)</td><td>Mevcut oturum maliyeti + plan limit kullanımı. Skill, subagent, plugin, MCP bazlı breakdown (d/w toggle).</td><td>Herkes (Local Sim)</td><td>Lokal tahmindir; authoritative billing değildir. Yalnızca bu cihazdaki kullanımı gösterir.</td></tr><tr><td>Console Usage (platform.claude.com)</td><td>Workspace bazlı token kullanımı ve spend.</td><td>API / Console kullanıcıları</td><td>Authoritative billing kaynağı.</td></tr><tr><td>Analytics Dashboard (claude.ai/analytics/claude-code)</td><td>Lines of code accepted, suggestion accept rate, daily active users, spend chart, GitHub contribution metrics (beta).</td><td>Team / Enterprise (admin/owner)</td><td>Adoption ve productivity metrikleri için; billing için değil.</td></tr><tr><td>OpenTelemetry (OTel) Export</td><td>Per-session token/cost/tool metrics; skill.name, plugin.name, agent.name ile attribution. Grafana, Datadog vb.&#x27;ye aktar.</td><td>Ops/Admin (OTel collector kurulumu gerekir)</td><td>Org-wide, real-time observability; cost metric&#x27;ler tahminidir.</td></tr><tr><td>Claude Apps Gateway</td><td>Per-user audit log, OTLP metrics, per-user spend limits. Third-party provider routing (Bedrock, Vertex, Foundry).</td><td>Ops/Admin (self-hosted gateway)</td><td>En kapsamlı enterprise kontrol; gateway kurulumu ve IdP entegrasyonu gerektirir.</td></tr></tbody></table><div class="callout kp"><span class="lbl">🔑 Önemli</span>/usage oturum içinde hızlı farkındalık için idealdir ama gösterdiği dolar değeri bir tahmindir — fatura için Console Usage veya cloud provider billing dashboard&#x27;una bakılmalıdır. Takım genelinde maliyet optimizasyonu yapacaksan Analytics + OTel birlikte kullanılmalıdır.</div><p>Maliyet azaltma stratejileri: Claude Code otomatik prompt caching uygular (tekrar eden system prompt ve CLAUDE.md içeriği cache&#x27;lenir). /clear ile görev geçişlerinde context temizliği, /compact ile bilinçli özetleme, subagent delegasyonu ile context izolasyonu — bunlar Gün 7&#x27;de öğrendiğin context stratejilerinin enterprise ölçeğindeki karşılığıdır.</p><p>Takım büyüklüğüne göre TPM (Token Per Minute) önerisi: küçük takım (~10 kişi) için kişi başı ~80K TPM, orta takım (~50 kişi) için ~40K, büyük takım (200+ kişi) için ~20K. Rate limit&#x27;ler organizasyon seviyesinde uygulanır; bireysel kullanıcı geçici olarak payından fazlasını tüketebilir.</p><h3 class="sub">1.7 Anti-Pattern&#x27;ler ve Olgunluk Merdiveni</h3><p>Enterprise Claude Code kullanımında sık karşılaşılan anti-pattern&#x27;ler:</p><table><thead><tr><th>Anti-Pattern</th><th>Sonuç</th><th>Çözüm</th></tr></thead><tbody><tr><td>Dev CLAUDE.md (10K+ karakter)</td><td>Her mesajda context bütçesinin büyük kısmı CLAUDE.md&#x27;ye harcanır; maliyet artar, erken talimatların etkisi zayıflar.</td><td>CLAUDE.md&#x27;yi 2-3K karakterle sınırla; detayları skill&#x27;lere ve rules/ dosyalarına taşı.</td></tr><tr><td>Her şey için agent kullanma</td><td>Gereksiz context fork&#x27;u; basit görevlerde overhead.</td><td>Agent yalnızca ayrı context ve uzman prompt gerektiğinde kullan; basit görevleri ana session&#x27;da yap.</td></tr><tr><td>Sandbox&#x27;suz --dangerously-skip-permissions</td><td>Claude&#x27;un tüm dosya sistemi ve ağa sınırsız erişimi; güvenlik riski maksimum.</td><td>Bypass mode yalnızca container, VM veya sandbox runtime içinde kullan.</td></tr><tr><td>Tek model herkes için</td><td>Ya pahalı model israf, ya ucuz model yetersiz.</td><td>Görev türüne göre model/effort matrisini uygula (bkz. Bölüm 1.3 tablosu).</td></tr><tr><td>MCP server denetimi yok</td><td>Potansiyel veri sızıntısı, güvenilmeyen araç riski.</td><td>allowedMcpServers veya managed-mcp.json ile kontrol.</td></tr></tbody></table><p>Enterprise olgunluk merdiveni — takımın nerede olduğunu değerlendirmek için:</p><table><thead><tr><th>Seviye</th><th>Özellik</th><th>Gösterge</th></tr></thead><tbody><tr><td>1 · Ad-hoc</td><td>Bireysel kullanım, standart yok</td><td>Herkes kendi ayarlarıyla çalışır; maliyet takibi yok</td></tr><tr><td>2 · Standardized</td><td>Ortak CLAUDE.md ve agent seti</td><td>Team starter kit repo&#x27;da; yeni üye kit ile başlar</td></tr><tr><td>3 · Governed</td><td>Managed settings + sandbox + MCP kontrolü</td><td>Model allowlist, sandbox policy, analytics dashboard aktif</td></tr><tr><td>4 · Optimized</td><td>OTel + gateway + continuous improvement</td><td>Per-skill/agent maliyet attribution; effort tuning; plugin marketplace ile güncel kit dağıtımı</td></tr></tbody></table><h2 class="sec"><span class="k">BÖLÜM 2</span>PRATİK — ADIM ADIM: Team Starter Kit</h2><h3 class="sub">2.1 CLAUDE.md Şablonu [Local Sim]</h3><p>Enterprise-grade bir CLAUDE.md şablonu oluşturarak başlıyoruz. Amaç: yeni bir projede bu template&#x27;i kopyala-yapıştır yapıp birkaç satır değiştirerek takım standardına uygun bir CLAUDE.md elde etmek.</p><ol><li>Bir çalışma dizini oluştur: mkdir -p team-claude-code-starter-kit</li><li>Claude Code&#x27;a şu prompt&#x27;u ver:</li></ol><pre><code>Bu proje için enterprise-grade bir CLAUDE.md şablonu oluştur.
+Şablonda şunlar olsun:
+- Proje metadatası (ad, açıklama, teknoloji stack&#x27;i — placeholder)
+- Coding standards (naming convention, test gereksinimleri)
+- Security policy (secret yok, güvenli dependency kullanımı)
+- Model/effort guidance (default: sonnet, high; review: opus)
+- Yasaklı eylemler (production DB&#x27;ye doğrudan erişim yok vb.)
+Toplam 2000-2500 karakter arasında tut — gereğinden uzun CLAUDE.md
+context bütçesini yer.</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>CLAUDE.md&#x27;yi 2-3K karakterle sınırlamak bilinçli bir tasarım kararı. Detaylı kurallar .claude/rules/ altına path-scoped rule olarak, domain bilgisi skill&#x27;lere taşınmalı. Bu yaklaşım Gün 3 ve Gün 7&#x27;de öğrendiğin context yönetimi prensiplerinin enterprise uygulaması.</div><h3 class="sub">2.2 Kit: Agent&#x27;lar ve Skills [Local Sim]</h3><p>Starter kit&#x27;e 3 agent ve 2 skill ekleyeceğiz. Bunlar Gün 11 ve Gün 13&#x27;te öğrendiğin subagent ve skill mekanizmalarının standartlaştırılmış, takım genelinde paylaşıma hazır versiyonları.</p><ol><li>Dizin yapısını oluştur:
+mkdir -p plugins/team-starter-kit/.claude-plugin
+mkdir -p plugins/team-starter-kit/agents
+mkdir -p plugins/team-starter-kit/skills/project-setup
+mkdir -p plugins/team-starter-kit/skills/deployment-checklist
+mkdir -p plugins/team-starter-kit/commands
+mkdir -p plugins/team-starter-kit/hooks</li><li>Claude Code&#x27;a 3 agent markdown dosyası yazdır:
+- security-reviewer.md (model: opus, effort: high, tools: Read/Grep/Glob/Bash)
+- test-writer.md (model: sonnet, effort: high, tools: Read/Write/Bash)
+- documenter.md (model: sonnet, effort: medium, tools: Read/Write/Glob)</li><li>2 skill için SKILL.md dosyaları yazdır:
+- project-setup: yeni proje başlatma rehberi (dizin yapısı, CLAUDE.md, git init)
+- deployment-checklist: deploy öncesi kontrol listesi (testler, lint, env vars, secrets)</li><li>3 command markdown dosyası yazdır:
+- security-review.md: güvenlik taraması başlatan komut
+- cost-check.md: /usage çıktısını yorumlayan komut
+- onboarding.md: yeni takım üyesine rehber gösteren komut</li></ol><div class="callout kp"><span class="lbl">🔑 Önemli</span>Agent frontmatter&#x27;ında model ve effort seçimi bilinçli olmalı. Security reviewer için Opus + high (kritik akıl yürütme), documenter için Sonnet + medium (metin üretimi, düşük maliyet). Bu seçimler Gün 15&#x27;teki rol-model eşlemesinin standardizasyonu.</div><h3 class="sub">2.3 Kit: Hook&#x27;lar [Local Sim]</h3><p>Kit&#x27;e 2 hook ekliyoruz — biri güvenlik, biri denetim için:</p><ol><li>block-dangerous-bash.sh: PreToolUse Bash hook&#x27;u. rm -rf /, güvenlik açısından riskli komutları (DROP TABLE, chmod 777 vb.) yakalar ve engeller.</li><li>audit-edit.sh: PostToolUse Write/Edit hook&#x27;u. Yapılan her dosya değişikliğini tarih damgasıyla bir log dosyasına yazar (basit denetim izi).</li></ol><pre><code># plugins/team-starter-kit/hooks/block-dangerous-bash.sh
+#!/usr/bin/env bash
+# PreToolUse Bash hook: tehlikeli komutları engeller
+INPUT=$(cat)
+COMMAND=$(echo &quot;$INPUT&quot; | jq -r &#x27;.tool_input.command // empty&#x27;)
+
+# Tehlikeli pattern&#x27;ler
+DANGEROUS_PATTERNS=(
+  &quot;rm -rf /&quot;
+  &quot;rm -rf ~&quot;
+  &quot;DROP TABLE&quot;
+  &quot;DROP DATABASE&quot;
+  &quot;chmod 777&quot;
+  &quot;&gt; /dev/sda&quot;
+)
+
+for PATTERN in &quot;${DANGEROUS_PATTERNS[@]}&quot;; do
+  if echo &quot;$COMMAND&quot; | grep -qi &quot;$PATTERN&quot;; then
+    echo &quot;BLOCKED: Dangerous command detected: $PATTERN&quot; &gt;&amp;2
+    exit 2  # exit 2 = block the tool call
+  fi
+done
+
+exit 0  # exit 0 = allow</code></pre><div class="callout tip"><span class="lbl">💡 İpucu</span>Hook exit code&#x27;ları: 0 = izin ver, 2 = engelle (hata mesajıyla). Enterprise ortamda allowManagedHooksOnly: true ile yalnızca managed/plugin hook&#x27;larının çalışmasını zorunlu kılabilirsin.</div><h3 class="sub">2.4 Kit&#x27;i Plugin Marketplace Olarak Paketleme [Local Sim]</h3><p>Şimdi tüm bu bileşenleri bir plugin marketplace yapısına dönüştürüyoruz. Bu yapı sayesinde kit başka projelere ve takım üyelerine dağıtılabilir.</p><ol><li>Marketplace root&#x27;unda .claude-plugin/ dizinini oluştur:
+mkdir -p .claude-plugin</li><li>marketplace.json dosyasını oluştur (aşağıdaki örneği kullan)</li><li>Plugin manifest&#x27;ini oluştur:
+plugins/team-starter-kit/.claude-plugin/plugin.json</li><li>Claude Code oturumunda validate et:
+/plugin validate .</li><li>Marketplace&#x27;i ekle ve plugin&#x27;i kur:
+/plugin marketplace add ./
+/plugin install team-starter-kit@team-tools</li></ol><pre><code>// .claude-plugin/marketplace.json
+{
+  &quot;name&quot;: &quot;team-tools&quot;,
+  &quot;owner&quot;: {
+    &quot;name&quot;: &quot;Orion TR Engineering&quot;
+  },
+  &quot;description&quot;: &quot;Enterprise team starter kit — agents, skills, hooks&quot;,
+  &quot;plugins&quot;: [
+    {
+      &quot;name&quot;: &quot;team-starter-kit&quot;,
+      &quot;source&quot;: &quot;./plugins/team-starter-kit&quot;,
+      &quot;description&quot;: &quot;Standard agents, skills, hooks and commands for team projects&quot;,
+      &quot;version&quot;: &quot;1.0.0&quot;
+    }
+  ]
+}</code></pre><pre><code>// plugins/team-starter-kit/.claude-plugin/plugin.json
+{
+  &quot;name&quot;: &quot;team-starter-kit&quot;,
+  &quot;description&quot;: &quot;Enterprise starter kit: security-reviewer, test-writer, documenter agents + project-setup, deployment-checklist skills + hooks&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;
+}</code></pre><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>plugin.json dosyası plugins/team-starter-kit/.claude-plugin/plugin.json path&#x27;inde olmalıdır — doğrudan plugin kökünde değil. Bu, resmi docs walkthrough&#x27;undaki standart yapıdır. Yanlış path plugin&#x27;in tanınmamasına neden olur.</div><div class="callout tip"><span class="lbl">💡 İpucu</span>CLI tarafında claude plugin marketplace add ve claude plugin install komutları da kullanılabilir (otomasyon ve CI senaryoları için). Eğitim pratiklerinde session-içi /plugin ... slash komutları daha doğal ve interaktiftir.</div><h3 class="sub">2.5 Managed Settings Simülasyonu [Local Sim]</h3><p>Gerçek server-managed settings Team/Enterprise gerektirir. Ama lokal olarak aynı JSON yapısını .claude/settings.json veya settings.local.json&#x27;a yazarak policy kararlarını simüle edebilirsin. Ayrıca examples/ dizinine enterprise-ready sample&#x27;lar ekleyeceğiz.</p><ol><li>examples/ dizini oluştur ve 3 sample dosya yaz:
+- managed-settings.sample.json (model allowlist + sandbox policy)
+- managed-mcp.sample.json (fixed MCP server set)
+- sandbox-policy.sample.json (sandboxed bash config)</li><li>.claude/settings.json&#x27;a model ve sandbox ayarı ekle:
+{ &quot;model&quot;: &quot;sonnet&quot;, &quot;sandbox&quot;: { &quot;autoApprove&quot;: true } }</li><li>/status ile hangi settings source&#x27;ların aktif olduğunu doğrula.</li><li>/sandbox ile sandbox durumunu kontrol et — Dependencies, Overrides ve Config panellerini incele.</li></ol><pre><code>// examples/managed-settings.sample.json
+// NOT: Bu örnek gerçek deploy için managed settings altyapısı gerektirir.
+// Lokal simülasyonda .claude/settings.json&#x27;a yazabilirsiniz.
+{
+  &quot;availableModels&quot;: [&quot;sonnet&quot;, &quot;opus&quot;, &quot;haiku&quot;],
+  &quot;enforceAvailableModels&quot;: true,
+  &quot;model&quot;: &quot;sonnet&quot;,
+  &quot;sandbox&quot;: {
+    &quot;autoApprove&quot;: true,
+    &quot;allow&quot;: {
+      &quot;allowedDomains&quot;: [&quot;github.com&quot;, &quot;registry.npmjs.org&quot;]
+    }
+  },
+  &quot;allowManagedHooksOnly&quot;: true
+}</code></pre><pre><code>// examples/managed-mcp.sample.json
+// NOT: Bu dosya gerçek ortamda sistem path&#x27;ine admin yetkisiyle deploy edilir.
+// Server-managed settings ile dağıtılamaz. Burada yalnızca yapıyı gösteriyoruz.
+{
+  &quot;mcpServers&quot;: {
+    &quot;approved-github&quot;: {
+      &quot;command&quot;: &quot;npx&quot;,
+      &quot;args&quot;: [&quot;-y&quot;, &quot;@anthropic/mcp-github&quot;]
+    },
+    &quot;company-jira&quot;: {
+      &quot;command&quot;: &quot;npx&quot;,
+      &quot;args&quot;: [&quot;-y&quot;, &quot;@company/mcp-jira&quot;]
+    }
+  }
+}</code></pre><div class="callout kp"><span class="lbl">🔑 Önemli</span>managed-mcp.sample.json bir Ops/Admin artifact&#x27;idir — öğrenciden bunu gerçekten deploy etmesi beklenmez. Amacı yapıyı öğrenmek ve managed-mcp.json ile allowedMcpServers farkını anlamaktır.</div><h3 class="sub">2.6 Maliyet Raporu: /usage Okuma ve Strateji [Local Sim]</h3><p>Günün pratik bölümünü maliyet farkındalığı ile kapatıyoruz.</p><ol><li>/usage çalıştır — oturum maliyetini, API süresini, kod değişiklik satırlarını gör.</li><li>d (day) ve w (week) ile dönem değiştir — son 24 saat ve son 7 günlük breakdown&#x27;ı karşılaştır.</li><li>Breakdown bölümünde hangi skill, subagent, plugin veya MCP server&#x27;ın en çok token tükettiğini belirle.</li><li>Takımın için bir model/effort strateji kararı yaz:
+- Default model ne olmalı?
+- Hangi görevlerde Opus/Fable gerekli?
+- Effort level policy ne olmalı?
+- Estimated monthly cost per developer?</li></ol><div class="callout warn"><span class="lbl">⚠️ Dikkat</span>/usage içindeki dolar değeri bu cihazdaki lokal tahmindir. Farklı cihazlardaki veya claude.ai web kullanımı dahil değildir. Authoritative billing için Console Usage (API) veya cloud provider billing dashboard&#x27;una bakılmalıdır.</div><h2 class="sec"><span class="k">BÖLÜM 3</span>PRATİK — DERİNLEŞ / UYGULAMA</h2><h3 class="sub">3.1 Onboarding Guide ve Rollout Checklist [Local Sim]</h3><p>Enterprise rollout&#x27;un en kritik noktalarından biri: yeni takım üyesi ilk gününde ne yapacak? Aşağıdaki adımlarla bir ONBOARDING.md ve ROLLOUT-CHECKLIST.md yazacaksın.</p><ol><li>Claude Code&#x27;a şu prompt&#x27;u ver:
+&#x27;Yeni bir takım üyesi için Claude Code onboarding rehberi yaz. Adımlar: (1) Kurulum, (2) Kimlik doğrulama, (3) Team starter kit kurulumu, (4) İlk session — kit&#x27;teki security-reviewer ile bir kod taraması, (5) /usage ile maliyet farkındalığı. Format: ONBOARDING.md&#x27;</li><li>Ardından bir ROLLOUT-CHECKLIST.md yazdır — admin perspektifinden:
+□ Managed settings hazırlandı mı?
+□ Model allowlist tanımlandı mı?
+□ Sandbox policy belirlendi mi?
+□ MCP server set onaylandı mı?
+□ Starter kit marketplace&#x27;e publish edildi mi?
+□ Analytics dashboard erişimi açıldı mı?
+□ Onboarding guide hazır mı?</li><li>Her iki dosyayı starter kit repo&#x27;sunun kök dizinine koy.</li></ol><h3 class="sub">3.2 Sandbox Stratejisi Karar Ağacı</h3><p>Farklı senaryolar farklı izolasyon katmanları gerektirir. Aşağıdaki karar ağacını kullanarak kendi ortamın için doğru sandbox stratejisini belirle:</p><table><thead><tr><th>Senaryo</th><th>Önerilen İzolasyon</th><th>Neden</th></tr></thead><tbody><tr><td>Bireysel geliştirici, güvenilir codebase</td><td>Sandboxed Bash (built-in) + auto mode</td><td>Düşük overhead, yeterli Bash izolasyonu, auto mode classifier ile akıllı onay</td></tr><tr><td>Takım, standart projeler</td><td>Sandboxed Bash + permission allowlists</td><td>Ortak ground; ekstra MCP/file tool izolasyonu gerekmez</td></tr><tr><td>CI/CD pipeline, otonom agent</td><td>Sandbox runtime veya Docker (--network none)</td><td>Unattended çalışma; tüm sürecin izole olması şart</td></tr><tr><td>Untrusted code evaluation</td><td>VM veya Firecracker microVM</td><td>Kernel-level izolasyon; container escape riskini sıfırlar</td></tr><tr><td>Regulated industry (finans, sağlık)</td><td>VM + gateway + ZDR + audit logging</td><td>Compliance gereksinimleri; her katmanda kontrol</td></tr></tbody></table><ol><li>SaaS Dashboard projesinde /sandbox çalıştır ve mevcut sandbox durumunu incele.</li><li>Sandboxed Bash&#x27;i etkinleştir (eğer aktif değilse): /sandbox panelinde &#x27;Enable&#x27; seç.</li><li>Basit bir test: sandbox aktifken &#x27;curl https://example.com&#x27; komutunu dene — allowedDomains listesine göre geçer veya engellenir.</li><li>Kendi projen için yukarıdaki karar tablosundan uygun izolasyon katmanını seç ve gerekçesini not et.</li></ol><h3 class="sub">3.3 Enterprise Challenge: Kit&#x27;i Yayınla ve Doğrula</h3><p>Günün final challenge&#x27;ı: ürettiğin tüm deliverable&#x27;ları bir arada test et.</p><ol><li>README.md yaz: kit&#x27;in ne içerdiği, nasıl kurulacağı, hangi bileşenlerin ne yaptığı. Claude Code&#x27;a yazdır.</li><li>Kit&#x27;i lokal marketplace olarak doğrula:
+/plugin validate .
+Hata varsa düzelt.</li><li>Starter kit marketplace&#x27;i ekle:
+/plugin marketplace add ./team-claude-code-starter-kit</li><li>Plugin&#x27;i kur:
+/plugin install team-starter-kit@team-tools</li><li>Yeni bir test projesi oluştur (mkdir test-project &amp;&amp; cd test-project &amp;&amp; git init) ve kit&#x27;in agent&#x27;larını, skill&#x27;lerini ve hook&#x27;larını bu projede test et.</li><li>ROLLOUT-CHECKLIST.md&#x27;yi aç ve her maddeyi (lokal simülasyon kapsamında) kontrol et.</li></ol><h2 class="sec"><span class="k">KÜTÜPHANE</span>🧰 Prompt & Şablon Kütüphanesi</h2><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Enterprise CLAUDE.md Şablonu</div><pre><code>Bu proje için enterprise-grade bir CLAUDE.md şablonu oluştur. Şablonda şunlar olsun: proje metadatası (placeholder), coding standards, security policy, model/effort guidance (default: sonnet, high; review: opus), yasaklı eylemler. Toplam 2000-2500 karakter.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Security Reviewer Agent</div><pre><code>.claude/agents/security-reviewer.md oluştur. Frontmatter: name: security-reviewer, description: Güvenlik açıkları için kod inceler, tools: Read Grep Glob Bash, model: opus, effort: high. System prompt: Kıdemli güvenlik mühendisi — injection, auth, secrets, data handling.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Deployment Checklist Skill</div><pre><code>.claude/skills/deployment-checklist/SKILL.md oluştur. Frontmatter: description: Deploy öncesi kontrol listesi. İçerik: test suite geçiyor mu, lint temiz mi, env variables tanımlı mı, secrets güvende mi, migration çalıştırıldı mı, rollback planı var mı.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Maliyet Strateji Raporu</div><pre><code>/usage çıktımı analiz et. Şu soruları yanıtla: (1) En çok token tüketen bileşen hangisi? (2) Model/effort kombinasyonu optimal mi? (3) Takımım için aylık tahmini maliyet ne olur? (4) Hangi optimizasyonları önerirsin?</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Plugin Marketplace Oluştur</div><pre><code>team-claude-code-starter-kit/ dizinindeki bileşenleri bir plugin marketplace olarak paketle. marketplace.json ve plugin.json oluştur. /plugin validate ile doğrula. Hata varsa düzelt.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Onboarding Rehberi</div><pre><code>Yeni bir takım üyesi için Claude Code onboarding rehberi yaz (ONBOARDING.md). Adımlar: kurulum, auth, starter kit kurulumu, ilk session (security-reviewer ile kod taraması), /usage ile maliyet farkındalığı.</code></pre></div><h2 class="sec"><span class="k">CHALLENGE</span>🏆 Günün Challenge'ı</h2><div class="challenge"><h3>Enterprise Team Starter Kit — Paketleme ve Doğrulama</h3><p>Bugün oluşturduğun tüm bileşenleri (CLAUDE.md şablonu, 3 agent, 2 skill, 3 command, 2 hook) bir plugin marketplace olarak paketle, lokal olarak yayınla, yeni bir projede kur ve çalıştığını doğrula.</p><p><strong>Gereksinimler:</strong></p><ul><li>marketplace.json ve plugin.json doğru path&#x27;lerde ve /plugin validate ile hatasız</li><li>/plugin marketplace add ve /plugin install ile başarıyla kurulabilir</li><li>Yeni bir projede en az 1 agent çağrılabiliyor, 1 skill tetiklenebiliyor, 1 hook çalışıyor</li><li>README.md kurulum talimatlarını içeriyor</li><li>ONBOARDING.md yeni üye rehberi olarak hazır</li><li>ROLLOUT-CHECKLIST.md admin perspektifinden doldurulmuş</li></ul><p><strong>Başarı Kriterleri:</strong></p><ul class="checks"><li><label><input type="checkbox" data-k="succ0"><span>Plugin validate hatasız geçiyor</span></label></li><li><label><input type="checkbox" data-k="succ1"><span>Başka projede kit kuruldu ve agent/skill/hook çalıştı</span></label></li><li><label><input type="checkbox" data-k="succ2"><span>README, ONBOARDING ve ROLLOUT-CHECKLIST tamamlandı</span></label></li></ul></div><div class="solution"><h3 class="sub">✅ Çözüm Rehberi</h3><p>Challenge tek seferde değil, adım adım çözülmelidir. Deliverable yapısı bu gün boyunca Bölüm 2&#x27;de oluşturulmuştur; şimdi son doğrulamayı yapıyoruz.</p><p><strong>Önerilen prompt zinciri:</strong></p><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Yapıyı Kontrol Et</div><pre><code>team-claude-code-starter-kit/ dizininin yapısını göster. Şu dosyaların var olduğunu doğrula: .claude-plugin/marketplace.json, plugins/team-starter-kit/.claude-plugin/plugin.json, plugins/team-starter-kit/agents/ (3 dosya), plugins/team-starter-kit/skills/ (2 dizin), plugins/team-starter-kit/hooks/ (2 dosya), plugins/team-starter-kit/commands/ (3 dosya), README.md, ONBOARDING.md, ROLLOUT-CHECKLIST.md</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Validate ve Kur</div><pre><code>/plugin validate . çalıştır. Hata varsa düzelt. Sonra /plugin marketplace add ./ ve /plugin install team-starter-kit@team-tools ile kur.</code></pre></div><div class="prompt"><button class="copybtn">kopyala</button><div class="pt">Yeni Projede Test</div><pre><code>Yeni bir dizin oluştur (test-enterprise-project), git init yap, kit&#x27;in security-reviewer agent&#x27;ını çağır, deployment-checklist skill&#x27;ini tetikle, bir Bash komutu ile hook&#x27;un çalışıp çalışmadığını test et.</code></pre></div><p><strong>Kontrol noktaları:</strong></p><ul><li>plugin.json path&#x27;i plugins/team-starter-kit/.claude-plugin/plugin.json olmalıdır — doğrudan plugin kökünde değil</li><li>marketplace.json&#x27;daki plugin name ile plugin.json&#x27;daki name aynı olmalı</li><li>Hook&#x27;ları test ederken kasıtlı olarak &#x27;rm -rf /&#x27; gibi bir komut yazmayı dene — hook engellerse başarılı</li><li>/plugin validate hata veriyorsa JSON syntax&#x27;ını ve path&#x27;leri kontrol et</li></ul><p><strong>Sık yapılan hatalar:</strong></p><ul><li>⚠️ plugin.json&#x27;ı yanlış path&#x27;e koymak (plugin kökü vs .claude-plugin/ altı) — en sık yapılan hata</li><li>⚠️ marketplace.json&#x27;daki version ile plugin.json&#x27;daki version&#x27;ı farklı yazmak — plugin.json her zaman önceliklidir</li><li>⚠️ Hook exit code&#x27;unu yanlış kullanmak: 0 = izin ver, 2 = engelle. 1 veya başka kod = hook hatası ama komut engellenmez</li><li>⚠️ Managed-mcp.json&#x27;ı .claude/settings.json&#x27;a yazmaya çalışmak — bu dosya ayrı bir mekanizmadır ve sistem path&#x27;ine deploy edilir</li></ul></div><h2 class="sec"><span class="k">ÖZET</span>📌 Takeaway'ler</h2><ol><li>Enterprise Claude Code yönetişimi dört eksende döner: politika (managed settings), güvenlik (sandbox + MCP), maliyet (model/effort + observability) ve onboarding (kit + rehber)</li><li>Settings precedence: Managed &gt; CLI args &gt; local &gt; project &gt; user. Server-managed settings client-side kontroldür; hard security boundary için sandbox ve managed MCP ile birleştirilmelidir</li><li>Built-in sandboxed Bash yalnızca Bash komutlarını izole eder — file tools, MCP server&#x27;lar ve hooks aynı sınırda değildir. Tam süreç izolasyonu için container veya VM gerekir</li><li>managed-mcp.json exclusive bir deploy aracıdır (admin yetkisi gerektirir, server-managed settings ile dağıtılamaz); allowedMcpServers/deniedMcpServers ise settings katmanlarında tanımlanabilen policy filtering kurallarıdır</li><li>/usage lokal tahmindir, authoritative billing değildir. Maliyet gözlemlenebilirliği katmanlıdır: /usage → Console → Analytics → OTel → Gateway</li><li><code>availableModels</code> managed source tarafından set edildiğinde kullanıcı/proje scope&#x27;u genişletemez — &#x27;settings&#x27;e model ekleyerek kısıtlamayı bypass ederim&#x27; yanılgısından kaçın</li><li>ZDR standart Enterprise&#x27;da otomatik değildir; per-org etkinleştirme gerektirir. Team/Enterprise/API planlarında kod ve prompt&#x27;lar model eğitiminde kullanılmaz</li><li>Team starter kit (CLAUDE.md + agents + skills + hooks → plugin marketplace) enterprise standardizasyonun temel deliverable&#x27;ıdır; olgunluk seviyesi arttıkça managed settings, OTel ve gateway katmanları eklenir</li></ol><h2 class="sec"><span class="k">KAYNAKLAR</span>📚 Ekstra Okuma</h2><p><strong>Resmi Dokümantasyon (⭐ zorunlu):</strong></p><ul><li>⭐ <a href="https://code.claude.com/docs/en/admin-setup" target="_blank" rel="noopener">Set up Claude Code for your organization — admin karar haritası, managed settings, policy enforcement, monitoring seçenekleri</a></li><li>⭐ <a href="https://code.claude.com/docs/en/server-managed-settings" target="_blank" rel="noopener">Configure server-managed settings — remote delivery, hourly poll, tolerant parsing, cache mekanizması</a></li><li>⭐ <a href="https://code.claude.com/docs/en/sandbox-environments" target="_blank" rel="noopener">Choose a sandbox environment — isolation spectrum karşılaştırması: built-in sandbox, sandbox runtime, dev container, Docker, VM</a></li><li>⭐ <a href="https://code.claude.com/docs/en/sandboxing" target="_blank" rel="noopener">Configure the sandboxed Bash tool — filesystem/network izolasyon, allowWrite, allowedDomains, admin enforcement</a></li><li>⭐ <a href="https://code.claude.com/docs/en/managed-mcp" target="_blank" rel="noopener">Control MCP server access — managed-mcp.json, allowedMcpServers, deniedMcpServers ve enterprise MCP stratejisi</a></li><li>⭐ <a href="https://code.claude.com/docs/en/costs" target="_blank" rel="noopener">Manage costs effectively — /usage, spend limits, token azaltma stratejileri, takım TPM önerileri</a></li><li>⭐ <a href="https://code.claude.com/docs/en/analytics" target="_blank" rel="noopener">Track team usage with analytics — dashboard, GitHub contribution metrics, data export</a></li><li>⭐ <a href="https://code.claude.com/docs/en/data-usage" target="_blank" rel="noopener">Data usage — retention politikaları, ZDR, telemetry opt-out, Claude Code on Web veri akışı</a></li><li>⭐ <a href="https://code.claude.com/docs/en/monitoring-usage" target="_blank" rel="noopener">Monitoring — OpenTelemetry export, per-skill/agent/plugin cost attribution, OTEL_LOG_TOOL_CONTENT</a></li><li>⭐ <a href="https://code.claude.com/docs/en/plugin-marketplaces" target="_blank" rel="noopener">Create and distribute a plugin marketplace — marketplace.json, plugin.json, validate, host ve distribute akışı</a></li></ul><p><strong>Topluluk (önerilen):</strong></p><ul><li><a href="https://www.anthropic.com/engineering/claude-code-best-practices" target="_blank" rel="noopener">Claude Code Best Practices (Anthropic Engineering) — enterprise patterns, context yönetimi, subagent delegasyonu</a></li></ul><p><strong>Ek kaynaklar:</strong></p><ul><li><a href="https://code.claude.com/docs/en/agent-sdk/secure-deployment" target="_blank" rel="noopener">Securely deploying AI agents — isolation, credential management, network controls için derinlemesine güvenlik rehberi</a></li></ul><div class="callout tip"><span class="lbl">Yarın (Gün 20)</span>Yarın (Gün 20) eğitimin final projesi: Mikro-servis mimarisinde enterprise capstone. Agent Teams ve Dynamic Workflows ile paralel geliştirme, tüm kit/plugin/hook&#x27;ları canlı projede uygulama, Artifacts ile sonucu paylaşma ve kendi Claude Code Playbook&#x27;unu yazma.</div><h2 class="sec"><span class="k">SELF-ASSESSMENT</span>☑️ Kontrol Listesi</h2><p>Günü tamamlamadan önce hepsini işaretle — ilerlemen üstteki çubuğa yansır.</p><ul class="checks"><li><label><input type="checkbox" data-k="final0" data-final="1"><span>Settings precedence sırasını (Managed &gt; CLI &gt; local &gt; project &gt; user) açıklayabiliyorum ve server-managed settings&#x27;in client-side control olduğunu, hard security boundary olmadığını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final1" data-final="1"><span><code>availableModels</code> ve <code>enforceAvailableModels</code> farkını açıklayabilirim; managed source&#x27;un bu listeyi kullanıcı/proje scope&#x27;undan genişletmeye izin vermediğini biliyorum</span></label></li><li><label><input type="checkbox" data-k="final2" data-final="1"><span>Sandbox spectrum&#x27;undaki 5 katmanı (sandboxed Bash → sandbox runtime → dev container → Docker → VM) ve her birinin neyi izole ettiğini / etmediğini biliyorum</span></label></li><li><label><input type="checkbox" data-k="final3" data-final="1"><span>Built-in sandbox&#x27;ın sadece Bash komutlarını sınırladığını; file tools, MCP ve hooks&#x27;un izole olmadığını biliyorum</span></label></li><li><label><input type="checkbox" data-k="final4" data-final="1"><span><code>managed-mcp.json</code> (fixed set, admin deploy) ile <code>allowedMcpServers</code> / <code>deniedMcpServers</code> (policy filtering, settings katmanları) farkını açıklayabilirim</span></label></li><li><label><input type="checkbox" data-k="final5" data-final="1"><span>ZDR&#x27;ın standart Enterprise&#x27;da otomatik olmadığını, per-org account team tarafından etkinleştirildiğini biliyorum</span></label></li><li><label><input type="checkbox" data-k="final6" data-final="1"><span>/usage ana komutunu çalıştırdım, breakdown&#x27;ı okudum; /cost ve /stats&#x27;ın alias olduğunu biliyorum; estimate vs authoritative billing ayrımını yapabiliyorum</span></label></li><li><label><input type="checkbox" data-k="final7" data-final="1"><span>Team starter kit oluşturdum: CLAUDE.md şablonu + 3 agent + 2 skill + 3 command + 2 hook</span></label></li><li><label><input type="checkbox" data-k="final8" data-final="1"><span>Kit&#x27;i plugin marketplace formatında paketledim (.claude-plugin/marketplace.json + plugins/.../\.claude-plugin/plugin.json) ve /plugin validate ile doğruladım</span></label></li><li><label><input type="checkbox" data-k="final9" data-final="1"><span>Kit&#x27;i /plugin marketplace add ve /plugin install ile kurdum; başka bir projede agent/skill/hook çalıştığını test ettim</span></label></li><li><label><input type="checkbox" data-k="final10" data-final="1"><span>ONBOARDING.md ve ROLLOUT-CHECKLIST.md yazdım</span></label></li><li><label><input type="checkbox" data-k="final11" data-final="1"><span>Enterprise anti-pattern&#x27;leri (büyük CLAUDE.md, sandbox&#x27;suz bypass, tek model herkes için, denetimsiz MCP) listeleyebilir ve çözüm önerebilirim</span></label></li></ul><div class="pager"><a href="gun18-cicd-routines-otomasyon.html"><div class="dir">← Önceki</div><div class="tt">Gün 18</div><div>CI/CD, Routines ve Otomasyon</div></a><a class="next" href="gun20-capstone-mikroservis.html"><div class="dir">Sonraki →</div><div class="tt">Gün 20</div><div>Capstone: Enterprise Mikro-Servis Projesi</div></a></div><div class="foot">Claude Code Master Eğitim Programı · Gün 19/20 · Temmuz 2026</div></article></div>
+</div>
+<script>window.__CCEDU_DAY__=19;</script>
+<script>
+(function(){
+  var day = window.__CCEDU_DAY__ || 1;
+  var ns = "ccedu:v1:day" + day + ":";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  boxes.forEach(function(b){
+    try{ if(localStorage.getItem(ns + b.dataset.k) === "1") b.checked = true; }catch(e){}
+    b.addEventListener('change', function(){
+      try{ localStorage.setItem(ns + b.dataset.k, b.checked ? "1":"0"); }catch(e){}
+      update();
+    });
+  });
+  var finals = boxes.filter(function(b){ return b.dataset.final === "1"; });
+  var bar = document.querySelector('.topbar .prog>span');
+  var lab = document.querySelector('.topbar .proglabel');
+  function update(){
+    var done = finals.filter(function(b){return b.checked;}).length;
+    var pct = finals.length ? Math.round(done*100/finals.length) : 0;
+    if(bar) bar.style.width = pct + "%";
+    if(lab) lab.textContent = "Gün " + day + " · %" + pct;
+    try{ localStorage.setItem("ccedu:v1:dayDone:"+day, (finals.length && done===finals.length)?"1":"0"); }catch(e){}
+  }
+  update();
+  document.querySelectorAll('.copybtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      if(!pre) return;
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var t = btn.textContent; btn.textContent = "kopyalandı ✓";
+        setTimeout(function(){ btn.textContent = t; }, 1400);
+      });
+    });
+  });
+  var mb = document.querySelector('.menu-btn'), scrim = document.querySelector('.scrim');
+  if(mb) mb.addEventListener('click', function(){ document.body.classList.toggle('nav-open'); });
+  if(scrim) scrim.addEventListener('click', function(){ document.body.classList.remove('nav-open'); });
+})();
+</script>
+</body>
+</html>
