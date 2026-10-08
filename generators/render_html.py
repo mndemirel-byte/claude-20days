@@ -18,6 +18,20 @@ def _inline(s):
     return s
 
 
+def _step(s):
+    """Adım metni; ``` ile çevrili bölümler pre-formatted kod bloğu olur."""
+    parts = s.split("```")
+    if len(parts) < 3:
+        return _inline(s)
+    out = []
+    for i, part in enumerate(parts):
+        if i % 2:
+            out.append(f"<pre><code>{esc(part.strip(chr(10)))}</code></pre>")
+        elif part.strip():
+            out.append(_inline(part.strip()))
+    return "".join(out)
+
+
 def _block(b):
     t = b["t"]
     if t == "h":
@@ -32,7 +46,7 @@ def _block(b):
         items = "".join(f"<li>{_inline(i)}</li>" for i in b["items"])
         return f"<ul>{items}</ul>"
     if t == "steps":
-        items = "".join(f"<li>{_inline(i)}</li>" for i in b["items"])
+        items = "".join(f"<li>{_step(i)}</li>" for i in b["items"])
         return f"<ol>{items}</ol>"
     if t == "code":
         return f'<pre><code>{esc(b["text"])}</code></pre>'

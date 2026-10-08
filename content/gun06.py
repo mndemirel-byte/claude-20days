@@ -621,17 +621,17 @@ LESSON = {
                     ),
                 },
             ],
-            "notes": (
-                "Temel frontmatter alanları: name (skill adı, /name ile çağrılır), "
-                "description (Claude'un otomatik tetikleme kararında kullandığı metin), "
-                "argument-hint (kullanıcıya gösterilen parametre ipucu), "
-                "disable-model-invocation (true ise Claude otomatik tetiklemez), "
-                "allowed-tools (onaysız kullanım izni — tool'u kaldırmaz), "
-                "disallowed-tools (tool'u tamamen engeller — onay atlamaz, kaldırır). "
-                "commit skill'inde disable-model-invocation: true önemli çünkü commit "
+            "notes": [
+                "Temel frontmatter alanları: `name` (skill adı, /name ile çağrılır), "
+                "`description` (Claude'un otomatik tetikleme kararında kullandığı metin), "
+                "`argument-hint` (kullanıcıya gösterilen parametre ipucu), "
+                "`disable-model-invocation` (true ise Claude otomatik tetiklemez), "
+                "`allowed-tools` (onaysız kullanım izni — tool'u kaldırmaz), "
+                "`disallowed-tools` (tool'u tamamen engeller — onay atlamaz, kaldırır).",
+                "commit skill'inde `disable-model-invocation: true` önemli: commit "
                 "state-changing bir işlem — Claude'un 'yardımcı olmak için' otomatik commit "
-                "atmasını istemezsin."
-            ),
+                "atmasını istemezsin.",
+            ],
             "pitfalls": [
                 "⚠️ SKILL.md'yi değiştirip /reload-skills çalıştırmayı unutma — eski versiyon yüklenmiş kalır.",
                 "⚠️ allowed-tools: [\"Bash\"] çok geniş bir izindir. Production'da daha dar izinler kullan.",
