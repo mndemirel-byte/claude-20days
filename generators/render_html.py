@@ -171,6 +171,10 @@ def render(L, built_days=None):
         def _note(n):
             if "\n" in n:  # çok satırlı not: ilk satır etiket, kalanı pre-formatted blok
                 first, rest = n.split("\n", 1)
+                lines = rest.split("\n")
+                if all(l.startswith("- ") for l in lines):  # alt madde listesi
+                    sub = "".join(f"<li>{_inline(l[2:])}</li>" for l in lines)
+                    return f"<li>{_inline(first)}<ul>{sub}</ul></li>"
                 return f"<li>{_inline(first)}<pre><code>{esc(rest)}</code></pre></li>"
             return f"<li>{_inline(n)}</li>"
         a("<p><strong>Kontrol noktaları:</strong></p><ul>" +
